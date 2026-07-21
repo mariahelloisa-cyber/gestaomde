@@ -1,0 +1,1 @@
+CREATE POLICY "Admins atualizam cargo de outros" ON public.perfis_usuarios FOR UPDATE TO authenticated USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));

@@ -1,0 +1,1 @@
+ALTER TYPE public.status_tarefa ADD VALUE IF NOT EXISTS 'Em Análise' BEFORE 'Concluído';
