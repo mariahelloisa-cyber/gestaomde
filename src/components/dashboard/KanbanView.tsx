@@ -149,7 +149,7 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
                 />
               ))}
               {list.length === 0 && (
-                <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border/60 py-8 text-xs text-muted-foreground">
+                <div className="flex shrink-0 flex-col items-center gap-2 rounded-lg border border-dashed border-border/60 py-8 text-xs text-muted-foreground">
                   <Icon className="h-5 w-5 opacity-40" />
                   Arraste tarefas aqui
                 </div>
@@ -186,7 +186,7 @@ function CardTarefa({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onOpen}
-      className="task-surface group cursor-grab overflow-hidden rounded-md border border-border p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
+      className="task-surface group shrink-0 cursor-grab overflow-hidden rounded-md border border-border p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
     >
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
         <span
