@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getEmailSettings, sendEmail, logEmail, msgConvite } from "./email.server";
 
-const SITE_URL = "https://gestaomde.lovable.app";
+const SITE_URL = "https://xn--gestomde-uza.tec.br";
 
 /* ---------------- Helpers ---------------- */
 
