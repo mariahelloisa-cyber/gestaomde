@@ -20,14 +20,26 @@ function AuthenticatedLayout() {
       return;
     }
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("perfis_usuarios")
-        .select("id")
+        .select("id, status")
         .eq("id", user.id)
         .maybeSingle();
+
+      if (error) {
+        // Falha inesperada na consulta (ex.: coluna "status" ainda não migrada
+        // no banco) — não bloqueia o acesso, só ignora a checagem de status.
+        console.error(error);
+        setChecking(false);
+        return;
+      }
       if (!data) {
         await supabase.auth.signOut();
         toast.error("Acesso negado: Você precisa de um convite da agência para acessar este espaço.");
+        navigate({ to: "/login", replace: true });
+      } else if (data.status === "inativo") {
+        await supabase.auth.signOut();
+        toast.error("Sua conta foi desativada. Fale com um administrador da agência.");
         navigate({ to: "/login", replace: true });
       } else {
         setChecking(false);

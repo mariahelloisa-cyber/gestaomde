@@ -56,6 +56,59 @@ export type Database = {
         }
         Relationships: []
       }
+      pastas_links: {
+        Row: {
+          comentario: string | null
+          criado_em: string
+          criado_por: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          comentario?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          comentario?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
+      pastas_links_itens: {
+        Row: {
+          criado_em: string
+          id: string
+          pasta_id: string
+          url: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          pasta_id: string
+          url: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          pasta_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pastas_links_itens_pasta_id_fkey"
+            columns: ["pasta_id"]
+            isOneToOne: false
+            referencedRelation: "pastas_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comentarios_tarefa: {
         Row: {
           conteudo: string
@@ -321,6 +374,7 @@ export type Database = {
           email: string
           id: string
           nome: string
+          status: string
         }
         Insert: {
           avatar_url?: string | null
@@ -330,6 +384,7 @@ export type Database = {
           email: string
           id: string
           nome: string
+          status?: string
         }
         Update: {
           avatar_url?: string | null
@@ -339,6 +394,7 @@ export type Database = {
           email?: string
           id?: string
           nome?: string
+          status?: string
         }
         Relationships: [
           {
@@ -493,7 +549,7 @@ export type Database = {
       plano_cliente: "Bronze" | "Prata" | "Ouro" | "Diamond"
       prioridade_tarefa: "Alta" | "Média" | "Baixa" | "Nenhuma"
       status_demanda: "pendente" | "aceita" | "recusada" | "transferida"
-      status_tarefa: "Pendente" | "Em Progresso" | "Concluído"
+      status_tarefa: "Pendente" | "Em Progresso" | "Em Análise" | "Concluído"
       tipo_item: "tarefa" | "lembrete"
     }
     CompositeTypes: {
@@ -627,7 +683,7 @@ export const Constants = {
       plano_cliente: ["Bronze", "Prata", "Ouro", "Diamond"],
       prioridade_tarefa: ["Alta", "Média", "Baixa", "Nenhuma"],
       status_demanda: ["pendente", "aceita", "recusada", "transferida"],
-      status_tarefa: ["Pendente", "Em Progresso", "Concluído"],
+      status_tarefa: ["Pendente", "Em Progresso", "Em Análise", "Concluído"],
       tipo_item: ["tarefa", "lembrete"],
     },
   },

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getEmailSettings, sendEmail, logEmail, msgConvite } from "./email.server";
 
 const SITE_URL = "https://xn--gestomde-uza.tec.br";
@@ -30,9 +31,11 @@ function toTimestamp(yyyymmdd: string | undefined | null): string | null {
   return new Date(`${yyyymmdd}T00:00:00.000Z`).toISOString();
 }
 
-/** Tolera valores de status legados que já não existem no enum (ex.: "Em Análise"). */
-function normalizeStatus(raw: string): "Pendente" | "Em Progresso" | "Concluído" {
-  return raw === "Pendente" || raw === "Em Progresso" || raw === "Concluído" ? raw : "Pendente";
+/** Tolera valores de status legados/inesperados que não existam mais no enum. */
+function normalizeStatus(raw: string): "Pendente" | "Em Progresso" | "Em Análise" | "Concluído" {
+  return raw === "Pendente" || raw === "Em Progresso" || raw === "Em Análise" || raw === "Concluído"
+    ? raw
+    : "Pendente";
 }
 
 /* ---------------- Read: full dashboard data ---------------- */
@@ -43,7 +46,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
 
     const [profilesRes, clientesRes, tarefasRes, respRes, comentariosRes, planosRes, transRes] = await Promise.all([
-      supabase.from("perfis_usuarios").select("id, nome, email, avatar_url, cargo, criado_em"),
+      supabase.from("perfis_usuarios").select("id, nome, email, avatar_url, cargo, status, criado_em"),
       supabase.from("clientes").select("id, nome_empresa, plano, endereco, documento, email, contrato_url, status").order("nome_empresa"),
       supabase
         .from("tarefas")
@@ -74,6 +77,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
       email: p.email,
       avatar_url: p.avatar_url ?? null,
       cargo: p.cargo as "Admin" | "Supervisor" | "Membro",
+      status: (p.status ?? "ativo") as "ativo" | "inativo",
       criado_em: p.criado_em,
     }));
     const memberByIniciais = new Map(membros.map((m) => [m.iniciais, m]));
@@ -186,7 +190,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
 const createSchema = z.object({
   cliente_id: z.string().uuid().nullable().optional(),
   titulo: z.string().min(1).max(500),
-  status: z.enum(["Pendente", "Em Progresso", "Concluído"]).default("Pendente"),
+  status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).default("Pendente"),
   prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).default("Nenhuma"),
   data_vencimento: z.string().optional(),
   descricao: z.string().max(5000).optional(),
@@ -200,6 +204,13 @@ export const createTarefa = createServerFn({ method: "POST" })
   .inputValidator((input) => createSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+
+    if (data.status === "Concluído") {
+      const { data: me } = await supabase.from("perfis_usuarios").select("cargo").eq("id", userId).maybeSingle();
+      if ((me?.cargo as string) !== "Admin") {
+        throw new Error("Apenas Admins podem marcar tarefas como concluídas.");
+      }
+    }
 
     const isLembrete = data.tipo === "lembrete";
     const insertPayload = {
@@ -230,7 +241,7 @@ const updateSchema = z.object({
   id: z.string().uuid(),
   patch: z.object({
     titulo: z.string().min(1).max(500).optional(),
-    status: z.enum(["Pendente", "Em Progresso", "Concluído"]).optional(),
+    status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).optional(),
     prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).optional(),
     data_vencimento: z.string().optional(),
     descricao: z.string().max(5000).optional(),
@@ -242,12 +253,19 @@ export const updateTarefa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => updateSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { id, patch } = data;
+
+    if (patch.status === "Concluído") {
+      const { data: me } = await supabase.from("perfis_usuarios").select("cargo").eq("id", userId).maybeSingle();
+      if ((me?.cargo as string) !== "Admin") {
+        throw new Error("Apenas Admins podem marcar tarefas como concluídas.");
+      }
+    }
 
     const dbPatch: Partial<{
       titulo: string;
-      status: "Pendente" | "Em Progresso" | "Concluído";
+      status: "Pendente" | "Em Progresso" | "Em Análise" | "Concluído";
       prioridade: "Alta" | "Média" | "Baixa" | "Nenhuma";
       descricao: string | null;
       data_vencimento: string | null;
@@ -329,6 +347,28 @@ export const getMyRole = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     return { cargo: (data?.cargo ?? "Membro") as "Admin" | "Supervisor" | "Membro", nome: data?.nome ?? "", email: data?.email ?? "" };
+  });
+
+/** Contexto do usuário logado para decidir se ele cai no portal do cliente ou no painel interno. */
+export const getMyPortalContext = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data, error } = await supabase
+      .from("perfis_usuarios")
+      .select("nome, email, cargo, cliente_id, clientes:cliente_id(nome_empresa, plano)")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const cli = data?.clientes as { nome_empresa: string; plano: string } | null;
+    return {
+      nome: data?.nome ?? "",
+      email: data?.email ?? "",
+      cargo: (data?.cargo ?? "Membro") as string,
+      cliente_id: data?.cliente_id ?? null,
+      cliente_nome: cli?.nome_empresa ?? null,
+      plano: cli?.plano ?? null,
+    };
   });
 
 export const createInvites = createServerFn({ method: "POST" })
@@ -413,6 +453,79 @@ export const updateMemberRole = createServerFn({ method: "POST" })
       .from("perfis_usuarios")
       .update({ cargo: data.cargo })
       .eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const setMemberStatusSchema = z.object({
+  user_id: z.string().uuid(),
+  status: z.enum(["ativo", "inativo"]),
+});
+
+/** Admin: ativa/inativa um membro. Inativo continua com histórico intacto, só perde acesso. */
+export const setMemberStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => setMemberStatusSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: me } = await supabase
+      .from("perfis_usuarios")
+      .select("cargo")
+      .eq("id", userId)
+      .maybeSingle();
+    if ((me?.cargo as string) !== "Admin") {
+      throw new Error("Apenas Admins podem inativar ou reativar membros.");
+    }
+    if (data.user_id === userId) {
+      throw new Error("Você não pode inativar sua própria conta.");
+    }
+
+    const { error } = await supabase
+      .from("perfis_usuarios")
+      .update({ status: data.status })
+      .eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const deleteMemberSchema = z.object({ user_id: z.string().uuid() });
+
+/** Admin: exclui a conta do membro por completo (auth.users cascateia perfil, tarefas atribuídas e comentários). */
+export const deleteMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => deleteMemberSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: me } = await supabase
+      .from("perfis_usuarios")
+      .select("cargo")
+      .eq("id", userId)
+      .maybeSingle();
+    if ((me?.cargo as string) !== "Admin") {
+      throw new Error("Apenas Admins podem excluir membros.");
+    }
+    if (data.user_id === userId) {
+      throw new Error("Você não pode excluir sua própria conta.");
+    }
+
+    const { data: alvo } = await supabase
+      .from("perfis_usuarios")
+      .select("cargo")
+      .eq("id", data.user_id)
+      .maybeSingle();
+    if (alvo?.cargo === "Admin") {
+      const { count } = await supabase
+        .from("perfis_usuarios")
+        .select("id", { count: "exact", head: true })
+        .eq("cargo", "Admin");
+      if ((count ?? 0) <= 1) {
+        throw new Error("Não é possível excluir o único Admin restante.");
+      }
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

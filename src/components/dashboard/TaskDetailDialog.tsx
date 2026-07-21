@@ -42,7 +42,7 @@ import {
 import { useTasks } from "@/lib/tasks-store";
 import { cn } from "@/lib/utils";
 
-const STATUSES: Status[] = ["Pendente", "Em Progresso", "Concluído"];
+const STATUSES: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
 const PRIORIDADES: Prioridade[] = ["Alta", "Média", "Baixa", "Nenhuma"];
 
 function relativo(iso: string): string {
@@ -58,9 +58,10 @@ function relativo(iso: string): string {
 }
 
 export function TaskDetailDialog() {
-  const { tarefas, clientes, selectedTaskId, closeTask, updateTarefa, addComentario, removerTarefa } = useTasks();
+  const { tarefas, clientes, selectedTaskId, closeTask, updateTarefa, addComentario, removerTarefa, myCargo } = useTasks();
   const tarefa = tarefas.find((t) => t.id === selectedTaskId) ?? null;
   const cliente = tarefa ? clientes.find((c) => c.id === tarefa.cliente_id) : null;
+  const isAdmin = myCargo === "Admin";
 
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -116,6 +117,7 @@ export function TaskDetailDialog() {
             <StatusDropdown
               status={tarefa.status}
               onChange={(s) => updateTarefa(tarefa.id, { status: s })}
+              isAdmin={isAdmin}
             />
           </div>
           <AlertDialog>
@@ -275,7 +277,8 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function StatusDropdown({ status, onChange }: { status: Status; onChange: (s: Status) => void }) {
+function StatusDropdown({ status, onChange, isAdmin }: { status: Status; onChange: (s: Status) => void; isAdmin: boolean }) {
+  const opcoes = isAdmin ? STATUSES : STATUSES.filter((s) => s !== "Concluído");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -288,7 +291,7 @@ function StatusDropdown({ status, onChange }: { status: Status; onChange: (s: St
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
-        {STATUSES.map((s) => (
+        {opcoes.map((s) => (
           <DropdownMenuItem key={s} onClick={() => onChange(s)} className="gap-2">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: statusCor[s] }} />
             <span className="flex-1">{s}</span>

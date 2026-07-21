@@ -20,6 +20,7 @@ function calcStatus(list: Tarefa[]) {
   const counts: Record<Status, number> = {
     Pendente: list.filter((t) => t.status === "Pendente").length,
     "Em Progresso": list.filter((t) => t.status === "Em Progresso").length,
+    "Em Análise": list.filter((t) => t.status === "Em Análise").length,
     "Concluído": list.filter((t) => t.status === "Concluído").length,
   };
   return {
@@ -28,6 +29,7 @@ function calcStatus(list: Tarefa[]) {
     pct: {
       Pendente: Math.round((counts.Pendente / total) * 100),
       "Em Progresso": Math.round((counts["Em Progresso"] / total) * 100),
+      "Em Análise": Math.round((counts["Em Análise"] / total) * 100),
       "Concluído": Math.round((counts["Concluído"] / total) * 100),
     },
   };
@@ -54,6 +56,7 @@ function calcPrazos(list: Tarefa[]) {
 const statusColors: Record<Status, string> = {
   Pendente: "#F59E0B",
   "Em Progresso": "#3B82F6",
+  "Em Análise": "#A855F7",
   "Concluído": "#22C55E",
 };
 
@@ -205,6 +208,7 @@ function ProgressoCard({ data }: { data: ReturnType<typeof calcStatus> }) {
           total={data.total}
           segments={[
             { color: statusColors["Concluído"], value: data.counts["Concluído"] },
+            { color: statusColors["Em Análise"], value: data.counts["Em Análise"] },
             { color: statusColors["Em Progresso"], value: data.counts["Em Progresso"] },
             { color: statusColors.Pendente, value: data.counts.Pendente },
           ]}
@@ -212,6 +216,7 @@ function ProgressoCard({ data }: { data: ReturnType<typeof calcStatus> }) {
         <Legend
           rows={[
             { color: statusColors["Concluído"], label: "Concluído", count: data.counts["Concluído"], pct: data.pct["Concluído"] },
+            { color: statusColors["Em Análise"], label: "Em Análise", count: data.counts["Em Análise"], pct: data.pct["Em Análise"] },
             { color: statusColors["Em Progresso"], label: "Em Progresso", count: data.counts["Em Progresso"], pct: data.pct["Em Progresso"] },
             { color: statusColors.Pendente, label: "Pendente", count: data.counts.Pendente, pct: data.pct.Pendente },
           ]}

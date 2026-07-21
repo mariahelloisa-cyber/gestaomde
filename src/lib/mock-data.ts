@@ -1,5 +1,5 @@
 export type Prioridade = "Alta" | "Média" | "Baixa" | "Nenhuma";
-export type Status = "Pendente" | "Em Progresso" | "Concluído";
+export type Status = "Pendente" | "Em Progresso" | "Em Análise" | "Concluído";
 export type TipoItem = "tarefa" | "lembrete";
 export type EscopoItem = "geral" | "pessoal";
 
@@ -101,6 +101,7 @@ export const prioridadeCor: Record<Prioridade, string> = {
 export const statusCor: Record<Status, string> = {
   Pendente: "#F59E0B",
   "Em Progresso": "#3B82F6",
+  "Em Análise": "#A855F7",
   "Concluído": "#22C55E",
 };
 

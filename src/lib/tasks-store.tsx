@@ -26,6 +26,7 @@ export interface Membro {
   email?: string;
   avatar_url?: string | null;
   cargo?: "Admin" | "Supervisor" | "Membro";
+  status?: "ativo" | "inativo";
   criado_em?: string;
 }
 
@@ -39,10 +40,9 @@ export type WorkspaceView =
   | { tipo: "financeiro" }
   | { tipo: "planos" }
   | { tipo: "clientes-inativos" }
-  | { tipo: "caminho-cliente" }
   | { tipo: "configuracoes" }
   | { tipo: "demandas" }
-  | { tipo: "gerenciar-treinamentos" }
+  | { tipo: "links" }
   | { tipo: "cliente"; clienteId: string };
 
 export type MainView = "Quadro" | "Calendário";

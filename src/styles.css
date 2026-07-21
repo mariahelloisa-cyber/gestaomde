@@ -218,7 +218,7 @@
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background-image: url("/__l5e/assets-v1/f5a58f37-4553-4cdc-ab84-24f466c27b85/mde-bg-v3.png");
+    background-image: url("./assets/logo-mde.png");
     background-repeat: no-repeat;
     background-position: center center;
     background-size: min(165vmin, 1680px);

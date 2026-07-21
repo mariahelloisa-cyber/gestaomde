@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Route as RouteIcon, Mail, Inbox, GraduationCap, Sun, Moon } from "lucide-react";
+import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Mail, Inbox, Link2, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/tasks-store";
 import { InviteDialog } from "./InviteDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/lib/theme";
-import logoMde from "@/assets/logo-mde.png.asset.json";
+import logoMde from "@/assets/logo-mde.png";
 
 export function PrimarySidebar() {
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -30,19 +30,17 @@ export function PrimarySidebar() {
                 ? "Planos"
                 : workspace.tipo === "clientes-inativos"
                   ? "Clientes inativos"
-                  : workspace.tipo === "caminho-cliente"
-                    ? "Caminho do cliente"
-                    : workspace.tipo === "configuracoes"
-                      ? "Configurações"
-                      : workspace.tipo === "dashboard"
-                    ? "Início"
-                    : workspace.tipo === "tarefas-gerais"
-                      ? "Tarefas"
-                      : workspace.tipo === "demandas"
-                        ? "Demandas"
-                      : workspace.tipo === "gerenciar-treinamentos"
-                        ? "Gerenciar Treinamentos"
-                      : "Minhas tarefas";
+                  : workspace.tipo === "configuracoes"
+                    ? "Configurações"
+                    : workspace.tipo === "dashboard"
+                  ? "Início"
+                  : workspace.tipo === "tarefas-gerais"
+                    ? "Tarefas"
+                    : workspace.tipo === "demandas"
+                      ? "Demandas"
+                      : workspace.tipo === "links"
+                        ? "Links"
+                    : "Minhas tarefas";
 
   const items: { icon: typeof Home; label: string; onClick: () => void }[] = [
     { icon: Home, label: "Início", onClick: () => { setWorkspace({ tipo: "dashboard" as const }); } },
@@ -74,7 +72,7 @@ export function PrimarySidebar() {
           {expanded && (
             <>
               <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-md bg-white">
-                <img src={logoMde.url} alt="Logo" className="h-6 w-6 object-contain" />
+                <img src={logoMde} alt="Logo" className="h-6 w-6 object-contain" />
               </div>
               <div className="flex-1 truncate text-sm font-medium">Painel</div>
               <ChevronDown className="h-4 w-4 text-sidebar-foreground/70" />
@@ -125,14 +123,6 @@ export function PrimarySidebar() {
             onClick={() => setWorkspace({ tipo: "clientes-inativos" })}
           />
 
-          <NavButton
-            icon={RouteIcon}
-            label="Caminho do cliente"
-            expanded={expanded}
-            active={active === "Caminho do cliente"}
-            onClick={() => setWorkspace({ tipo: "caminho-cliente" })}
-          />
-
           {isAdminLike && (
             <NavButton
               icon={Wallet}
@@ -151,6 +141,14 @@ export function PrimarySidebar() {
             onClick={() => setWorkspace({ tipo: "planos" })}
           />
 
+          <NavButton
+            icon={Link2}
+            label="Links"
+            expanded={expanded}
+            active={active === "Links"}
+            onClick={() => setWorkspace({ tipo: "links" })}
+          />
+
           {isAdminLike && (
             <NavButton
               icon={Mail}
@@ -158,16 +156,6 @@ export function PrimarySidebar() {
               expanded={expanded}
               active={active === "Configurações"}
               onClick={() => setWorkspace({ tipo: "configuracoes" })}
-            />
-          )}
-
-          {isAdminLike && (
-            <NavButton
-              icon={GraduationCap}
-              label="Gerenciar Treinamentos"
-              expanded={expanded}
-              active={active === "Gerenciar Treinamentos"}
-              onClick={() => setWorkspace({ tipo: "gerenciar-treinamentos" })}
             />
           )}
 

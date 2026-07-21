@@ -16,7 +16,7 @@ const DESCRICAO: Record<Cargo, string> = {
   Membro: "Pode acessar todos os itens públicos em seu Espaço de trabalho.",
   Admin: "Pode gerenciar membros, faturamento e configurações do Espaço.",
   Supervisor: "Acesso completo, igual ao Admin — gerencia tudo do Espaço.",
-  Cliente: "Acessa apenas o portal do cliente (boas-vindas e treinamentos do seu plano).",
+  Cliente: "Acessa apenas o portal do cliente (boas-vindas).",
 };
 
 export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {

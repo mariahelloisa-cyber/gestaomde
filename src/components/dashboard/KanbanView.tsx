@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowRight,
@@ -72,19 +73,27 @@ function isAtrasada(t: Tarefa): boolean {
 const colunas: { status: Status; label: string; icon: typeof Clock }[] = [
   { status: "Pendente", label: "Pendentes", icon: Clock },
   { status: "Em Progresso", label: "Em Andamento", icon: Clock },
+  { status: "Em Análise", label: "Em Análise", icon: Eye },
   { status: "Concluído", label: "Concluídas", icon: Check },
 ];
 
 export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: string; semCliente?: boolean } = {}) {
-  const { tarefas, updateTarefa, openTask, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter } = useTasks();
+  const { tarefas, updateTarefa, openTask, myId, myCargo, meuStatusFilter, geralStatusFilter, geralEmpresaFilter } = useTasks();
   const apenasMinhas = !semCliente && !clienteFilterId;
+  const isAdmin = myCargo === "Admin";
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // No escopo "geral" (semCliente) o filtro de empresa vem do contexto e pode
   // restringir a visão a um único cliente, mesmo sendo o escopo da agência inteira.
   const empresaEfetiva = semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
 
   const onDrop = (status: Status) => {
-    if (draggingId) updateTarefa(draggingId, { status });
+    if (!draggingId) return;
+    if (status === "Concluído" && !isAdmin) {
+      toast.error("Apenas Admins podem marcar tarefas como concluídas.");
+      setDraggingId(null);
+      return;
+    }
+    updateTarefa(draggingId, { status });
     setDraggingId(null);
   };
 
@@ -110,7 +119,9 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
         return (
           <div
             key={c.status}
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => {
+              if (c.status !== "Concluído" || isAdmin) e.preventDefault();
+            }}
             onDrop={() => onDrop(c.status)}
             className="flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-[var(--surface-2)]"
           >
@@ -134,7 +145,9 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-xs font-medium text-muted-foreground">{list.length}</span>
-                <AddTaskDialog defaultStatus={c.status} compact lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
+                {(c.status !== "Concluído" || isAdmin) && (
+                  <AddTaskDialog defaultStatus={c.status} compact lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
+                )}
               </div>
             </div>
 
@@ -154,7 +167,9 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
                   Arraste tarefas aqui
                 </div>
               )}
-              <AddTaskDialog defaultStatus={c.status} lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
+              {(c.status !== "Concluído" || isAdmin) && (
+                <AddTaskDialog defaultStatus={c.status} lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
+              )}
             </div>
           </div>
         );
@@ -517,7 +532,7 @@ function MetaCard({ label, children }: { label: string; children: React.ReactNod
 
 /* ---------------- Pílulas ---------------- */
 
-const STATUSES: Status[] = ["Pendente", "Em Progresso", "Concluído"];
+const STATUSES: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
 const PRIORIDADES: Prioridade[] = ["Alta", "Média", "Baixa", "Nenhuma"];
 
 function pillBase(active?: boolean) {

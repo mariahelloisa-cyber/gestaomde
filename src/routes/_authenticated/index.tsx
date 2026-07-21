@@ -14,12 +14,11 @@ import { MembersView } from "@/components/dashboard/MembersView";
 import { FinancialView } from "@/components/dashboard/FinancialView";
 import { PlansView } from "@/components/dashboard/PlansView";
 import { DashboardView } from "@/components/dashboard/DashboardView";
-import { ClientJourneyView } from "@/components/dashboard/ClientJourneyView";
 import { SystemSettingsView } from "@/components/dashboard/SystemSettingsView";
 import { DemandasView } from "@/components/dashboard/DemandasView";
-import { TreinamentosAdminView } from "@/components/dashboard/TreinamentosAdminView";
+import { LinksView } from "@/components/dashboard/LinksView";
 import { ClientPortal } from "@/components/portal/ClientPortal";
-import { getMyPortalContext } from "@/lib/treinamentos.functions";
+import { getMyPortalContext } from "@/lib/data.functions";
 import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -71,8 +70,7 @@ function WorkspaceContent() {
     !isAdminLike &&
     (workspace.tipo === "financeiro" ||
       workspace.tipo === "configuracoes" ||
-      workspace.tipo === "demandas" ||
-      workspace.tipo === "gerenciar-treinamentos");
+      workspace.tipo === "demandas");
 
   if (workspace.tipo === "dashboard") {
     return (
@@ -165,14 +163,6 @@ function WorkspaceContent() {
     );
   }
 
-  if (workspace.tipo === "caminho-cliente") {
-    return (
-      <div className="flex-1 overflow-hidden bg-[var(--surface-1)]">
-        <ClientJourneyView />
-      </div>
-    );
-  }
-
   if (workspace.tipo === "configuracoes") {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
@@ -189,10 +179,10 @@ function WorkspaceContent() {
     );
   }
 
-  if (workspace.tipo === "gerenciar-treinamentos") {
+  if (workspace.tipo === "links") {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
-        <TreinamentosAdminView />
+        <LinksView />
       </div>
     );
   }

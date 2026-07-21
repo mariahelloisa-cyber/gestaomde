@@ -69,7 +69,7 @@ export async function logEmail(params: {
   tarefa_id: string | null;
   usuario_id: string | null;
   destinatario: string | null;
-  tipo: "designacao" | "lembrete" | "expirado" | "teste" | "convite";
+  tipo: "designacao" | "lembrete" | "expirado" | "teste" | "convite" | "em_analise";
   assunto: string;
   mensagem: string;
   result: SendResult;
@@ -242,5 +242,43 @@ export function msgConvite(opts: ConviteInput) {
     "Para aceitar, crie sua conta usando este mesmo e-mail:",
     opts.signupUrl,
   ].join("\n");
+  return { assunto, html, text };
+}
+
+export type EmAnaliseInput = {
+  nome: string;
+  titulo: string;
+  cliente: string | null;
+  vencimento: string | null;
+  prioridade?: string;
+};
+
+export function msgEmAnalise(opts: EmAnaliseInput) {
+  const assunto = `Tarefa aguardando revisão: ${opts.titulo}`;
+  const items: Array<[string, string]> = [
+    ["Tarefa", opts.titulo],
+    ["Prioridade", opts.prioridade ?? "Nenhuma"],
+  ];
+  if (opts.cliente) items.push(["Cliente", opts.cliente]);
+  if (opts.vencimento) items.push(["Vencimento", formatDataBR(opts.vencimento)]);
+  const html = wrapHtml(
+    `Olá, ${opts.nome}!`,
+    "Uma tarefa foi movida para \"Em Análise\" e está aguardando sua revisão antes de ser marcada como concluída.",
+    items,
+    "Acesse o painel para revisar e, se estiver tudo certo, marcar como concluída.",
+  );
+  const text = [
+    `Olá, ${opts.nome}!`,
+    "",
+    "Uma tarefa foi movida para \"Em Análise\" e está aguardando sua revisão:",
+    `- ${opts.titulo}`,
+    opts.cliente ? `- Cliente: ${opts.cliente}` : null,
+    `- Prioridade: ${opts.prioridade ?? "Nenhuma"}`,
+    opts.vencimento ? `- Vencimento: ${formatDataBR(opts.vencimento)}` : null,
+    "",
+    "Acesse o painel para revisar e, se estiver tudo certo, marcar como concluída.",
+  ]
+    .filter(Boolean)
+    .join("\n");
   return { assunto, html, text };
 }

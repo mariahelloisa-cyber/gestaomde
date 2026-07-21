@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Shield, ShieldCheck, User, Mail, Clock, Building2 } from "lucide-react";
+import { Shield, ShieldCheck, User, Mail, Clock, Building2, Power, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/tasks-store";
-import { getMyRole, createInvites, updateMemberRole } from "@/lib/data.functions";
+import { getMyRole, createInvites, updateMemberRole, setMemberStatus, deleteMember } from "@/lib/data.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 interface ConvitePendente {
@@ -27,6 +39,8 @@ function MemberCard({
   m,
   canEditRole,
   onChangeRole,
+  onToggleStatus,
+  onDelete,
 }: {
   m: {
     id: string;
@@ -35,22 +49,38 @@ function MemberCard({
     cor: string;
     email?: string;
     cargo?: "Admin" | "Supervisor" | "Membro";
+    status?: "ativo" | "inativo";
   };
   canEditRole?: boolean;
   onChangeRole?: (userId: string, cargo: "Admin" | "Supervisor" | "Membro") => void;
+  onToggleStatus?: (userId: string, status: "ativo" | "inativo") => void;
+  onDelete?: (userId: string) => void;
 }) {
   const RoleIcon = m.cargo === "Admin" ? Shield : m.cargo === "Supervisor" ? ShieldCheck : User;
   const badgeVariant = m.cargo === "Admin" || m.cargo === "Supervisor" ? "default" : "secondary";
+  const inativo = m.status === "inativo";
   return (
-    <div className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0">
+    <div
+      className={cn(
+        "flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0",
+        inativo && "opacity-60",
+      )}
+    >
       <div
-        className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold text-white"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
         style={{ backgroundColor: m.cor }}
       >
         {m.iniciais}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-black">{m.nome}</div>
+        <div className="flex items-center gap-2">
+          <div className="truncate text-sm font-medium text-black">{m.nome}</div>
+          {inativo && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              Inativo
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-1 truncate text-xs text-gray-600">
           <Mail className="h-3 w-3" />
           <span className="truncate">{m.email ?? "—"}</span>
@@ -75,6 +105,74 @@ function MemberCard({
           <RoleIcon className="h-3 w-3" />
           {m.cargo ?? "Membro"}
         </Badge>
+      )}
+      {canEditRole && (onToggleStatus || onDelete) && (
+        <div className="flex shrink-0 items-center gap-1">
+          {onToggleStatus && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-gray-600 hover:text-black"
+                  title={inativo ? "Reativar" : "Inativar"}
+                >
+                  <Power className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {inativo ? `Reativar ${m.nome}?` : `Inativar ${m.nome}?`}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {inativo
+                      ? "A pessoa volta a ter acesso ao painel."
+                      : "A pessoa perde o acesso ao painel imediatamente. O histórico de tarefas e comentários é mantido."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onToggleStatus(m.id, inativo ? "ativo" : "inativo")}>
+                    Confirmar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {onDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-gray-600 hover:text-destructive"
+                  title="Excluir"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir {m.nome}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação é permanente: a conta de acesso é removida por completo. As tarefas já
+                    atribuídas a essa pessoa continuam existindo, apenas ficam sem responsável.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(m.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       )}
     </div>
   );
@@ -108,10 +206,12 @@ function ClientCard({ c }: { c: { id: string; nome_empresa: string; email?: stri
 }
 
 export function MembersView() {
-  const { membros, clientes, myIniciais } = useTasks();
+  const { membros, clientes, myId } = useTasks();
   const getMyRoleFn = useServerFn(getMyRole);
   const createInvitesFn = useServerFn(createInvites);
   const updateRoleFn = useServerFn(updateMemberRole);
+  const setStatusFn = useServerFn(setMemberStatus);
+  const deleteMemberFn = useServerFn(deleteMember);
   const queryClient = useQueryClient();
   const [isAdmin, setIsAdmin] = useState(false);
   const [pendentes, setPendentes] = useState<ConvitePendente[]>([]);
@@ -158,6 +258,26 @@ export function MembersView() {
     }
   };
 
+  const alternarStatus = async (user_id: string, status: "ativo" | "inativo") => {
+    try {
+      await setStatusFn({ data: { user_id, status } });
+      toast.success(status === "inativo" ? "Membro inativado." : "Membro reativado.");
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao atualizar status.");
+    }
+  };
+
+  const excluirMembro = async (user_id: string) => {
+    try {
+      await deleteMemberFn({ data: { user_id } });
+      toast.success("Membro excluído.");
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir membro.");
+    }
+  };
+
   const admins = membros
     .filter((m) => m.cargo === "Admin")
     .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -198,8 +318,10 @@ export function MembersView() {
               <MemberCard
                 key={m.id}
                 m={m}
-                canEditRole={isAdmin && m.iniciais !== myIniciais}
+                canEditRole={isAdmin && m.id !== myId}
                 onChangeRole={alterarCargo}
+                onToggleStatus={isAdmin && m.id !== myId ? alternarStatus : undefined}
+                onDelete={isAdmin && m.id !== myId ? excluirMembro : undefined}
               />
             ))
           )}
@@ -221,8 +343,10 @@ export function MembersView() {
               <MemberCard
                 key={m.id}
                 m={m}
-                canEditRole={isAdmin && m.iniciais !== myIniciais}
+                canEditRole={isAdmin && m.id !== myId}
                 onChangeRole={alterarCargo}
+                onToggleStatus={isAdmin && m.id !== myId ? alternarStatus : undefined}
+                onDelete={isAdmin && m.id !== myId ? excluirMembro : undefined}
               />
             ))
           )}
@@ -243,8 +367,10 @@ export function MembersView() {
               <MemberCard
                 key={m.id}
                 m={m}
-                canEditRole={isAdmin && m.iniciais !== myIniciais}
+                canEditRole={isAdmin && m.id !== myId}
                 onChangeRole={alterarCargo}
+                onToggleStatus={isAdmin && m.id !== myId ? alternarStatus : undefined}
+                onDelete={isAdmin && m.id !== myId ? excluirMembro : undefined}
               />
             ))
           )}

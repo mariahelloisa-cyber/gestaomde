@@ -17,7 +17,7 @@ const tabs: { key: View; label: string; icon: typeof LayoutGrid }[] = [
   { key: "Calendário", label: "Agenda", icon: CalendarIcon },
 ];
 
-const statusOrdem: Status[] = ["Pendente", "Em Progresso", "Concluído"];
+const statusOrdem: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
 
 export function TarefasHeader({
   view,
