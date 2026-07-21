@@ -69,7 +69,7 @@ export async function logEmail(params: {
   tarefa_id: string | null;
   usuario_id: string | null;
   destinatario: string | null;
-  tipo: "designacao" | "lembrete" | "expirado" | "teste";
+  tipo: "designacao" | "lembrete" | "expirado" | "teste" | "convite";
   assunto: string;
   mensagem: string;
   result: SendResult;
@@ -107,18 +107,28 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function wrapHtml(title: string, intro: string, items: Array<[string, string]>, footer: string): string {
+function wrapHtml(
+  title: string,
+  intro: string,
+  items: Array<[string, string]>,
+  footer: string,
+  cta?: { label: string; url: string },
+): string {
   const rows = items
     .map(
       ([k, v]) =>
         `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:13px;">${escapeHtml(k)}</td><td style="padding:4px 0;color:#111827;font-size:14px;"><strong>${escapeHtml(v)}</strong></td></tr>`,
     )
     .join("");
+  const ctaHtml = cta
+    ? `<p style="margin:0 0 24px;"><a href="${escapeHtml(cta.url)}" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;">${escapeHtml(cta.label)}</a></p>`
+    : "";
   return `<!doctype html><html><body style="margin:0;background:#ffffff;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827;">
   <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
     <h1 style="margin:0 0 8px;font-size:20px;">${escapeHtml(title)}</h1>
     <p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.5;">${escapeHtml(intro)}</p>
     <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">${rows}</table>
+    ${ctaHtml}
     <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.5;">${escapeHtml(footer)}</p>
   </div>
 </body></html>`;
@@ -207,5 +217,30 @@ export function msgExpirado(opts: MsgInput) {
   ]
     .filter(Boolean)
     .join("\n");
+  return { assunto, html, text };
+}
+
+export type ConviteInput = {
+  cargo: string;
+  convidadoPor?: string | null;
+  signupUrl: string;
+};
+
+export function msgConvite(opts: ConviteInput) {
+  const assunto = "Você foi convidado(a) para o Painel da Agência";
+  const quem = opts.convidadoPor ? `${opts.convidadoPor} convidou você` : "Você foi convidado(a)";
+  const html = wrapHtml(
+    "Você recebeu um convite!",
+    `${quem} para participar do Espaço de Trabalho da agência como ${opts.cargo}. Para aceitar, crie sua conta usando este mesmo e-mail.`,
+    [["Função", opts.cargo]],
+    "Se você não esperava este convite, pode ignorar este e-mail.",
+    { label: "Criar minha conta", url: opts.signupUrl },
+  );
+  const text = [
+    `${quem} para participar do Espaço de Trabalho da agência como ${opts.cargo}.`,
+    "",
+    "Para aceitar, crie sua conta usando este mesmo e-mail:",
+    opts.signupUrl,
+  ].join("\n");
   return { assunto, html, text };
 }

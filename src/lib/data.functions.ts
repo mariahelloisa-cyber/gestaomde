@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getEmailSettings, sendEmail, logEmail, msgConvite } from "./email.server";
+
+const SITE_URL = "https://gestaomde.lovable.app";
 
 /* ---------------- Helpers ---------------- */
 
@@ -25,6 +28,11 @@ function toDateOnly(value: string | null | undefined): string {
 function toTimestamp(yyyymmdd: string | undefined | null): string | null {
   if (!yyyymmdd) return null;
   return new Date(`${yyyymmdd}T00:00:00.000Z`).toISOString();
+}
+
+/** Tolera valores de status legados que já não existem no enum (ex.: "Em Análise"). */
+function normalizeStatus(raw: string): "Pendente" | "Em Progresso" | "Concluído" {
+  return raw === "Pendente" || raw === "Em Progresso" || raw === "Concluído" ? raw : "Pendente";
 }
 
 /* ---------------- Read: full dashboard data ---------------- */
@@ -129,7 +137,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
           id: t.id,
           cliente_id: t.cliente_id ?? "",
           titulo: t.titulo,
-          status: t.status,
+          status: normalizeStatus(t.status),
           prioridade: t.prioridade,
           responsaveis,
           data_vencimento: toDateOnly(t.data_vencimento),
@@ -178,7 +186,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
 const createSchema = z.object({
   cliente_id: z.string().uuid().nullable().optional(),
   titulo: z.string().min(1).max(500),
-  status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).default("Pendente"),
+  status: z.enum(["Pendente", "Em Progresso", "Concluído"]).default("Pendente"),
   prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).default("Nenhuma"),
   data_vencimento: z.string().optional(),
   descricao: z.string().max(5000).optional(),
@@ -222,7 +230,7 @@ const updateSchema = z.object({
   id: z.string().uuid(),
   patch: z.object({
     titulo: z.string().min(1).max(500).optional(),
-    status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).optional(),
+    status: z.enum(["Pendente", "Em Progresso", "Concluído"]).optional(),
     prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).optional(),
     data_vencimento: z.string().optional(),
     descricao: z.string().max(5000).optional(),
@@ -239,7 +247,7 @@ export const updateTarefa = createServerFn({ method: "POST" })
 
     const dbPatch: Partial<{
       titulo: string;
-      status: "Pendente" | "Em Progresso" | "Em Análise" | "Concluído";
+      status: "Pendente" | "Em Progresso" | "Concluído";
       prioridade: "Alta" | "Média" | "Baixa" | "Nenhuma";
       descricao: string | null;
       data_vencimento: string | null;
@@ -347,7 +355,35 @@ export const createInvites = createServerFn({ method: "POST" })
       }
       throw new Error(error.message);
     }
-    return { ok: true, count: rows.length };
+
+    const { data: convidador } = await supabase
+      .from("perfis_usuarios")
+      .select("nome")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const settings = await getEmailSettings();
+    let emailsEnviados = 0;
+    for (const email of data.emails) {
+      const { assunto, html, text } = msgConvite({
+        cargo: data.cargo,
+        convidadoPor: convidador?.nome ?? null,
+        signupUrl: `${SITE_URL}/signup`,
+      });
+      const result = await sendEmail(email, assunto, html, text, settings);
+      await logEmail({
+        tarefa_id: null,
+        usuario_id: null,
+        destinatario: email,
+        tipo: "convite",
+        assunto,
+        mensagem: text,
+        result,
+      });
+      if (result.ok) emailsEnviados++;
+    }
+
+    return { ok: true, count: rows.length, emailsEnviados };
   });
 
 const updateMemberRoleSchema = z.object({

@@ -493,7 +493,7 @@ export type Database = {
       plano_cliente: "Bronze" | "Prata" | "Ouro" | "Diamond"
       prioridade_tarefa: "Alta" | "Média" | "Baixa" | "Nenhuma"
       status_demanda: "pendente" | "aceita" | "recusada" | "transferida"
-      status_tarefa: "Pendente" | "Em Progresso" | "Em Análise" | "Concluído"
+      status_tarefa: "Pendente" | "Em Progresso" | "Concluído"
       tipo_item: "tarefa" | "lembrete"
     }
     CompositeTypes: {
@@ -627,7 +627,7 @@ export const Constants = {
       plano_cliente: ["Bronze", "Prata", "Ouro", "Diamond"],
       prioridade_tarefa: ["Alta", "Média", "Baixa", "Nenhuma"],
       status_demanda: ["pendente", "aceita", "recusada", "transferida"],
-      status_tarefa: ["Pendente", "Em Progresso", "Em Análise", "Concluído"],
+      status_tarefa: ["Pendente", "Em Progresso", "Concluído"],
       tipo_item: ["tarefa", "lembrete"],
     },
   },

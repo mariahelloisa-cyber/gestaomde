@@ -47,9 +47,12 @@ export const listDemandas = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Só demandas ainda pendentes: aceitas viram tarefa (e somem daqui, ficam só
+    // na aba Tarefas) e recusadas são excluídas na hora — nunca aparecem aqui.
     const { data, error } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, solicitante_email, responsavel_id, descricao, prazo_sugerido, anexos, status, justificativa_recusa, tarefa_id, criado_em")
+      .select("id, solicitante_nome, solicitante_email, responsavel_id, descricao, prazo_sugerido, anexos, status, tarefa_id, criado_em")
+      .eq("status", "pendente")
       .order("criado_em", { ascending: false });
     if (error) throw new Error(error.message);
 
@@ -138,11 +141,10 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
     return { tarefa_id: nova.id };
   });
 
-/* ---------------- Auth: recusar ---------------- */
+/* ---------------- Auth: recusar (remove a demanda por completo) ---------------- */
 
 const recusarSchema = z.object({
   id: z.string().uuid(),
-  justificativa: z.string().trim().max(2000).optional(),
 });
 
 export const recusarDemanda = createServerFn({ method: "POST" })
@@ -150,14 +152,20 @@ export const recusarDemanda = createServerFn({ method: "POST" })
   .inputValidator((input) => recusarSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const { error } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: dem } = await supabase
       .from("demandas_externas")
-      .update({
-        status: "recusada",
-        justificativa_recusa: data.justificativa || null,
-        atualizado_em: new Date().toISOString(),
-      })
-      .eq("id", data.id);
+      .select("anexos")
+      .eq("id", data.id)
+      .single();
+
+    const anexos = Array.isArray(dem?.anexos) ? (dem.anexos as Array<{ path: string }>) : [];
+    if (anexos.length > 0) {
+      await supabaseAdmin.storage.from("demandas-anexos").remove(anexos.map((a) => a.path));
+    }
+
+    const { error } = await supabase.from("demandas_externas").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

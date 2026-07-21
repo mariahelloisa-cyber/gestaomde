@@ -21,6 +21,7 @@ export function SystemSettingsView() {
   const [apiKey, setApiKey] = useState("");
   const [fromEmail, setFromEmail] = useState("");
   const [fromName, setFromName] = useState("");
+  const [webhookConfigurado, setWebhookConfigurado] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,6 +42,7 @@ export function SystemSettingsView() {
         setApiKey(cfg.apiKey);
         setFromEmail(cfg.fromEmail);
         setFromName(cfg.fromName);
+        setWebhookConfigurado(cfg.webhookConfigurado);
         setUpdatedAt(cfg.atualizado_em);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Falha ao carregar configurações.");
@@ -71,6 +73,7 @@ export function SystemSettingsView() {
         data: { apiKey: apiKey.trim(), fromEmail: fromEmail.trim(), fromName: fromName.trim() },
       });
       toast.success("Configurações salvas.");
+      setWebhookConfigurado(true);
       setUpdatedAt(new Date().toISOString());
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
@@ -168,6 +171,12 @@ export function SystemSettingsView() {
                 Salvar
               </Button>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              {webhookConfigurado
+                ? "✅ Webhook de designação de tarefa está ativo."
+                : "⚠️ O webhook de designação será ativado automaticamente ao salvar."}
+            </p>
           </>
         )}
       </section>
@@ -208,10 +217,11 @@ export function SystemSettingsView() {
       <section className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
         <p className="mb-1 font-medium text-foreground">Como funciona</p>
         <ul className="list-inside list-disc space-y-1">
+          <li>Convite: ao convidar alguém em Membros, o e-mail com o link de cadastro sai na hora.</li>
           <li>Designação: ao adicionar um responsável a uma tarefa, o e-mail sai na hora.</li>
           <li>Lembrete: tarefas que vencem em menos de 24h recebem aviso uma vez por dia.</li>
           <li>Expirado: tarefas pendentes que passaram do prazo recebem aviso uma vez.</li>
-          <li>O membro precisa ter e-mail cadastrado no perfil para receber.</li>
+          <li>O membro precisa ter e-mail cadastrado no perfil para receber avisos de tarefa.</li>
         </ul>
       </section>
     </div>

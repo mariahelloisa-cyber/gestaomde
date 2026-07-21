@@ -24,13 +24,14 @@ export const getEmailConfig = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("configuracoes_sistema")
       .select("chave, valor, atualizado_em")
-      .in("chave", ["resend_api_key", "email_from_address", "email_from_name"]);
+      .in("chave", ["resend_api_key", "email_from_address", "email_from_name", "email_webhook_secret"]);
     if (error) throw new Error(error.message);
     const map = new Map((data ?? []).map((r) => [r.chave, r]));
     return {
       apiKey: map.get("resend_api_key")?.valor ?? "",
       fromEmail: map.get("email_from_address")?.valor ?? "",
       fromName: map.get("email_from_name")?.valor ?? "",
+      webhookConfigurado: !!map.get("email_webhook_secret")?.valor,
       atualizado_em: map.get("resend_api_key")?.atualizado_em ?? null,
     };
   });
@@ -53,6 +54,23 @@ export const saveEmailConfig = createServerFn({ method: "POST" })
       { chave: "email_from_address", valor: data.fromEmail, atualizado_por: context.userId, atualizado_em: now },
       { chave: "email_from_name", valor: data.fromName ?? "", atualizado_por: context.userId, atualizado_em: now },
     ];
+
+    // O webhook interno (aviso de designação de tarefa) precisa de um segredo
+    // compartilhado; gera um só na primeira vez que o Admin salva o e-mail.
+    const { data: existente } = await supabaseAdmin
+      .from("configuracoes_sistema")
+      .select("valor")
+      .eq("chave", "email_webhook_secret")
+      .maybeSingle();
+    if (!existente?.valor) {
+      rows.push({
+        chave: "email_webhook_secret",
+        valor: crypto.randomUUID(),
+        atualizado_por: context.userId,
+        atualizado_em: now,
+      });
+    }
+
     const { error } = await supabaseAdmin
       .from("configuracoes_sistema")
       .upsert(rows, { onConflict: "chave" });

@@ -3,9 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PrimarySidebar } from "@/components/layout/PrimarySidebar";
 import { SecondarySidebar } from "@/components/layout/SecondarySidebar";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { MinhasTarefasHeader } from "@/components/dashboard/MinhasTarefasHeader";
-import { TaskListView } from "@/components/dashboard/TaskListView";
+import { TarefasHeader } from "@/components/dashboard/TarefasHeader";
 import { KanbanView, AddTaskDialog } from "@/components/dashboard/KanbanView";
 import { CalendarView } from "@/components/dashboard/CalendarView";
 import { TasksProvider, useTasks } from "@/lib/tasks-store";
@@ -87,9 +85,8 @@ function WorkspaceContent() {
   if (blockedForMembro) {
     return (
       <>
-        <MinhasTarefasHeader view={mainView} onViewChange={setMainView} />
+        <TarefasHeader view={mainView} onViewChange={setMainView} />
         <div key={mainView} className="flex-1 animate-in fade-in-50 overflow-y-auto bg-[var(--surface-1)] duration-200">
-          {mainView === "Lista" && <TaskListView />}
           {mainView === "Quadro" && <KanbanView />}
           {mainView === "Calendário" && <CalendarView scope="pessoal" />}
         </div>
@@ -111,9 +108,8 @@ function WorkspaceContent() {
     );
     return (
       <>
-        <DashboardHeader view={mainView} onViewChange={setMainView} extraActions={criarTarefaButton} />
+        <TarefasHeader view={mainView} onViewChange={setMainView} extraActions={criarTarefaButton} mode="geral" />
         <div key={mainView} className="flex-1 animate-in fade-in-50 overflow-y-auto bg-[var(--surface-1)] duration-200">
-          {mainView === "Lista" && <TaskListView semCliente />}
           {mainView === "Quadro" && <KanbanView semCliente />}
           {mainView === "Calendário" && <CalendarView scope="sem-cliente" />}
         </div>
@@ -211,9 +207,8 @@ function WorkspaceContent() {
 
   return (
     <>
-      <MinhasTarefasHeader view={mainView} onViewChange={setMainView} />
+      <TarefasHeader view={mainView} onViewChange={setMainView} />
       <div key={mainView} className="flex-1 animate-in fade-in-50 overflow-y-auto bg-[var(--surface-1)] duration-200">
-        {mainView === "Lista" && <TaskListView />}
         {mainView === "Quadro" && <KanbanView />}
         {mainView === "Calendário" && <CalendarView scope="pessoal" />}
       </div>

@@ -20,7 +20,6 @@ function calcStatus(list: Tarefa[]) {
   const counts: Record<Status, number> = {
     Pendente: list.filter((t) => t.status === "Pendente").length,
     "Em Progresso": list.filter((t) => t.status === "Em Progresso").length,
-    "Em Análise": list.filter((t) => t.status === "Em Análise").length,
     "Concluído": list.filter((t) => t.status === "Concluído").length,
   };
   return {
@@ -29,7 +28,6 @@ function calcStatus(list: Tarefa[]) {
     pct: {
       Pendente: Math.round((counts.Pendente / total) * 100),
       "Em Progresso": Math.round((counts["Em Progresso"] / total) * 100),
-      "Em Análise": Math.round((counts["Em Análise"] / total) * 100),
       "Concluído": Math.round((counts["Concluído"] / total) * 100),
     },
   };
@@ -56,7 +54,6 @@ function calcPrazos(list: Tarefa[]) {
 const statusColors: Record<Status, string> = {
   Pendente: "#F59E0B",
   "Em Progresso": "#3B82F6",
-  "Em Análise": "#A855F7",
   "Concluído": "#22C55E",
 };
 

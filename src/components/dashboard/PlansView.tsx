@@ -19,9 +19,11 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 export function PlansView() {
   const { planos, updatePlano, myCargo } = useTasks();
   const podeEditar = myCargo === "Admin" || myCargo === "Supervisor";
-  const ordenados = [...planos].sort(
-    (a, b) => ORDEM.indexOf(a.nome_plano) - ORDEM.indexOf(b.nome_plano),
-  );
+  // Planos com nome_plano fora do enum conhecido (ex: dado legado/inconsistente)
+  // não têm ícone/cor definidos — não travar a tela inteira por causa disso.
+  const ordenados = [...planos]
+    .filter((p) => p.nome_plano in META)
+    .sort((a, b) => ORDEM.indexOf(a.nome_plano) - ORDEM.indexOf(b.nome_plano));
 
   return (
     <div className="px-6 py-6">

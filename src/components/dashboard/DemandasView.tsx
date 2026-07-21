@@ -10,8 +10,6 @@ import {
 } from "@/lib/demandas.functions";
 import { useTasks } from "@/lib/tasks-store";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -58,13 +66,11 @@ export function DemandasView() {
   const [aceitarState, setAceitarState] = useState<{ id: string; responsavel_id: string } | null>(null);
 
   const [recusaOpen, setRecusaOpen] = useState<string | null>(null);
-  const [justificativa, setJustificativa] = useState("");
   const recusarMut = useMutation({
-    mutationFn: (vars: { id: string; justificativa?: string }) => recusarFn({ data: vars }),
+    mutationFn: (vars: { id: string }) => recusarFn({ data: vars }),
     onSuccess: () => {
       toast.success("Demanda recusada.");
       setRecusaOpen(null);
-      setJustificativa("");
       invalidate();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
@@ -190,32 +196,26 @@ export function DemandasView() {
       </Dialog>
 
       {/* Recusar */}
-      <Dialog open={!!recusaOpen} onOpenChange={(o) => !o && setRecusaOpen(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Recusar demanda</DialogTitle>
-          </DialogHeader>
-          <Textarea
-            placeholder="Justificativa (opcional)"
-            rows={4}
-            value={justificativa}
-            onChange={(e) => setJustificativa(e.target.value)}
-            maxLength={2000}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRecusaOpen(null)}>Cancelar</Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                recusaOpen && recusarMut.mutate({ id: recusaOpen, justificativa: justificativa.trim() || undefined })
-              }
+      <AlertDialog open={!!recusaOpen} onOpenChange={(o) => !o && setRecusaOpen(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Recusar demanda?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A demanda será removida definitivamente e não poderá ser recuperada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => recusaOpen && recusarMut.mutate({ id: recusaOpen })}
               disabled={recusarMut.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Recusar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Transferir */}
       <Dialog open={!!transferirState} onOpenChange={(o) => !o && setTransferirState(null)}>
@@ -254,17 +254,6 @@ export function DemandasView() {
   );
 }
 
-function statusBadge(s: Demanda["status"]) {
-  const map: Record<Demanda["status"], { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    pendente: { label: "Pendente", variant: "outline" },
-    aceita: { label: "Aceita", variant: "default" },
-    recusada: { label: "Recusada", variant: "destructive" },
-    transferida: { label: "Transferida", variant: "secondary" },
-  };
-  const v = map[s];
-  return <Badge variant={v.variant}>{v.label}</Badge>;
-}
-
 function DemandaCard({
   d,
   nomeResponsavel,
@@ -280,14 +269,12 @@ function DemandaCard({
   onAbrirTransferir: () => void;
   busy: boolean;
 }) {
-  const isPendente = d.status === "pendente";
   return (
     <div className="rounded-lg border border-border bg-white text-black p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold">{d.solicitante_nome}</h3>
-            {statusBadge(d.status)}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-600">
             {d.solicitante_email && (
@@ -305,12 +292,6 @@ function DemandaCard({
       </div>
 
       <p className="mt-3 whitespace-pre-wrap text-sm text-black">{d.descricao}</p>
-
-      {d.justificativa_recusa && (
-        <div className="mt-3 rounded-md border border-border bg-gray-100 p-3 text-xs text-gray-700">
-          <strong>Justificativa:</strong> {d.justificativa_recusa}
-        </div>
-      )}
 
       {d.anexos.length > 0 && (
         <div className="mt-4 space-y-1">
@@ -333,30 +314,22 @@ function DemandaCard({
         </div>
       )}
 
-      {isPendente && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" onClick={onAceitar} disabled={busy}>
-            <Check className="mr-1 h-4 w-4" /> Aceitar
-          </Button>
-          <Button size="sm" variant="outline" onClick={onAbrirTransferir}>
-            <ArrowRightLeft className="mr-1 h-4 w-4" /> Passar para outro
-          </Button>
-          <Button size="sm" variant="destructive" onClick={onAbrirRecusa}>
-            <X className="mr-1 h-4 w-4" /> Recusar
-          </Button>
-        </div>
-      )}
-
-      {d.status === "aceita" && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={onAceitar} disabled={busy}>
-            <Check className="mr-1 h-4 w-4" /> Recriar tarefa
-          </Button>
-          <p className="text-xs text-gray-500 self-center">
-            Use caso a tarefa correspondente tenha sido excluída.
-          </p>
-        </div>
-      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button size="sm" onClick={onAceitar} disabled={busy}>
+          <Check className="mr-1 h-4 w-4" /> Aceitar
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onAbrirTransferir}
+          className="border-gray-300 bg-white text-black hover:bg-gray-100"
+        >
+          <ArrowRightLeft className="mr-1 h-4 w-4" /> Passar para outro
+        </Button>
+        <Button size="sm" variant="destructive" onClick={onAbrirRecusa}>
+          <X className="mr-1 h-4 w-4" /> Recusar
+        </Button>
+      </div>
     </div>
   );
 }

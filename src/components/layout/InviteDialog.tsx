@@ -40,7 +40,14 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     setSubmitting(true);
     try {
       const res = await createInvitesFn({ data: { emails: lista, cargo, cliente_id: cargo === "Cliente" ? clienteId : null } });
-      toast.success(`Convite registrado para ${res.count} ${res.count === 1 ? "pessoa" : "pessoas"} como ${cargo}.`);
+      const pessoas = res.count === 1 ? "pessoa" : "pessoas";
+      if (res.emailsEnviados === res.count) {
+        toast.success(`Convite enviado por e-mail para ${res.count} ${pessoas} como ${cargo}.`);
+      } else if (res.emailsEnviados > 0) {
+        toast.success(`Convite registrado para ${res.count} ${pessoas}, mas só ${res.emailsEnviados} e-mail(s) foram enviados. Confira a Resend em Configurações.`);
+      } else {
+        toast.success(`Convite registrado para ${res.count} ${pessoas} como ${cargo}, mas o e-mail não foi enviado — configure a Resend em Configurações.`);
+      }
       setEmails("");
       setCargo("Membro");
       setClienteId("");
@@ -86,15 +93,15 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Adicionar como</Label>
             <Select value={cargo} onValueChange={(v) => setCargo(v as Cargo)}>
-              <SelectTrigger className="h-auto py-2.5">
+              <SelectTrigger className="h-auto py-2.5 whitespace-normal [&>span]:line-clamp-none">
                 <SelectValue>
-                  <div className="flex items-center gap-3 text-left">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background">
+                  <div className="flex min-w-0 items-center gap-3 text-left">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background">
                       <Icon className="h-4 w-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{cargo}</div>
-                      <div className="text-xs text-muted-foreground">{DESCRICAO[cargo]}</div>
+                      <div className="whitespace-normal text-xs text-muted-foreground">{DESCRICAO[cargo]}</div>
                     </div>
                   </div>
                 </SelectValue>

@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { ArrowLeft, Plus, List as ListIcon, Calendar as CalendarIcon, LayoutGrid, Power, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Calendar as CalendarIcon, LayoutGrid, Power, Trash2, Pencil } from "lucide-react";
 import { useTasks } from "@/lib/tasks-store";
-import { TaskListView } from "./TaskListView";
 import { CalendarView } from "./CalendarView";
 import { KanbanView, AddTaskDialog } from "./KanbanView";
 import { cn } from "@/lib/utils";
@@ -23,7 +22,7 @@ export function ClientFocusView({ clienteId }: { clienteId: string }) {
   const cliente = clientes.find((c) => c.id === clienteId);
   if (!cliente) return null;
   const ativas = contarTarefasCliente(clienteId);
-  const [aba, setAba] = useState<"lista" | "quadro" | "calendario">("lista");
+  const [aba, setAba] = useState<"quadro" | "calendario">("quadro");
   const ehInativo = (cliente.status ?? "ativo") === "inativo";
   const voltar = () => setWorkspace({ tipo: ehInativo ? "clientes-inativos" : "todos-clientes" });
 
@@ -142,7 +141,6 @@ export function ClientFocusView({ clienteId }: { clienteId: string }) {
 
       <div className="flex items-center gap-1 border-b border-border bg-background px-4">
         {([
-          { id: "lista", label: "Lista", Icon: ListIcon },
           { id: "quadro", label: "Quadro", Icon: LayoutGrid },
           { id: "calendario", label: "Calendário", Icon: CalendarIcon },
         ] as const).map(({ id, label, Icon }) => (
@@ -163,7 +161,6 @@ export function ClientFocusView({ clienteId }: { clienteId: string }) {
       </div>
 
       <div className="flex-1 overflow-auto">
-        {aba === "lista" && <TaskListView clienteFilterId={clienteId} />}
         {aba === "quadro" && <KanbanView clienteFilterId={clienteId} />}
         {aba === "calendario" && <CalendarView clienteFilterId={clienteId} />}
       </div>

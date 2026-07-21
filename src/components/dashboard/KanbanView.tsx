@@ -2,6 +2,9 @@ import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
   Calendar as CalendarIcon,
   Check,
   ChevronDown,
@@ -12,6 +15,7 @@ import {
   FileText,
   Flag,
   Lock,
+  Minus,
   Paperclip,
   Plus,
   User,
@@ -50,17 +54,34 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
+const prioridadeIcon: Record<Prioridade, typeof ArrowUp> = {
+  Alta: ArrowUp,
+  "Média": ArrowRight,
+  Baixa: ArrowDown,
+  Nenhuma: Minus,
+};
+
+function isAtrasada(t: Tarefa): boolean {
+  if (t.status === "Concluído" || !t.data_vencimento) return false;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const venc = new Date(t.data_vencimento.length === 10 ? `${t.data_vencimento}T00:00:00` : t.data_vencimento);
+  return venc.getTime() < hoje.getTime();
+}
+
 const colunas: { status: Status; label: string; icon: typeof Clock }[] = [
   { status: "Pendente", label: "Pendentes", icon: Clock },
   { status: "Em Progresso", label: "Em Andamento", icon: Clock },
-  { status: "Em Análise", label: "Em Análise", icon: Eye },
   { status: "Concluído", label: "Concluídas", icon: Check },
 ];
 
 export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: string; semCliente?: boolean } = {}) {
-  const { tarefas, updateTarefa, openTask, myId, meuStatusFilter } = useTasks();
+  const { tarefas, updateTarefa, openTask, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter } = useTasks();
   const apenasMinhas = !semCliente && !clienteFilterId;
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // No escopo "geral" (semCliente) o filtro de empresa vem do contexto e pode
+  // restringir a visão a um único cliente, mesmo sendo o escopo da agência inteira.
+  const empresaEfetiva = semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
 
   const onDrop = (status: Status) => {
     if (draggingId) updateTarefa(draggingId, { status });
@@ -72,7 +93,11 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
       {colunas.map((c) => {
         const list = tarefas.filter((t) => {
           if ((t.tipo ?? "tarefa") !== "tarefa" || t.status !== c.status) return false;
-          if (semCliente) return !t.cliente_id;
+          if (semCliente) {
+            if (geralStatusFilter && t.status !== geralStatusFilter) return false;
+            if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
+            return true;
+          }
           if (clienteFilterId) return t.cliente_id === clienteFilterId;
           if (apenasMinhas) {
             if (!t.responsaveis.some((r) => r.id === myId)) return false;
@@ -109,11 +134,11 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-xs font-medium text-muted-foreground">{list.length}</span>
-                <AddTaskDialog defaultStatus={c.status} compact lockedClienteId={clienteFilterId} semCliente={semCliente} />
+                <AddTaskDialog defaultStatus={c.status} compact lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
               </div>
             </div>
 
-            <div className="flex flex-1 flex-col gap-2 p-2">
+            <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
               {list.map((t) => (
                 <CardTarefa
                   key={t.id}
@@ -129,7 +154,7 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
                   Arraste tarefas aqui
                 </div>
               )}
-              <AddTaskDialog defaultStatus={c.status} lockedClienteId={clienteFilterId} semCliente={semCliente} />
+              <AddTaskDialog defaultStatus={c.status} lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
             </div>
           </div>
         );
@@ -151,6 +176,9 @@ function CardTarefa({
 }) {
   const { clientes } = useTasks();
   const cliente = clientes.find((c) => c.id === tarefa.cliente_id);
+  const atrasada = isAtrasada(tarefa);
+  const PrioIcon = prioridadeIcon[tarefa.prioridade];
+  const prioCor = prioridadeCor[tarefa.prioridade];
 
   return (
     <div
@@ -158,31 +186,44 @@ function CardTarefa({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onOpen}
-      className="task-surface group cursor-grab rounded-md border border-border p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
+      className="task-surface group cursor-grab overflow-hidden rounded-md border border-border p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
     >
-      <p className="mb-1.5 text-sm font-medium leading-snug">{tarefa.titulo}</p>
+      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+        <span
+          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+          style={{
+            color: prioCor,
+            backgroundColor: `color-mix(in oklab, ${prioCor} 16%, transparent)`,
+            borderColor: `color-mix(in oklab, ${prioCor} 45%, transparent)`,
+          }}
+        >
+          <PrioIcon className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} />
+          {tarefa.prioridade}
+        </span>
+        {atrasada && (
+          <span className="inline-flex shrink-0 items-center rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
+            Atrasada
+          </span>
+        )}
+      </div>
+      <p className="mb-1 break-words text-sm font-medium leading-snug">{tarefa.titulo}</p>
       {cliente && (
-        <p className="mb-2.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="mb-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <span
-            className="h-1.5 w-1.5 rounded-full"
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ backgroundColor: cliente.cor }}
           />
-          {cliente.nome_empresa}
+          <span className="min-w-0 truncate">{cliente.nome_empresa}</span>
         </p>
       )}
+      {tarefa.descricao && (
+        <p className="mb-2.5 truncate text-xs text-muted-foreground">{tarefa.descricao}</p>
+      )}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-            {rotuloData(tarefa.data_vencimento)}
-          </span>
-          <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-            style={prioridadePillStyle(tarefa.prioridade)}
-          >
-            <Flag className="h-2.5 w-2.5" style={{ fill: "currentColor" }} />
-            {tarefa.prioridade}
-          </span>
-        </div>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <CalendarIcon className="h-3 w-3" />
+          {rotuloData(tarefa.data_vencimento)}
+        </span>
         <AvatarStack responsaveis={tarefa.responsaveis} />
       </div>
     </div>

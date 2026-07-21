@@ -19,7 +19,7 @@ export function CalendarView({
   clienteFilterId,
   scope = clienteFilterId ? "cliente" : "pessoal",
 }: { clienteFilterId?: string; scope?: CalendarScope } = {}) {
-  const { tarefas: todas, clientes, openTask, myIniciais, myId, meuStatusFilter } = useTasks();
+  const { tarefas: todas, clientes, openTask, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter } = useTasks();
   const tarefas = useMemo(() => {
     return todas.filter((t) => {
       const isLembrete = t.tipo === "lembrete";
@@ -27,7 +27,10 @@ export function CalendarView({
         return !isLembrete && t.cliente_id === clienteFilterId;
       }
       if (scope === "sem-cliente") {
-        return !isLembrete && !t.cliente_id;
+        if (isLembrete) return false;
+        if (geralStatusFilter && t.status !== geralStatusFilter) return false;
+        if (geralEmpresaFilter !== "todas") return t.cliente_id === geralEmpresaFilter;
+        return true;
       }
       if (scope === "geral") {
         // Tarefas + lembretes gerais (sem pessoais de ninguém)
@@ -42,7 +45,7 @@ export function CalendarView({
       const esc = t.escopo ?? "geral";
       return esc === "geral" || t.criado_por === (myIniciais || USUARIO_LOGADO_INICIAIS);
     });
-  }, [todas, scope, clienteFilterId, myIniciais, myId, meuStatusFilter]);
+  }, [todas, scope, clienteFilterId, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter]);
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
     d.setDate(1);
@@ -182,8 +185,8 @@ export function CalendarView({
         <AddTaskDialog
           key={quickDate}
           defaultDate={quickDate}
-          lockedClienteId={clienteFilterId}
-          semCliente={scope === "sem-cliente"}
+          lockedClienteId={clienteFilterId ?? (scope === "sem-cliente" && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined)}
+          semCliente={scope === "sem-cliente" && geralEmpresaFilter === "todas"}
           defaultReminderScope={scope === "pessoal" ? "pessoal" : "geral"}
           allowLembrete={scope !== "cliente" && scope !== "sem-cliente"}
           trigger={null}

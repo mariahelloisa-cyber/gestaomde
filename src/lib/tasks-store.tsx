@@ -45,7 +45,7 @@ export type WorkspaceView =
   | { tipo: "gerenciar-treinamentos" }
   | { tipo: "cliente"; clienteId: string };
 
-export type MainView = "Lista" | "Quadro" | "Calendário";
+export type MainView = "Quadro" | "Calendário";
 // Backwards-compat: components still import this constant; it is overwritten
 // from the live profile at runtime by TasksProvider.
 export let USUARIO_LOGADO_INICIAIS = "EU";
@@ -108,6 +108,7 @@ interface TasksCtx {
   removerTransacao: (id: string) => void;
   contarPorStatus: (s: Status) => number;
   contarMinhasPorStatus: (s: Status) => number;
+  contarGeraisPorStatus: (s: Status) => number;
   clientesAtivos: () => Cliente[];
   selectedTaskId: string | null;
   openTask: (id: string) => void;
@@ -121,6 +122,10 @@ interface TasksCtx {
   clientesComMinhasTarefas: () => Cliente[];
   meuStatusFilter: Status | null;
   setMeuStatusFilter: (s: Status | null) => void;
+  geralStatusFilter: Status | null;
+  setGeralStatusFilter: (s: Status | null) => void;
+  geralEmpresaFilter: string | "todas";
+  setGeralEmpresaFilter: (id: string | "todas") => void;
 }
 
 const Ctx = createContext<TasksCtx | null>(null);
@@ -128,8 +133,10 @@ const Ctx = createContext<TasksCtx | null>(null);
 export function TasksProvider({ children }: { children: ReactNode }) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceView>({ tipo: "dashboard" });
-  const [mainView, setMainView] = useState<MainView>("Lista");
+  const [mainView, setMainView] = useState<MainView>("Quadro");
   const [meuStatusFilter, setMeuStatusFilter] = useState<Status | null>(null);
+  const [geralStatusFilter, setGeralStatusFilter] = useState<Status | null>(null);
+  const [geralEmpresaFilter, setGeralEmpresaFilter] = useState<string | "todas">("todas");
 
   const queryClient = useQueryClient();
   const fetchDashboard = useServerFn(getDashboardData);
@@ -359,6 +366,17 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     [tarefas, data?.me?.id],
   );
 
+  const contarGeraisPorStatus = useCallback(
+    (s: Status) =>
+      tarefas.filter(
+        (t) =>
+          (t.tipo ?? "tarefa") === "tarefa" &&
+          t.status === s &&
+          (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter),
+      ).length,
+    [tarefas, geralEmpresaFilter],
+  );
+
   const clientesAtivos = useCallback(() => {
     const ids = new Set(tarefas.map((t) => t.cliente_id));
     return clientes.filter((c) => ids.has(c.id));
@@ -401,6 +419,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       removerTransacao,
       contarPorStatus,
       contarMinhasPorStatus,
+      contarGeraisPorStatus,
       clientesAtivos,
       selectedTaskId,
       openTask,
@@ -414,8 +433,12 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       clientesComMinhasTarefas,
       meuStatusFilter,
       setMeuStatusFilter,
+      geralStatusFilter,
+      setGeralStatusFilter,
+      geralEmpresaFilter,
+      setGeralEmpresaFilter,
     }),
-    [tarefas, clientes, membros, planos, transacoes, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter],
+    [tarefas, clientes, membros, planos, transacoes, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

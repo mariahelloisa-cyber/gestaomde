@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Calendar as CalendarIcon, ChevronDown, LayoutGrid, List, Search } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, ChevronDown, ClipboardList, LayoutGrid, Search } from "lucide-react";
 import { useTasks } from "@/lib/tasks-store";
 import { statusCor, type Prioridade, type Status } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -10,24 +10,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type View = "Lista" | "Quadro" | "Calendário";
+type View = "Quadro" | "Calendário";
 
-const tabs: { key: View; label: string; icon: typeof List }[] = [
+const tabs: { key: View; label: string; icon: typeof LayoutGrid }[] = [
   { key: "Quadro", label: "Kanban", icon: LayoutGrid },
   { key: "Calendário", label: "Agenda", icon: CalendarIcon },
-  { key: "Lista", label: "Lista", icon: List },
 ];
 
-const statusOrdem: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
+const statusOrdem: Status[] = ["Pendente", "Em Progresso", "Concluído"];
 
-export function MinhasTarefasHeader({
+export function TarefasHeader({
   view,
   onViewChange,
   extraActions,
+  mode = "minhas",
 }: {
   view: View;
   onViewChange: (v: View) => void;
   extraActions?: React.ReactNode;
+  mode?: "minhas" | "geral";
 }) {
   const {
     tarefas,
@@ -38,8 +39,13 @@ export function MinhasTarefasHeader({
     myAvatar,
     myIniciais,
     contarMinhasPorStatus,
+    contarGeraisPorStatus,
     meuStatusFilter,
     setMeuStatusFilter,
+    geralStatusFilter,
+    setGeralStatusFilter,
+    geralEmpresaFilter,
+    setGeralEmpresaFilter,
   } = useTasks();
 
   const [busca, setBusca] = useState("");
@@ -48,12 +54,26 @@ export function MinhasTarefasHeader({
   const [dataDe, setDataDe] = useState("");
   const [dataAte, setDataAte] = useState("");
 
+  const statusFilter = mode === "geral" ? geralStatusFilter : meuStatusFilter;
+  const setStatusFilter = mode === "geral" ? setGeralStatusFilter : setMeuStatusFilter;
+  const contarPorStatus = mode === "geral" ? contarGeraisPorStatus : contarMinhasPorStatus;
+
   const totalMinhas = useMemo(
     () =>
       tarefas.filter(
         (t) => (t.tipo ?? "tarefa") === "tarefa" && t.responsaveis.some((r) => r.id === myId),
       ).length,
     [tarefas, myId],
+  );
+
+  const totalGerais = useMemo(
+    () =>
+      tarefas.filter(
+        (t) =>
+          (t.tipo ?? "tarefa") === "tarefa" &&
+          (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter),
+      ).length,
+    [tarefas, geralEmpresaFilter],
   );
 
   const empresasComMinhas = useMemo(() => {
@@ -65,6 +85,11 @@ export function MinhasTarefasHeader({
     );
     return clientes.filter((c) => ids.has(c.id));
   }, [tarefas, clientes, myId]);
+
+  const empresasAtivas = useMemo(
+    () => clientes.filter((c) => (c.status ?? "ativo") === "ativo"),
+    [clientes],
+  );
 
   return (
     <header className="border-b border-border bg-background">
@@ -79,7 +104,11 @@ export function MinhasTarefasHeader({
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="relative shrink-0">
-            {myAvatar ? (
+            {mode === "geral" ? (
+              <div className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground ring-2 ring-primary/40">
+                <ClipboardList className="h-5 w-5" />
+              </div>
+            ) : myAvatar ? (
               <img
                 src={myAvatar}
                 alt={myNome}
@@ -93,23 +122,23 @@ export function MinhasTarefasHeader({
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold leading-tight text-foreground">
-              {myNome || "Minhas tarefas"}
+              {mode === "geral" ? "Tarefas Gerais" : myNome || "Minhas tarefas"}
             </h1>
-            {myEmail && (
-              <p className="truncate text-xs text-muted-foreground">{myEmail}</p>
-            )}
+            <p className="truncate text-xs text-muted-foreground">
+              {mode === "geral" ? "Tarefas de toda a agência" : myEmail}
+            </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {statusOrdem.map((s) => {
-            const count = contarMinhasPorStatus(s);
+            const count = contarPorStatus(s);
             const cor = statusCor[s];
-            const active = meuStatusFilter === s;
+            const active = statusFilter === s;
             return (
               <button
                 key={s}
-                onClick={() => setMeuStatusFilter(active ? null : s)}
+                onClick={() => setStatusFilter(active ? null : s)}
                 title={s}
                 className={cn(
                   "inline-flex h-8 min-w-[56px] items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-semibold transition-all",
@@ -152,14 +181,14 @@ export function MinhasTarefasHeader({
         </FiltroPill>
 
         <FiltroPill
-          label={meuStatusFilter ?? "Todos Status"}
-          swatch={meuStatusFilter ? statusCor[meuStatusFilter] : undefined}
+          label={statusFilter ?? "Todos Status"}
+          swatch={statusFilter ? statusCor[statusFilter] : undefined}
         >
-          <DropdownMenuItem onClick={() => setMeuStatusFilter(null)} className="text-sm">
+          <DropdownMenuItem onClick={() => setStatusFilter(null)} className="text-sm">
             Todos Status
           </DropdownMenuItem>
           {statusOrdem.map((s) => (
-            <DropdownMenuItem key={s} onClick={() => setMeuStatusFilter(s)} className="text-sm">
+            <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)} className="text-sm">
               <span className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: statusCor[s] }} />
               {s}
             </DropdownMenuItem>
@@ -168,16 +197,27 @@ export function MinhasTarefasHeader({
 
         <FiltroPill
           label={
-            empresa === "todas"
-              ? "Todas Empresas"
-              : clientes.find((c) => c.id === empresa)?.nome_empresa ?? "Empresa"
+            mode === "geral"
+              ? geralEmpresaFilter === "todas"
+                ? "Todas Empresas"
+                : clientes.find((c) => c.id === geralEmpresaFilter)?.nome_empresa ?? "Empresa"
+              : empresa === "todas"
+                ? "Todas Empresas"
+                : clientes.find((c) => c.id === empresa)?.nome_empresa ?? "Empresa"
           }
         >
-          <DropdownMenuItem onClick={() => setEmpresa("todas")} className="text-sm">
+          <DropdownMenuItem
+            onClick={() => (mode === "geral" ? setGeralEmpresaFilter("todas") : setEmpresa("todas"))}
+            className="text-sm"
+          >
             Todas Empresas
           </DropdownMenuItem>
-          {empresasComMinhas.map((c) => (
-            <DropdownMenuItem key={c.id} onClick={() => setEmpresa(c.id)} className="text-sm">
+          {(mode === "geral" ? empresasAtivas : empresasComMinhas).map((c) => (
+            <DropdownMenuItem
+              key={c.id}
+              onClick={() => (mode === "geral" ? setGeralEmpresaFilter(c.id) : setEmpresa(c.id))}
+              className="text-sm"
+            >
               <span className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: c.cor }} />
               {c.nome_empresa}
             </DropdownMenuItem>
@@ -202,7 +242,9 @@ export function MinhasTarefasHeader({
           />
         </div>
 
-        <div className="ml-auto text-xs text-muted-foreground">{totalMinhas} tarefas</div>
+        <div className="ml-auto text-xs text-muted-foreground">
+          {mode === "geral" ? totalGerais : totalMinhas} tarefas
+        </div>
       </div>
 
       {/* Tabs */}
