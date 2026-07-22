@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Shield, ShieldCheck, User, Mail, Clock, Building2, Power, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/tasks-store";
-import { getMyRole, createInvites, updateMemberRole, setMemberStatus, deleteMember } from "@/lib/data.functions";
+import { getMyRole, createInvites, updateMemberRole, setMemberStatus, deleteMember, deleteInvite } from "@/lib/data.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -212,9 +212,19 @@ export function MembersView() {
   const updateRoleFn = useServerFn(updateMemberRole);
   const setStatusFn = useServerFn(setMemberStatus);
   const deleteMemberFn = useServerFn(deleteMember);
+  const deleteInviteFn = useServerFn(deleteInvite);
   const queryClient = useQueryClient();
   const [isAdmin, setIsAdmin] = useState(false);
   const [pendentes, setPendentes] = useState<ConvitePendente[]>([]);
+
+  const recarregarPendentes = async () => {
+    const { data } = await supabase
+      .from("convites")
+      .select("id, email, cargo, criado_em")
+      .eq("status", "pendente")
+      .order("criado_em", { ascending: false });
+    setPendentes((data ?? []) as ConvitePendente[]);
+  };
 
   useEffect(() => {
     (async () => {
@@ -222,14 +232,7 @@ export function MembersView() {
         const r = await getMyRoleFn();
         const admin = r.cargo === "Admin";
         setIsAdmin(admin);
-        if (admin) {
-          const { data } = await supabase
-            .from("convites")
-            .select("id, email, cargo, criado_em")
-            .eq("status", "pendente")
-            .order("criado_em", { ascending: false });
-          setPendentes((data ?? []) as ConvitePendente[]);
-        }
+        if (admin) await recarregarPendentes();
       } catch {
         // ignore
       }
@@ -242,6 +245,16 @@ export function MembersView() {
       toast.success("Convite reenviado.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao reenviar.");
+    }
+  };
+
+  const excluirConvite = async (c: ConvitePendente) => {
+    try {
+      await deleteInviteFn({ data: { id: c.id } });
+      toast.success("Convite excluído.");
+      setPendentes((prev) => prev.filter((p) => p.id !== c.id));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir convite.");
     }
   };
 
@@ -425,6 +438,30 @@ export function MembersView() {
                   <Button size="sm" variant="ghost" onClick={() => reenviar(c)}>
                     Reenviar
                   </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-600 hover:text-destructive" title="Excluir convite">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir convite de {c.email}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          O convite é cancelado. Se essa pessoa tentar se cadastrar depois, vai precisar de um novo convite.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => excluirConvite(c)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               ))
             )}

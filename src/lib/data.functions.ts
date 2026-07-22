@@ -426,6 +426,24 @@ export const createInvites = createServerFn({ method: "POST" })
     return { ok: true, count: rows.length, emailsEnviados };
   });
 
+const deleteInviteSchema = z.object({ id: z.string().uuid() });
+
+/** Admin: cancela/exclui um convite pendente. */
+export const deleteInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => deleteInviteSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase.from("convites").delete().eq("id", data.id);
+    if (error) {
+      if (error.code === "42501" || /row-level security/i.test(error.message)) {
+        throw new Error("Apenas Admins podem excluir convites.");
+      }
+      throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
 const updateMemberRoleSchema = z.object({
   user_id: z.string().uuid(),
   cargo: z.enum(["Admin", "Supervisor", "Membro"]),
