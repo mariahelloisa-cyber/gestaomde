@@ -1,6 +1,3 @@
--- O app deixou de rodar em gestaomde.lovable.app e passou a rodar no domínio
--- próprio (xn--gestomde-uza.tec.br). Atualiza as URLs hardcoded usadas pelos
--- webhooks internos (designação de tarefa e lembretes/expirados diários).
 
 CREATE OR REPLACE FUNCTION public.notificar_designacao_email()
 RETURNS trigger
