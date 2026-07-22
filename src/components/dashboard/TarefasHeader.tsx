@@ -33,6 +33,7 @@ export function TarefasHeader({
   const {
     tarefas,
     clientes,
+    membros,
     myId,
     myNome,
     myEmail,
@@ -46,6 +47,8 @@ export function TarefasHeader({
     setGeralStatusFilter,
     geralEmpresaFilter,
     setGeralEmpresaFilter,
+    geralMembroFilter,
+    setGeralMembroFilter,
   } = useTasks();
 
   const [busca, setBusca] = useState("");
@@ -71,9 +74,10 @@ export function TarefasHeader({
       tarefas.filter(
         (t) =>
           (t.tipo ?? "tarefa") === "tarefa" &&
-          (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter),
+          (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter) &&
+          (geralMembroFilter === "todos" || t.responsaveis.some((r) => r.id === geralMembroFilter)),
       ).length,
-    [tarefas, geralEmpresaFilter],
+    [tarefas, geralEmpresaFilter, geralMembroFilter],
   );
 
   const empresasComMinhas = useMemo(() => {
@@ -223,6 +227,31 @@ export function TarefasHeader({
             </DropdownMenuItem>
           ))}
         </FiltroPill>
+
+        {mode === "geral" && (
+          <FiltroPill
+            label={
+              geralMembroFilter === "todos"
+                ? "Todos os Membros"
+                : membros.find((m) => m.id === geralMembroFilter)?.nome ?? "Membro"
+            }
+          >
+            <DropdownMenuItem onClick={() => setGeralMembroFilter("todos")} className="text-sm">
+              Todos os Membros
+            </DropdownMenuItem>
+            {membros.map((m) => (
+              <DropdownMenuItem key={m.id} onClick={() => setGeralMembroFilter(m.id)} className="text-sm">
+                <span
+                  className="mr-2 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+                  style={{ backgroundColor: m.cor }}
+                >
+                  {m.iniciais}
+                </span>
+                {m.nome}
+              </DropdownMenuItem>
+            ))}
+          </FiltroPill>
+        )}
 
         <div className="flex items-center gap-1.5 rounded-lg border border-border bg-[var(--surface-2)] px-2 py-1.5 text-xs">
           <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />

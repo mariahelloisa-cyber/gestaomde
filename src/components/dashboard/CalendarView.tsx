@@ -19,7 +19,7 @@ export function CalendarView({
   clienteFilterId,
   scope = clienteFilterId ? "cliente" : "pessoal",
 }: { clienteFilterId?: string; scope?: CalendarScope } = {}) {
-  const { tarefas: todas, clientes, openTask, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter } = useTasks();
+  const { tarefas: todas, clientes, openTask, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter } = useTasks();
   const tarefas = useMemo(() => {
     return todas.filter((t) => {
       const isLembrete = t.tipo === "lembrete";
@@ -29,7 +29,8 @@ export function CalendarView({
       if (scope === "sem-cliente") {
         if (isLembrete) return false;
         if (geralStatusFilter && t.status !== geralStatusFilter) return false;
-        if (geralEmpresaFilter !== "todas") return t.cliente_id === geralEmpresaFilter;
+        if (geralEmpresaFilter !== "todas" && t.cliente_id !== geralEmpresaFilter) return false;
+        if (geralMembroFilter !== "todos" && !t.responsaveis.some((r) => r.id === geralMembroFilter)) return false;
         return true;
       }
       if (scope === "geral") {
@@ -45,7 +46,7 @@ export function CalendarView({
       const esc = t.escopo ?? "geral";
       return esc === "geral" || t.criado_por === (myIniciais || USUARIO_LOGADO_INICIAIS);
     });
-  }, [todas, scope, clienteFilterId, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter]);
+  }, [todas, scope, clienteFilterId, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter]);
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
     d.setDate(1);

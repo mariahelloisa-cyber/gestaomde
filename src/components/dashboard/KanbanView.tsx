@@ -79,12 +79,12 @@ const colunas: { status: Status; label: string; icon: typeof Clock }[] = [
 ];
 
 export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: string; semCliente?: boolean } = {}) {
-  const { tarefas, updateTarefa, openTask, myId, myCargo, meuStatusFilter, geralStatusFilter, geralEmpresaFilter } = useTasks();
+  const { tarefas, updateTarefa, openTask, myId, myCargo, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter } = useTasks();
   const apenasMinhas = !semCliente && !clienteFilterId;
   const isAdmin = myCargo === "Admin";
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  // No escopo "geral" (semCliente) o filtro de empresa vem do contexto e pode
-  // restringir a visão a um único cliente, mesmo sendo o escopo da agência inteira.
+  // No escopo "geral" (semCliente) os filtros de empresa e membro vêm do
+  // contexto e podem restringir a visão, mesmo sendo o escopo da agência inteira.
   const empresaEfetiva = semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
 
   const onDrop = (status: Status) => {
@@ -107,6 +107,7 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
           if (semCliente) {
             if (geralStatusFilter && t.status !== geralStatusFilter) return false;
             if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
+            if (geralMembroFilter !== "todos" && !t.responsaveis.some((r) => r.id === geralMembroFilter)) return false;
             return true;
           }
           if (clienteFilterId) return t.cliente_id === clienteFilterId;

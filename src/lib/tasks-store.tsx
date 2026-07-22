@@ -134,6 +134,8 @@ interface TasksCtx {
   setGeralStatusFilter: (s: Status | null) => void;
   geralEmpresaFilter: string | "todas";
   setGeralEmpresaFilter: (id: string | "todas") => void;
+  geralMembroFilter: string | "todos";
+  setGeralMembroFilter: (id: string | "todos") => void;
 }
 
 const Ctx = createContext<TasksCtx | null>(null);
@@ -145,6 +147,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [meuStatusFilter, setMeuStatusFilter] = useState<Status | null>(null);
   const [geralStatusFilter, setGeralStatusFilter] = useState<Status | null>(null);
   const [geralEmpresaFilter, setGeralEmpresaFilter] = useState<string | "todas">("todas");
+  const [geralMembroFilter, setGeralMembroFilter] = useState<string | "todos">("todos");
 
   const queryClient = useQueryClient();
   const fetchDashboard = useServerFn(getDashboardData);
@@ -411,9 +414,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         (t) =>
           (t.tipo ?? "tarefa") === "tarefa" &&
           t.status === s &&
-          (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter),
+          (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter) &&
+          (geralMembroFilter === "todos" || t.responsaveis.some((r) => r.id === geralMembroFilter)),
       ).length,
-    [tarefas, geralEmpresaFilter],
+    [tarefas, geralEmpresaFilter, geralMembroFilter],
   );
 
   const clientesAtivos = useCallback(() => {
@@ -479,8 +483,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       setGeralStatusFilter,
       geralEmpresaFilter,
       setGeralEmpresaFilter,
+      geralMembroFilter,
+      setGeralMembroFilter,
     }),
-    [tarefas, clientes, membros, planos, transacoes, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, addChecklistItem, toggleChecklistItem, removerChecklistItem, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter],
+    [tarefas, clientes, membros, planos, transacoes, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, addChecklistItem, toggleChecklistItem, removerChecklistItem, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
