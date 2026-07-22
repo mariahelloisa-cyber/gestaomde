@@ -148,6 +148,38 @@ export type Database = {
           },
         ]
       }
+      tarefa_checklist_itens: {
+        Row: {
+          concluido: boolean
+          criado_em: string
+          id: string
+          tarefa_id: string
+          texto: string
+        }
+        Insert: {
+          concluido?: boolean
+          criado_em?: string
+          id?: string
+          tarefa_id: string
+          texto: string
+        }
+        Update: {
+          concluido?: boolean
+          criado_em?: string
+          id?: string
+          tarefa_id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_checklist_itens_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "tarefas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_planos: {
         Row: {
           atualizado_em: string

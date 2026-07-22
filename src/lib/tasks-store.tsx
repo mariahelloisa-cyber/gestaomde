@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import type { Cliente, Comentario, Status, Tarefa } from "./mock-data";
+import type { Cliente, ChecklistItem, Comentario, Status, Tarefa } from "./mock-data";
 import {
   addComentario as addComentarioFn,
   createTarefa as createTarefaFn,
@@ -16,6 +16,9 @@ import {
   updatePlano as updatePlanoFn,
   addServicoAvulso as addServicoAvulsoFn,
   deleteTransacao as deleteTransacaoFn,
+  addChecklistItem as addChecklistItemFn,
+  toggleChecklistItem as toggleChecklistItemFn,
+  deleteChecklistItem as deleteChecklistItemFn,
 } from "./data.functions";
 
 export interface Membro {
@@ -114,6 +117,9 @@ interface TasksCtx {
   openTask: (id: string) => void;
   closeTask: () => void;
   addComentario: (taskId: string, c: Omit<Comentario, "id" | "criado_em">) => void;
+  addChecklistItem: (tarefaId: string, texto: string) => void;
+  toggleChecklistItem: (id: string, concluido: boolean) => void;
+  removerChecklistItem: (id: string) => void;
   workspace: WorkspaceView;
   setWorkspace: (v: WorkspaceView) => void;
   contarTarefasCliente: (clienteId: string) => number;
@@ -144,6 +150,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const updateFn = useServerFn(updateTarefaFn);
   const commentFn = useServerFn(addComentarioFn);
   const deleteFn = useServerFn(deleteTarefaFn);
+  const addChecklistFn = useServerFn(addChecklistItemFn);
+  const toggleChecklistFn = useServerFn(toggleChecklistItemFn);
+  const deleteChecklistFn = useServerFn(deleteChecklistItemFn);
   const createClienteServerFn = useServerFn(createClienteFn);
   const setStatusFn = useServerFn(setClienteStatusFn);
   const deleteClienteServerFn = useServerFn(deleteClienteFn);
@@ -211,6 +220,24 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       commentFn({ data: vars }),
     onSuccess: invalidate,
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao comentar"),
+  });
+
+  const addChecklistMut = useMutation({
+    mutationFn: (vars: { tarefa_id: string; texto: string }) => addChecklistFn({ data: vars }),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao adicionar item"),
+  });
+
+  const toggleChecklistMut = useMutation({
+    mutationFn: (vars: { id: string; concluido: boolean }) => toggleChecklistFn({ data: vars }),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao atualizar item"),
+  });
+
+  const deleteChecklistMut = useMutation({
+    mutationFn: (id: string) => deleteChecklistFn({ data: { id } }),
+    onSuccess: invalidate,
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao excluir item"),
   });
 
   const deleteMut = useMutation({
@@ -343,6 +370,16 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     [commentMut],
   );
 
+  const addChecklistItem = useCallback(
+    (tarefaId: string, texto: string) => addChecklistMut.mutate({ tarefa_id: tarefaId, texto }),
+    [addChecklistMut],
+  );
+  const toggleChecklistItem = useCallback(
+    (id: string, concluido: boolean) => toggleChecklistMut.mutate({ id, concluido }),
+    [toggleChecklistMut],
+  );
+  const removerChecklistItem = useCallback((id: string) => deleteChecklistMut.mutate(id), [deleteChecklistMut]);
+
   const contarTarefasCliente = useCallback(
     (clienteId: string) => tarefas.filter((t) => (t.tipo ?? "tarefa") === "tarefa" && t.cliente_id === clienteId && t.status !== "Concluído").length,
     [tarefas],
@@ -425,6 +462,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       openTask,
       closeTask,
       addComentario,
+      addChecklistItem,
+      toggleChecklistItem,
+      removerChecklistItem,
       workspace,
       setWorkspace,
       contarTarefasCliente,
@@ -438,7 +478,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       geralEmpresaFilter,
       setGeralEmpresaFilter,
     }),
-    [tarefas, clientes, membros, planos, transacoes, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter],
+    [tarefas, clientes, membros, planos, transacoes, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, addChecklistItem, toggleChecklistItem, removerChecklistItem, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

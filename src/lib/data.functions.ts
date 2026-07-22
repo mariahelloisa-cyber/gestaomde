@@ -45,7 +45,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
 
-    const [profilesRes, clientesRes, tarefasRes, respRes, comentariosRes, planosRes, transRes] = await Promise.all([
+    const [profilesRes, clientesRes, tarefasRes, respRes, comentariosRes, checklistRes, planosRes, transRes] = await Promise.all([
       supabase.from("perfis_usuarios").select("id, nome, email, avatar_url, cargo, status, criado_em"),
       supabase.from("clientes").select("id, nome_empresa, plano, endereco, documento, email, contrato_url, status").order("nome_empresa"),
       supabase
@@ -54,6 +54,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
         .order("data_criacao", { ascending: false }),
       supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id"),
       supabase.from("comentarios_tarefa").select("id, tarefa_id, usuario_id, conteudo, criado_em").order("criado_em"),
+      supabase.from("tarefa_checklist_itens").select("id, tarefa_id, texto, concluido, criado_em").order("criado_em"),
       supabase.from("configuracoes_planos").select("id, nome_plano, valor_mensal, servicos_inclusos").order("valor_mensal"),
       supabase.from("financeiro_transacoes").select("id, cliente_id, tipo, descricao, valor, data_pagamento").order("data_pagamento", { ascending: false }),
     ]);
@@ -63,6 +64,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
     if (tarefasRes.error) throw new Error(tarefasRes.error.message);
     if (respRes.error) throw new Error(respRes.error.message);
     if (comentariosRes.error) throw new Error(comentariosRes.error.message);
+    if (checklistRes.error) throw new Error(checklistRes.error.message);
     if (planosRes.error) throw new Error(planosRes.error.message);
     if (transRes.error) throw new Error(transRes.error.message);
 
@@ -102,6 +104,13 @@ export const getDashboardData = createServerFn({ method: "GET" })
         criado_em: c.criado_em,
       });
       comentariosByTarefa.set(c.tarefa_id, arr);
+    }
+
+    const checklistByTarefa = new Map<string, Array<{ id: string; texto: string; concluido: boolean }>>();
+    for (const item of checklistRes.data ?? []) {
+      const arr = checklistByTarefa.get(item.tarefa_id) ?? [];
+      arr.push({ id: item.id, texto: item.texto, concluido: item.concluido });
+      checklistByTarefa.set(item.tarefa_id, arr);
     }
 
     const clientes = (clientesRes.data ?? []).map((c) => ({
@@ -150,6 +159,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
           escopo: t.escopo,
           criado_por: criadoPorProfile ? initialsFromName(criadoPorProfile.nome) : undefined,
           comentarios: comentariosByTarefa.get(t.id) ?? [],
+          checklist: checklistByTarefa.get(t.id) ?? [],
         };
       });
 
@@ -310,6 +320,55 @@ export const addComentario = createServerFn({ method: "POST" })
       usuario_id: userId,
       conteudo: data.conteudo,
     });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const addChecklistItemSchema = z.object({
+  tarefa_id: z.string().uuid(),
+  texto: z.string().trim().min(1).max(500),
+});
+
+export const addChecklistItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => addChecklistItemSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: novo, error } = await supabase
+      .from("tarefa_checklist_itens")
+      .insert({ tarefa_id: data.tarefa_id, texto: data.texto })
+      .select("id")
+      .single();
+    if (error || !novo) throw new Error(error?.message ?? "Falha ao adicionar item");
+    return { id: novo.id };
+  });
+
+const toggleChecklistItemSchema = z.object({
+  id: z.string().uuid(),
+  concluido: z.boolean(),
+});
+
+export const toggleChecklistItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => toggleChecklistItemSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("tarefa_checklist_itens")
+      .update({ concluido: data.concluido })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const deleteChecklistItemSchema = z.object({ id: z.string().uuid() });
+
+export const deleteChecklistItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => deleteChecklistItemSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase.from("tarefa_checklist_itens").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

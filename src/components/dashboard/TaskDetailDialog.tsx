@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Check, Flag, Send, Trash2 } from "lucide-react";
+import { CalendarIcon, Check, Flag, ListChecks, Plus, Send, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -58,7 +58,19 @@ function relativo(iso: string): string {
 }
 
 export function TaskDetailDialog() {
-  const { tarefas, clientes, selectedTaskId, closeTask, updateTarefa, addComentario, removerTarefa, myCargo } = useTasks();
+  const {
+    tarefas,
+    clientes,
+    selectedTaskId,
+    closeTask,
+    updateTarefa,
+    addComentario,
+    removerTarefa,
+    myCargo,
+    addChecklistItem,
+    toggleChecklistItem,
+    removerChecklistItem,
+  } = useTasks();
   const tarefa = tarefas.find((t) => t.id === selectedTaskId) ?? null;
   const cliente = tarefa ? clientes.find((c) => c.id === tarefa.cliente_id) : null;
   const isAdmin = myCargo === "Admin";
@@ -66,6 +78,7 @@ export function TaskDetailDialog() {
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [comentario, setComentario] = useState("");
+  const [novoItem, setNovoItem] = useState("");
 
   useEffect(() => {
     if (tarefa) {
@@ -76,6 +89,18 @@ export function TaskDetailDialog() {
   }, [tarefa?.id]);
 
   if (!tarefa) return null;
+
+  const checklist = tarefa.checklist ?? [];
+  const totalItens = checklist.length;
+  const concluidosItens = checklist.filter((i) => i.concluido).length;
+  const progresso = totalItens > 0 ? Math.round((concluidosItens / totalItens) * 100) : 0;
+
+  const adicionarItem = () => {
+    const v = novoItem.trim();
+    if (!v) return;
+    addChecklistItem(tarefa.id, v);
+    setNovoItem("");
+  };
 
   const commitTitulo = () => {
     const v = titulo.trim();
@@ -176,6 +201,82 @@ export function TaskDetailDialog() {
               placeholder="Escreva uma descrição..."
               className="mt-4 min-h-[120px] resize-none border-border/60 bg-[var(--surface-1)] text-sm shadow-none focus-visible:ring-1"
             />
+
+            {/* Checklist */}
+            <div className="mt-6">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <ListChecks className="h-3.5 w-3.5" />
+                Checklist
+                {totalItens > 0 && (
+                  <span className="normal-case tracking-normal text-muted-foreground/80">
+                    ({concluidosItens}/{totalItens})
+                  </span>
+                )}
+              </h3>
+
+              {totalItens > 0 && (
+                <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${progresso}%` }}
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-0.5">
+                {checklist.map((item) => (
+                  <div
+                    key={item.id}
+                    className="group flex items-center gap-2 rounded-md px-1 py-1.5 hover:bg-muted/40"
+                  >
+                    <button
+                      onClick={() => toggleChecklistItem(item.id, !item.concluido)}
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                        item.concluido
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border",
+                      )}
+                    >
+                      {item.concluido && <Check className="h-3 w-3" />}
+                    </button>
+                    <span
+                      className={cn(
+                        "flex-1 text-sm",
+                        item.concluido && "text-muted-foreground line-through",
+                      )}
+                    >
+                      {item.texto}
+                    </span>
+                    <button
+                      onClick={() => removerChecklistItem(item.id)}
+                      className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-destructive group-hover:opacity-100"
+                      title="Remover item"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  value={novoItem}
+                  onChange={(e) => setNovoItem(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      adicionarItem();
+                    }
+                  }}
+                  placeholder="Adicionar item ao checklist..."
+                  className="h-9 flex-1 rounded-md border border-border bg-[var(--surface-1)] px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+                />
+                <Button size="icon" className="h-9 w-9 shrink-0" onClick={adicionarItem} disabled={!novoItem.trim()}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
             {/* Comentários */}
             <div className="mt-6">

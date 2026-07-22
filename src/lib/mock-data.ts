@@ -25,6 +25,7 @@ export interface Tarefa {
   data_vencimento: string; // ISO YYYY-MM-DD
   descricao?: string;
   comentarios?: Comentario[];
+  checklist?: ChecklistItem[];
   tipo?: TipoItem; // default: "tarefa"
   escopo?: EscopoItem; // relevante apenas para lembretes; default "geral"
   criado_por?: string; // iniciais do usuário criador (privado p/ lembretes)
@@ -35,6 +36,12 @@ export interface Comentario {
   autor: { nome: string; iniciais: string; cor?: string };
   conteudo: string;
   criado_em: string; // ISO timestamp
+}
+
+export interface ChecklistItem {
+  id: string;
+  texto: string;
+  concluido: boolean;
 }
 
 export interface Membro {
