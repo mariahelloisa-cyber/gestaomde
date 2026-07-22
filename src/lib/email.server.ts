@@ -69,7 +69,7 @@ export async function logEmail(params: {
   tarefa_id: string | null;
   usuario_id: string | null;
   destinatario: string | null;
-  tipo: "designacao" | "lembrete" | "expirado" | "teste" | "convite" | "em_analise";
+  tipo: "designacao" | "lembrete" | "expirado" | "teste" | "convite" | "em_analise" | "ideia";
   assunto: string;
   mensagem: string;
   result: SendResult;
@@ -277,6 +277,39 @@ export function msgEmAnalise(opts: EmAnaliseInput) {
     opts.vencimento ? `- Vencimento: ${formatDataBR(opts.vencimento)}` : null,
     "",
     "Acesse o painel para revisar e, se estiver tudo certo, marcar como concluída.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return { assunto, html, text };
+}
+
+export type NovaIdeiaInput = {
+  nomeAdmin: string;
+  autor: string;
+  titulo: string;
+  descricao: string | null;
+};
+
+export function msgNovaIdeia(opts: NovaIdeiaInput) {
+  const assunto = `Nova ideia enviada: ${opts.titulo}`;
+  const items: Array<[string, string]> = [
+    ["Ideia", opts.titulo],
+    ["Enviada por", opts.autor],
+  ];
+  const html = wrapHtml(
+    `Olá, ${opts.nomeAdmin}!`,
+    `${opts.autor} acabou de enviar uma nova ideia para avaliação.`,
+    items,
+    "Acesse o painel para aceitar (com pontuação) ou rejeitar.",
+  );
+  const text = [
+    `Olá, ${opts.nomeAdmin}!`,
+    "",
+    `${opts.autor} acabou de enviar uma nova ideia para avaliação:`,
+    `- ${opts.titulo}`,
+    opts.descricao ? `- Descrição: ${opts.descricao}` : null,
+    "",
+    "Acesse o painel para aceitar (com pontuação) ou rejeitar.",
   ]
     .filter(Boolean)
     .join("\n");

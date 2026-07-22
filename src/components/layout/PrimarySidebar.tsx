@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Mail, Inbox, Link2, Sun, Moon } from "lucide-react";
+import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Mail, Inbox, Link2, CheckCheck, Lightbulb, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/tasks-store";
 import { InviteDialog } from "./InviteDialog";
@@ -40,6 +40,10 @@ export function PrimarySidebar() {
                       ? "Demandas"
                       : workspace.tipo === "links"
                         ? "Links"
+                        : workspace.tipo === "finalizados"
+                          ? "Finalizados"
+                          : workspace.tipo === "ideias"
+                            ? "Ideias"
                     : "Minhas tarefas";
 
   const items: { icon: typeof Home; label: string; onClick: () => void }[] = [
@@ -147,6 +151,24 @@ export function PrimarySidebar() {
             expanded={expanded}
             active={active === "Links"}
             onClick={() => setWorkspace({ tipo: "links" })}
+          />
+
+          {isAdminLike && (
+            <NavButton
+              icon={CheckCheck}
+              label="Finalizados"
+              expanded={expanded}
+              active={active === "Finalizados"}
+              onClick={() => setWorkspace({ tipo: "finalizados" })}
+            />
+          )}
+
+          <NavButton
+            icon={Lightbulb}
+            label="Ideias"
+            expanded={expanded}
+            active={active === "Ideias"}
+            onClick={() => setWorkspace({ tipo: "ideias" })}
           />
 
           {isAdminLike && (

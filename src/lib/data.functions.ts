@@ -26,9 +26,10 @@ function toDateOnly(value: string | null | undefined): string {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+/** Vencimento vale até o fim do dia (23:59:59 no horário de Brasília, UTC-3), não a partir da meia-noite. */
 function toTimestamp(yyyymmdd: string | undefined | null): string | null {
   if (!yyyymmdd) return null;
-  return new Date(`${yyyymmdd}T00:00:00.000Z`).toISOString();
+  return new Date(`${yyyymmdd}T23:59:59.000-03:00`).toISOString();
 }
 
 /** Tolera valores de status legados/inesperados que não existam mais no enum. */
@@ -50,7 +51,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
       supabase.from("clientes").select("id, nome_empresa, plano, endereco, documento, email, contrato_url, status").order("nome_empresa"),
       supabase
         .from("tarefas")
-        .select("id, cliente_id, titulo, status, prioridade, data_vencimento, descricao, tipo, escopo, criado_por")
+        .select("id, cliente_id, titulo, status, prioridade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em")
         .order("data_criacao", { ascending: false }),
       supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id"),
       supabase.from("comentarios_tarefa").select("id, tarefa_id, usuario_id, conteudo, criado_em").order("criado_em"),
@@ -131,6 +132,13 @@ export const getDashboardData = createServerFn({ method: "GET" })
         .map((c) => c.id)
     );
 
+    // Membros comuns só enxergam tarefas em que estão designados como
+    // responsáveis; Admins e Supervisores continuam vendo tudo. Lembretes têm
+    // sua própria regra de visibilidade (geral/pessoal) aplicada no front-end,
+    // então ficam de fora desse filtro.
+    const meuCargo = (profileById.get(userId)?.cargo as string) ?? "Membro";
+    const isAdminLike = meuCargo === "Admin" || meuCargo === "Supervisor";
+
     const tarefas = (tarefasRes.data ?? [])
       .filter((t) => {
         if (!t.cliente_id) return true;
@@ -154,6 +162,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
           prioridade: t.prioridade,
           responsaveis,
           data_vencimento: toDateOnly(t.data_vencimento),
+          concluido_em: t.concluido_em ?? null,
           descricao: t.descricao ?? undefined,
           tipo: t.tipo,
           escopo: t.escopo,
@@ -161,6 +170,11 @@ export const getDashboardData = createServerFn({ method: "GET" })
           comentarios: comentariosByTarefa.get(t.id) ?? [],
           checklist: checklistByTarefa.get(t.id) ?? [],
         };
+      })
+      .filter((t) => {
+        if (isAdminLike) return true;
+        if ((t.tipo ?? "tarefa") === "lembrete") return true;
+        return t.responsaveis.some((r) => r.id === userId);
       });
 
     const meProfile = profileById.get(userId);

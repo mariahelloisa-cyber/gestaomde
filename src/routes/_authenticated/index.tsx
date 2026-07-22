@@ -17,6 +17,8 @@ import { DashboardView } from "@/components/dashboard/DashboardView";
 import { SystemSettingsView } from "@/components/dashboard/SystemSettingsView";
 import { DemandasView } from "@/components/dashboard/DemandasView";
 import { LinksView } from "@/components/dashboard/LinksView";
+import { FinalizadosView } from "@/components/dashboard/FinalizadosView";
+import { IdeiasView } from "@/components/dashboard/IdeiasView";
 import { ClientPortal } from "@/components/portal/ClientPortal";
 import { getMyPortalContext } from "@/lib/data.functions";
 import { Plus } from "lucide-react";
@@ -70,7 +72,8 @@ function WorkspaceContent() {
     !isAdminLike &&
     (workspace.tipo === "financeiro" ||
       workspace.tipo === "configuracoes" ||
-      workspace.tipo === "demandas");
+      workspace.tipo === "demandas" ||
+      workspace.tipo === "finalizados");
 
   if (workspace.tipo === "dashboard") {
     return (
@@ -183,6 +186,22 @@ function WorkspaceContent() {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
         <LinksView />
+      </div>
+    );
+  }
+
+  if (workspace.tipo === "finalizados") {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
+        <FinalizadosView />
+      </div>
+    );
+  }
+
+  if (workspace.tipo === "ideias") {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
+        <IdeiasView />
       </div>
     );
   }

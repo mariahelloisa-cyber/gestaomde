@@ -108,7 +108,7 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
 
     const titulo = `Demanda externa — ${dem.solicitante_nome}`;
     const vencimento = dem.prazo_sugerido
-      ? new Date(`${dem.prazo_sugerido}T00:00:00.000Z`).toISOString()
+      ? new Date(`${dem.prazo_sugerido}T23:59:59.000-03:00`).toISOString()
       : null;
 
     const { data: nova, error: errTar } = await supabase

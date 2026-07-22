@@ -26,6 +26,7 @@ export interface Tarefa {
   descricao?: string;
   comentarios?: Comentario[];
   checklist?: ChecklistItem[];
+  concluido_em?: string | null; // ISO timestamp, definido quando status vira "Concluído"
   tipo?: TipoItem; // default: "tarefa"
   escopo?: EscopoItem; // relevante apenas para lembretes; default "geral"
   criado_por?: string; // iniciais do usuário criador (privado p/ lembretes)
@@ -122,4 +123,13 @@ export function statusPillStyle(s: Status) {
 export function prioridadePillStyle(p: Prioridade) {
   const c = prioridadeCor[p];
   return { backgroundColor: c, color: "#fff", borderColor: c } as const;
+}
+
+const DIAS_PARA_FINALIZAR = 7;
+
+/** Tarefa concluída há mais de 7 dias: sai do Kanban e passa pra aba "Finalizados". */
+export function isFinalizada(t: Tarefa): boolean {
+  if (t.status !== "Concluído" || !t.concluido_em) return false;
+  const diffDias = (Date.now() - new Date(t.concluido_em).getTime()) / 86400000;
+  return diffDias >= DIAS_PARA_FINALIZAR;
 }

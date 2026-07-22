@@ -56,6 +56,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ideias: {
+        Row: {
+          avaliado_em: string | null
+          avaliado_por: string | null
+          criado_em: string
+          criado_por: string
+          descricao: string | null
+          id: string
+          pontos: number | null
+          status: string
+          titulo: string
+        }
+        Insert: {
+          avaliado_em?: string | null
+          avaliado_por?: string | null
+          criado_em?: string
+          criado_por: string
+          descricao?: string | null
+          id?: string
+          pontos?: number | null
+          status?: string
+          titulo: string
+        }
+        Update: {
+          avaliado_em?: string | null
+          avaliado_por?: string | null
+          criado_em?: string
+          criado_por?: string
+          descricao?: string | null
+          id?: string
+          pontos?: number | null
+          status?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ideias_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideias_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pastas_links: {
         Row: {
           comentario: string | null
@@ -476,6 +527,7 @@ export type Database = {
           aviso_expirado_enviado_em: string | null
           aviso_lembrete_enviado_em: string | null
           cliente_id: string | null
+          concluido_em: string | null
           criado_por: string | null
           data_criacao: string
           data_vencimento: string | null
@@ -491,6 +543,7 @@ export type Database = {
           aviso_expirado_enviado_em?: string | null
           aviso_lembrete_enviado_em?: string | null
           cliente_id?: string | null
+          concluido_em?: string | null
           criado_por?: string | null
           data_criacao?: string
           data_vencimento?: string | null
@@ -506,6 +559,7 @@ export type Database = {
           aviso_expirado_enviado_em?: string | null
           aviso_lembrete_enviado_em?: string | null
           cliente_id?: string | null
+          concluido_em?: string | null
           criado_por?: string | null
           data_criacao?: string
           data_vencimento?: string | null

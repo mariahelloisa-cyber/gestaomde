@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as DemandasNovaRouteImport } from './routes/demandas.nova'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as ApiPublicHooksEmailIdeiaRouteImport } from './routes/api/public/hooks/email-ideia'
 import { Route as ApiPublicHooksEmailEmAnaliseRouteImport } from './routes/api/public/hooks/email-em-analise'
 import { Route as ApiPublicHooksEmailDailyRouteImport } from './routes/api/public/hooks/email-daily'
 import { Route as ApiPublicHooksEmailAssignmentRouteImport } from './routes/api/public/hooks/email-assignment'
@@ -48,6 +49,12 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksEmailIdeiaRoute =
+  ApiPublicHooksEmailIdeiaRouteImport.update({
+    id: '/api/public/hooks/email-ideia',
+    path: '/api/public/hooks/email-ideia',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksEmailEmAnaliseRoute =
   ApiPublicHooksEmailEmAnaliseRouteImport.update({
     id: '/api/public/hooks/email-em-analise',
@@ -76,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
+  '/api/public/hooks/email-ideia': typeof ApiPublicHooksEmailIdeiaRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -86,6 +94,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
+  '/api/public/hooks/email-ideia': typeof ApiPublicHooksEmailIdeiaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +107,7 @@ export interface FileRoutesById {
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
+  '/api/public/hooks/email-ideia': typeof ApiPublicHooksEmailIdeiaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
+    | '/api/public/hooks/email-ideia'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
+    | '/api/public/hooks/email-ideia'
   id:
     | '__root__'
     | '/_authenticated'
@@ -131,6 +143,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
+    | '/api/public/hooks/email-ideia'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -142,6 +155,7 @@ export interface RootRouteChildren {
   ApiPublicHooksEmailAssignmentRoute: typeof ApiPublicHooksEmailAssignmentRoute
   ApiPublicHooksEmailDailyRoute: typeof ApiPublicHooksEmailDailyRoute
   ApiPublicHooksEmailEmAnaliseRoute: typeof ApiPublicHooksEmailEmAnaliseRoute
+  ApiPublicHooksEmailIdeiaRoute: typeof ApiPublicHooksEmailIdeiaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -186,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/email-ideia': {
+      id: '/api/public/hooks/email-ideia'
+      path: '/api/public/hooks/email-ideia'
+      fullPath: '/api/public/hooks/email-ideia'
+      preLoaderRoute: typeof ApiPublicHooksEmailIdeiaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/email-em-analise': {
@@ -233,6 +254,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksEmailAssignmentRoute: ApiPublicHooksEmailAssignmentRoute,
   ApiPublicHooksEmailDailyRoute: ApiPublicHooksEmailDailyRoute,
   ApiPublicHooksEmailEmAnaliseRoute: ApiPublicHooksEmailEmAnaliseRoute,
+  ApiPublicHooksEmailIdeiaRoute: ApiPublicHooksEmailIdeiaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

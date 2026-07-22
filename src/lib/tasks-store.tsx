@@ -46,6 +46,8 @@ export type WorkspaceView =
   | { tipo: "configuracoes" }
   | { tipo: "demandas" }
   | { tipo: "links" }
+  | { tipo: "finalizados" }
+  | { tipo: "ideias" }
   | { tipo: "cliente"; clienteId: string };
 
 export type MainView = "Quadro" | "Calendário";

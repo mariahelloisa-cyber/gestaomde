@@ -28,6 +28,7 @@ import {
   statusCor,
   statusPillStyle,
   prioridadePillStyle,
+  isFinalizada,
   type Prioridade,
   type Status,
   type Tarefa,
@@ -102,6 +103,7 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
       {colunas.map((c) => {
         const list = tarefas.filter((t) => {
           if ((t.tipo ?? "tarefa") !== "tarefa" || t.status !== c.status) return false;
+          if (isFinalizada(t)) return false;
           if (semCliente) {
             if (geralStatusFilter && t.status !== geralStatusFilter) return false;
             if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
