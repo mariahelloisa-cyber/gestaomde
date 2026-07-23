@@ -1,6 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTasks } from "@/lib/tasks-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodFilter } from "./PeriodFilter";
+import { calcularProdutividade, resolverPeriodo, type Periodo, type PeriodoPreset } from "@/lib/productivity";
 import type { Tarefa, Status } from "@/lib/mock-data";
 
 type PrazoBucket = "no-prazo" | "prestes" | "expirada";
@@ -67,7 +70,15 @@ const prazoColors: Record<PrazoBucket, string> = {
 };
 
 export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean } = {}) {
-  const { tarefas, myId, loading } = useTasks();
+  const { tarefas, myId, loading, membros } = useTasks();
+  const [membroSelecionadoId, setMembroSelecionadoId] = useState<string>("");
+  const [preset, setPreset] = useState<PeriodoPreset>("30d");
+  const [customDe, setCustomDe] = useState("");
+  const [customAte, setCustomAte] = useState("");
+  const periodo = useMemo(
+    () => resolverPeriodo(preset, { de: customDe, ate: customAte }),
+    [preset, customDe, customAte],
+  );
 
   const todas = useMemo(
     () => tarefas.filter((t) => (t.tipo ?? "tarefa") === "tarefa"),
@@ -78,10 +89,21 @@ export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean
     [todas, myId],
   );
 
+  const membrosOrdenados = useMemo(
+    () => [...membros].sort((a, b) => a.nome.localeCompare(b.nome)),
+    [membros],
+  );
+  const membroSelecionado = membrosOrdenados.find((m) => m.id === membroSelecionadoId);
+  const tarefasMembro = useMemo(
+    () =>
+      membroSelecionado
+        ? todas.filter((t) => t.responsaveis.some((r) => r.id === membroSelecionado.id))
+        : [],
+    [todas, membroSelecionado],
+  );
+
   const geralStatus = useMemo(() => calcStatus(todas), [todas]);
   const geralPrazos = useMemo(() => calcPrazos(todas), [todas]);
-  const meuStatus = useMemo(() => calcStatus(minhas), [minhas]);
-  const meuPrazos = useMemo(() => calcPrazos(minhas), [minhas]);
 
   if (loading) {
     return (
@@ -107,10 +129,114 @@ export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean
           <PrazosCard data={geralPrazos} />
         </Section>
       )}
-      <Section title="Minha Visão" subtitle="Tarefas atribuídas a você">
-        <ProgressoCard data={meuStatus} />
-        <PrazosCard data={meuPrazos} />
-      </Section>
+
+      <section className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Produtividade</h2>
+            <p className="text-xs text-muted-foreground">
+              Compare tarefas recebidas x concluídas no período selecionado
+            </p>
+          </div>
+          <PeriodFilter
+            preset={preset}
+            onPresetChange={setPreset}
+            customDe={customDe}
+            customAte={customAte}
+            onCustomChange={(de, ate) => {
+              setCustomDe(de);
+              setCustomAte(ate);
+            }}
+          />
+        </div>
+
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Minha Visão</h3>
+          <MemberProductivityBlock tarefasDoMembro={minhas} membroId={myId} periodo={periodo} />
+        </div>
+
+        {!apenasMinhas && (
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-foreground">Visão por Membro</h3>
+              <Select value={membroSelecionadoId} onValueChange={setMembroSelecionadoId}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Selecione um membro" />
+                </SelectTrigger>
+                <SelectContent>
+                  {membrosOrdenados.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {membroSelecionado ? (
+              <MemberProductivityBlock
+                tarefasDoMembro={tarefasMembro}
+                membroId={membroSelecionado.id}
+                periodo={periodo}
+              />
+            ) : (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                {membrosOrdenados.length === 0
+                  ? "Nenhum membro cadastrado ainda."
+                  : "Selecione um membro acima para ver o dashboard individual."}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function MemberProductivityBlock({
+  tarefasDoMembro,
+  membroId,
+  periodo,
+}: {
+  tarefasDoMembro: Tarefa[];
+  membroId: string;
+  periodo: Periodo;
+}) {
+  const metricas = useMemo(
+    () => calcularProdutividade(tarefasDoMembro, membroId, periodo),
+    [tarefasDoMembro, membroId, periodo],
+  );
+  const status = useMemo(() => calcStatus(tarefasDoMembro), [tarefasDoMembro]);
+  const prazos = useMemo(() => calcPrazos(tarefasDoMembro), [tarefasDoMembro]);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile label="Atribuídas no período" value={String(metricas.atribuidas)} />
+        <StatTile label="Concluídas no período" value={String(metricas.concluidas)} accent={statusColors["Concluído"]} />
+        <StatTile
+          label="Taxa de conclusão"
+          value={`${metricas.taxaConclusao.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
+        />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <ProgressoCard data={status} />
+        <PrazosCard data={prazos} />
+      </div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card/80 p-4 shadow-sm">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div
+        className="mt-1 text-2xl font-semibold tabular-nums text-foreground"
+        style={accent ? { color: accent } : undefined}
+      >
+        {value}
+      </div>
     </div>
   );
 }

@@ -19,16 +19,22 @@ import {
   Minus,
   Paperclip,
   Plus,
+  SignalHigh,
+  SignalLow,
+  SignalMedium,
   User,
   X,
 } from "lucide-react";
 import {
   prioridadeCor,
+  complexidadeCor,
+  complexidadePillStyle,
   rotuloData,
   statusCor,
   statusPillStyle,
   prioridadePillStyle,
   isFinalizada,
+  type Complexidade,
   type Prioridade,
   type Status,
   type Tarefa,
@@ -61,6 +67,12 @@ const prioridadeIcon: Record<Prioridade, typeof ArrowUp> = {
   "Média": ArrowRight,
   Baixa: ArrowDown,
   Nenhuma: Minus,
+};
+
+const complexidadeIcon: Record<Complexidade, typeof SignalLow> = {
+  "Fácil": SignalLow,
+  "Média": SignalMedium,
+  "Difícil": SignalHigh,
 };
 
 function isAtrasada(t: Tarefa): boolean {
@@ -197,6 +209,8 @@ function CardTarefa({
   const atrasada = isAtrasada(tarefa);
   const PrioIcon = prioridadeIcon[tarefa.prioridade];
   const prioCor = prioridadeCor[tarefa.prioridade];
+  const ComplexIcon = complexidadeIcon[tarefa.complexidade];
+  const complexCor = complexidadeCor[tarefa.complexidade];
 
   return (
     <div
@@ -217,6 +231,17 @@ function CardTarefa({
         >
           <PrioIcon className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} />
           {tarefa.prioridade}
+        </span>
+        <span
+          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+          style={{
+            color: complexCor,
+            backgroundColor: `color-mix(in oklab, ${complexCor} 16%, transparent)`,
+            borderColor: `color-mix(in oklab, ${complexCor} 45%, transparent)`,
+          }}
+        >
+          <ComplexIcon className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} />
+          {tarefa.complexidade}
         </span>
         {atrasada && (
           <span className="inline-flex shrink-0 items-center rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
@@ -288,6 +313,7 @@ export function AddTaskDialog({
   const [data, setData] = useState<string>(defaultDate ?? "");
   const [status, setStatus] = useState<Status>(defaultStatus);
   const [prioridade, setPrioridade] = useState<Prioridade>("Nenhuma");
+  const [complexidade, setComplexidade] = useState<Complexidade>("Média");
   const [responsaveis, setResponsaveis] = useState<{ id: string; nome: string; iniciais: string }[]>([]);
   const [anexos, setAnexos] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +329,7 @@ export function AddTaskDialog({
       titulo: titulo.trim(),
       status: isLembrete ? "Pendente" : status,
       prioridade: isLembrete ? "Nenhuma" : prioridade,
+      complexidade: isLembrete ? "Média" : complexidade,
       responsaveis: isLembrete ? [] : responsaveis,
       data_vencimento: data || "",
       descricao: descricao.trim() || undefined,
@@ -432,6 +459,11 @@ export function AddTaskDialog({
                 <PrioridadePill value={prioridade} onChange={setPrioridade} />
               </MetaCard>
             )}
+            {!isLembrete && (
+              <MetaCard label="Complexidade">
+                <ComplexidadePill value={complexidade} onChange={setComplexidade} />
+              </MetaCard>
+            )}
             <MetaCard label="Prazo">
               <DataPill value={data} onChange={setData} />
             </MetaCard>
@@ -537,6 +569,7 @@ function MetaCard({ label, children }: { label: string; children: React.ReactNod
 
 const STATUSES: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
 const PRIORIDADES: Prioridade[] = ["Alta", "Média", "Baixa", "Nenhuma"];
+const COMPLEXIDADES: Complexidade[] = ["Fácil", "Média", "Difícil"];
 
 function pillBase(active?: boolean) {
   return cn(
@@ -726,6 +759,41 @@ function PrioridadePill({
             {p === value && <Check className="h-3.5 w-3.5" />}
           </DropdownMenuItem>
         ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ComplexidadePill({
+  value,
+  onChange,
+}: {
+  value: Complexidade;
+  onChange: (c: Complexidade) => void;
+}) {
+  const Icon = complexidadeIcon[value];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold uppercase tracking-wide shadow-sm transition-opacity hover:opacity-90"
+          style={complexidadePillStyle(value)}
+        >
+          <Icon className="h-3.5 w-3.5" />
+          {value}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-40">
+        {COMPLEXIDADES.map((c) => {
+          const ItemIcon = complexidadeIcon[c];
+          return (
+            <DropdownMenuItem key={c} onClick={() => onChange(c)} className="gap-2">
+              <ItemIcon className="h-3.5 w-3.5" style={{ color: complexidadeCor[c] }} />
+              <span className="flex-1">{c}</span>
+              {c === value && <Check className="h-3.5 w-3.5" />}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -491,16 +491,19 @@ export type Database = {
       }
       tarefa_responsaveis: {
         Row: {
+          criado_em: string
           id: string
           tarefa_id: string
           usuario_id: string
         }
         Insert: {
+          criado_em?: string
           id?: string
           tarefa_id: string
           usuario_id: string
         }
         Update: {
+          criado_em?: string
           id?: string
           tarefa_id?: string
           usuario_id?: string
@@ -527,6 +530,7 @@ export type Database = {
           aviso_expirado_enviado_em: string | null
           aviso_lembrete_enviado_em: string | null
           cliente_id: string | null
+          complexidade: Database["public"]["Enums"]["complexidade_tarefa"]
           concluido_em: string | null
           criado_por: string | null
           data_criacao: string
@@ -543,6 +547,7 @@ export type Database = {
           aviso_expirado_enviado_em?: string | null
           aviso_lembrete_enviado_em?: string | null
           cliente_id?: string | null
+          complexidade?: Database["public"]["Enums"]["complexidade_tarefa"]
           concluido_em?: string | null
           criado_por?: string | null
           data_criacao?: string
@@ -559,6 +564,7 @@ export type Database = {
           aviso_expirado_enviado_em?: string | null
           aviso_lembrete_enviado_em?: string | null
           cliente_id?: string | null
+          complexidade?: Database["public"]["Enums"]["complexidade_tarefa"]
           concluido_em?: string | null
           criado_por?: string | null
           data_criacao?: string
@@ -631,6 +637,7 @@ export type Database = {
     }
     Enums: {
       cargo_usuario: "Admin" | "Membro" | "Cliente" | "Supervisor"
+      complexidade_tarefa: "Fácil" | "Média" | "Difícil"
       escopo_item: "geral" | "pessoal"
       plano_cliente: "Bronze" | "Prata" | "Ouro" | "Diamond"
       prioridade_tarefa: "Alta" | "Média" | "Baixa" | "Nenhuma"
@@ -765,6 +772,7 @@ export const Constants = {
   public: {
     Enums: {
       cargo_usuario: ["Admin", "Membro", "Cliente", "Supervisor"],
+      complexidade_tarefa: ["Fácil", "Média", "Difícil"],
       escopo_item: ["geral", "pessoal"],
       plano_cliente: ["Bronze", "Prata", "Ouro", "Diamond"],
       prioridade_tarefa: ["Alta", "Média", "Baixa", "Nenhuma"],

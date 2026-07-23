@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Check, Flag, ListChecks, Plus, Send, Trash2, X } from "lucide-react";
+import { CalendarIcon, Check, Flag, ListChecks, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,8 +34,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   prioridadeCor,
+  complexidadeCor,
+  complexidadePillStyle,
   statusCor,
   prioridadePillStyle,
+  type Complexidade,
   type Prioridade,
   type Status,
 } from "@/lib/mock-data";
@@ -44,6 +47,12 @@ import { cn } from "@/lib/utils";
 
 const STATUSES: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
 const PRIORIDADES: Prioridade[] = ["Alta", "Média", "Baixa", "Nenhuma"];
+const COMPLEXIDADES: Complexidade[] = ["Fácil", "Média", "Difícil"];
+const complexidadeIcon: Record<Complexidade, typeof SignalLow> = {
+  "Fácil": SignalLow,
+  "Média": SignalMedium,
+  "Difícil": SignalHigh,
+};
 
 function relativo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -352,6 +361,13 @@ export function TaskDetailDialog() {
               />
             </MetaRow>
 
+            <MetaRow label="Complexidade">
+              <ComplexidadeDropdown
+                value={tarefa.complexidade}
+                onChange={(c) => updateTarefa(tarefa.id, { complexidade: c })}
+              />
+            </MetaRow>
+
             {cliente && (
               <MetaRow label="Cliente">
                 <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm">
@@ -433,6 +449,41 @@ function PrioridadeDropdown({
             {p === value && <Check className="h-3.5 w-3.5" />}
           </DropdownMenuItem>
         ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ComplexidadeDropdown({
+  value,
+  onChange,
+}: {
+  value: Complexidade;
+  onChange: (c: Complexidade) => void;
+}) {
+  const Icon = complexidadeIcon[value];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide shadow-sm transition-opacity hover:opacity-90"
+          style={complexidadePillStyle(value)}
+        >
+          <Icon className="h-3.5 w-3.5" />
+          {value}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-44">
+        {COMPLEXIDADES.map((c) => {
+          const ItemIcon = complexidadeIcon[c];
+          return (
+            <DropdownMenuItem key={c} onClick={() => onChange(c)} className="gap-2">
+              <ItemIcon className="h-3.5 w-3.5" style={{ color: complexidadeCor[c] }} />
+              <span className="flex-1">{c}</span>
+              {c === value && <Check className="h-3.5 w-3.5" />}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

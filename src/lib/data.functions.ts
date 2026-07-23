@@ -39,6 +39,11 @@ function normalizeStatus(raw: string): "Pendente" | "Em Progresso" | "Em Anális
     : "Pendente";
 }
 
+/** Tolera valores de complexidade legados/inesperados que não existam mais no enum. */
+function normalizeComplexidade(raw: string): "Fácil" | "Média" | "Difícil" {
+  return raw === "Fácil" || raw === "Média" || raw === "Difícil" ? raw : "Média";
+}
+
 /* ---------------- Read: full dashboard data ---------------- */
 
 export const getDashboardData = createServerFn({ method: "GET" })
@@ -51,9 +56,9 @@ export const getDashboardData = createServerFn({ method: "GET" })
       supabase.from("clientes").select("id, nome_empresa, plano, endereco, documento, email, contrato_url, status").order("nome_empresa"),
       supabase
         .from("tarefas")
-        .select("id, cliente_id, titulo, status, prioridade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em")
+        .select("id, cliente_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em")
         .order("data_criacao", { ascending: false }),
-      supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id"),
+      supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id, criado_em"),
       supabase.from("comentarios_tarefa").select("id, tarefa_id, usuario_id, conteudo, criado_em").order("criado_em"),
       supabase.from("tarefa_checklist_itens").select("id, tarefa_id, texto, concluido, criado_em").order("criado_em"),
       supabase.from("configuracoes_planos").select("id, nome_plano, valor_mensal, servicos_inclusos").order("valor_mensal"),
@@ -85,10 +90,10 @@ export const getDashboardData = createServerFn({ method: "GET" })
     }));
     const memberByIniciais = new Map(membros.map((m) => [m.iniciais, m]));
 
-    const respByTarefa = new Map<string, string[]>();
+    const respByTarefa = new Map<string, Array<{ usuario_id: string; criado_em: string }>>();
     for (const r of respRes.data ?? []) {
       const arr = respByTarefa.get(r.tarefa_id) ?? [];
-      arr.push(r.usuario_id);
+      arr.push({ usuario_id: r.usuario_id, criado_em: r.criado_em });
       respByTarefa.set(r.tarefa_id, arr);
     }
 
@@ -145,14 +150,21 @@ export const getDashboardData = createServerFn({ method: "GET" })
         return activeClientIds.has(t.cliente_id);
       })
       .map((t) => {
-        const respIds = respByTarefa.get(t.id) ?? [];
-        const responsaveis = respIds
-          .map((uid) => {
-            const profile = profileById.get(uid);
+        const resps = respByTarefa.get(t.id) ?? [];
+        const responsaveis = resps
+          .map((r) => {
+            const profile = profileById.get(r.usuario_id);
             if (!profile) return null;
-            return { id: profile.id, nome: profile.nome, iniciais: initialsFromName(profile.nome) };
+            return {
+              id: profile.id,
+              nome: profile.nome,
+              iniciais: initialsFromName(profile.nome),
+              atribuido_em: r.criado_em,
+            };
           })
-          .filter((x): x is { id: string; nome: string; iniciais: string } => x !== null);
+          .filter(
+            (x): x is { id: string; nome: string; iniciais: string; atribuido_em: string } => x !== null,
+          );
         const criadoPorProfile = t.criado_por ? profileById.get(t.criado_por) : undefined;
         return {
           id: t.id,
@@ -160,6 +172,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
           titulo: t.titulo,
           status: normalizeStatus(t.status),
           prioridade: t.prioridade,
+          complexidade: normalizeComplexidade(t.complexidade),
           responsaveis,
           data_vencimento: toDateOnly(t.data_vencimento),
           concluido_em: t.concluido_em ?? null,
@@ -216,6 +229,7 @@ const createSchema = z.object({
   titulo: z.string().min(1).max(500),
   status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).default("Pendente"),
   prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).default("Nenhuma"),
+  complexidade: z.enum(["Fácil", "Média", "Difícil"]).default("Média"),
   data_vencimento: z.string().optional(),
   descricao: z.string().max(5000).optional(),
   tipo: z.enum(["tarefa", "lembrete"]).default("tarefa"),
@@ -242,6 +256,7 @@ export const createTarefa = createServerFn({ method: "POST" })
       titulo: data.titulo,
       status: data.status,
       prioridade: data.prioridade,
+      complexidade: data.complexidade,
       data_vencimento: toTimestamp(data.data_vencimento),
       descricao: data.descricao ?? null,
       tipo: data.tipo,
@@ -267,6 +282,7 @@ const updateSchema = z.object({
     titulo: z.string().min(1).max(500).optional(),
     status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).optional(),
     prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).optional(),
+    complexidade: z.enum(["Fácil", "Média", "Difícil"]).optional(),
     data_vencimento: z.string().optional(),
     descricao: z.string().max(5000).optional(),
     responsavel_ids: z.array(z.string().uuid()).optional(),
@@ -291,12 +307,14 @@ export const updateTarefa = createServerFn({ method: "POST" })
       titulo: string;
       status: "Pendente" | "Em Progresso" | "Em Análise" | "Concluído";
       prioridade: "Alta" | "Média" | "Baixa" | "Nenhuma";
+      complexidade: "Fácil" | "Média" | "Difícil";
       descricao: string | null;
       data_vencimento: string | null;
     }> = {};
     if (patch.titulo !== undefined) dbPatch.titulo = patch.titulo;
     if (patch.status !== undefined) dbPatch.status = patch.status;
     if (patch.prioridade !== undefined) dbPatch.prioridade = patch.prioridade;
+    if (patch.complexidade !== undefined) dbPatch.complexidade = patch.complexidade;
     if (patch.descricao !== undefined) dbPatch.descricao = patch.descricao;
     if (patch.data_vencimento !== undefined) dbPatch.data_vencimento = toTimestamp(patch.data_vencimento);
 
@@ -306,11 +324,30 @@ export const updateTarefa = createServerFn({ method: "POST" })
     }
 
     if (patch.responsavel_ids !== undefined) {
-      const { error: delErr } = await supabase.from("tarefa_responsaveis").delete().eq("tarefa_id", id);
-      if (delErr) throw new Error(delErr.message);
+      // Diff em vez de apagar-tudo-e-reinserir: preserva o "atribuido_em" (criado_em)
+      // de quem continua responsável — só quem realmente entra ganha timestamp novo.
+      const { data: atuais, error: getErr } = await supabase
+        .from("tarefa_responsaveis")
+        .select("usuario_id")
+        .eq("tarefa_id", id);
+      if (getErr) throw new Error(getErr.message);
 
-      if (patch.responsavel_ids.length > 0) {
-        const rows = patch.responsavel_ids.map((uid) => ({ tarefa_id: id, usuario_id: uid }));
+      const atuaisIds = new Set((atuais ?? []).map((r) => r.usuario_id));
+      const novosIds = new Set(patch.responsavel_ids);
+      const paraRemover = [...atuaisIds].filter((uid) => !novosIds.has(uid));
+      const paraAdicionar = [...novosIds].filter((uid) => !atuaisIds.has(uid));
+
+      if (paraRemover.length > 0) {
+        const { error: delErr } = await supabase
+          .from("tarefa_responsaveis")
+          .delete()
+          .eq("tarefa_id", id)
+          .in("usuario_id", paraRemover);
+        if (delErr) throw new Error(delErr.message);
+      }
+
+      if (paraAdicionar.length > 0) {
+        const rows = paraAdicionar.map((uid) => ({ tarefa_id: id, usuario_id: uid }));
         const { error: insErr } = await supabase.from("tarefa_responsaveis").insert(rows);
         if (insErr) throw new Error(insErr.message);
       }

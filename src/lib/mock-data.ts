@@ -1,4 +1,5 @@
 export type Prioridade = "Alta" | "Média" | "Baixa" | "Nenhuma";
+export type Complexidade = "Fácil" | "Média" | "Difícil";
 export type Status = "Pendente" | "Em Progresso" | "Em Análise" | "Concluído";
 export type TipoItem = "tarefa" | "lembrete";
 export type EscopoItem = "geral" | "pessoal";
@@ -21,7 +22,8 @@ export interface Tarefa {
   titulo: string;
   status: Status;
   prioridade: Prioridade;
-  responsaveis: { id: string; nome: string; iniciais: string }[];
+  complexidade: Complexidade;
+  responsaveis: { id: string; nome: string; iniciais: string; atribuido_em?: string }[];
   data_vencimento: string; // ISO YYYY-MM-DD
   descricao?: string;
   comentarios?: Comentario[];
@@ -73,12 +75,12 @@ function isoOffset(days: number): string {
 }
 
 export const tarefasIniciais: Tarefa[] = [
-  { id: "t1", cliente_id: "c1", titulo: "Setup das tarefas em 5 minutos", status: "Pendente", prioridade: "Alta", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(0) },
-  { id: "t2", cliente_id: "c1", titulo: "Desenhar workflow do cliente", status: "Pendente", prioridade: "Alta", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(1) },
-  { id: "t3", cliente_id: "c2", titulo: "Onboarding da equipe", status: "Em Progresso", prioridade: "Média", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(3) },
-  { id: "t4", cliente_id: "c2", titulo: "Integrar ferramentas favoritas", status: "Em Progresso", prioridade: "Alta", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(4) },
-  { id: "t5", cliente_id: "c3", titulo: "Importar trabalho existente", status: "Concluído", prioridade: "Baixa", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(-2) },
-  { id: "t6", cliente_id: "c4", titulo: "Trabalhar mais inteligente com IA", status: "Pendente", prioridade: "Nenhuma", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(6) },
+  { id: "t1", cliente_id: "c1", titulo: "Setup das tarefas em 5 minutos", status: "Pendente", prioridade: "Alta", complexidade: "Fácil", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(0) },
+  { id: "t2", cliente_id: "c1", titulo: "Desenhar workflow do cliente", status: "Pendente", prioridade: "Alta", complexidade: "Difícil", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(1) },
+  { id: "t3", cliente_id: "c2", titulo: "Onboarding da equipe", status: "Em Progresso", prioridade: "Média", complexidade: "Média", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(3) },
+  { id: "t4", cliente_id: "c2", titulo: "Integrar ferramentas favoritas", status: "Em Progresso", prioridade: "Alta", complexidade: "Média", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(4) },
+  { id: "t5", cliente_id: "c3", titulo: "Importar trabalho existente", status: "Concluído", prioridade: "Baixa", complexidade: "Fácil", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(-2) },
+  { id: "t6", cliente_id: "c4", titulo: "Trabalhar mais inteligente com IA", status: "Pendente", prioridade: "Nenhuma", complexidade: "Difícil", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(6) },
 ];
 
 export function rotuloData(iso: string): string {
@@ -113,6 +115,12 @@ export const statusCor: Record<Status, string> = {
   "Concluído": "#22C55E",
 };
 
+export const complexidadeCor: Record<Complexidade, string> = {
+  "Fácil": "#22C55E",
+  "Média": "#F59E0B",
+  "Difícil": "#EF4444",
+};
+
 /** Estilo "pill" colorido (preenchimento sólido + texto branco) para status. */
 export function statusPillStyle(s: Status) {
   const c = statusCor[s];
@@ -123,6 +131,12 @@ export function statusPillStyle(s: Status) {
 export function prioridadePillStyle(p: Prioridade) {
   const c = prioridadeCor[p];
   return { backgroundColor: c, color: "#fff", borderColor: c } as const;
+}
+
+/** Estilo "pill" colorido para complexidade. */
+export function complexidadePillStyle(c: Complexidade) {
+  const cor = complexidadeCor[c];
+  return { backgroundColor: cor, color: "#fff", borderColor: cor } as const;
 }
 
 const DIAS_PARA_FINALIZAR = 7;
