@@ -337,7 +337,6 @@ export function AddTaskDialog({
 
   const submit = () => {
     if (!titulo.trim()) return;
-    if (!isLembrete && !semCliente && !clienteId) return;
     addTarefa({
       cliente_id: isLembrete || semCliente ? "" : clienteId,
       projeto_id: isLembrete ? null : projetoId || null,
@@ -587,7 +586,7 @@ export function AddTaskDialog({
           </button>
           <button
             onClick={submit}
-            disabled={!titulo.trim() || (!isLembrete && !semCliente && !clienteId)}
+            disabled={!titulo.trim()}
             className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {isLembrete ? "Criar Lembrete" : "Criar Tarefa"}
