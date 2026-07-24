@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -311,6 +311,18 @@ export function AddTaskDialog({
   const [clienteId, setClienteId] = useState(
     semCliente ? "" : (lockedClienteId ?? clientes[0]?.id ?? ""),
   );
+  // O diálogo monta assim que o Kanban aparece — antes de "clientes" terminar
+  // de carregar do servidor. Sem isso, quem abrisse a tela recém-carregada
+  // ficava com clienteId="" travado pra sempre (o useState acima só roda uma
+  // vez) e o botão "Criar Tarefa" continuava desabilitado silenciosamente.
+  useEffect(() => {
+    if (semCliente) return;
+    if (lockedClienteId) {
+      setClienteId(lockedClienteId);
+      return;
+    }
+    setClienteId((atual) => (atual && clientes.some((c) => c.id === atual) ? atual : (clientes[0]?.id ?? "")));
+  }, [clientes, lockedClienteId, semCliente]);
   const [projetoId, setProjetoId] = useState("");
   const [data, setData] = useState<string>(defaultDate ?? "");
   const [status, setStatus] = useState<Status>(defaultStatus);
