@@ -1,8 +1,9 @@
 import type { Tarefa } from "./mock-data";
 
-export type PeriodoPreset = "hoje" | "7d" | "30d" | "90d" | "este-mes" | "mes-anterior" | "personalizado";
+export type PeriodoPreset = "todos" | "hoje" | "7d" | "30d" | "90d" | "este-mes" | "mes-anterior" | "personalizado";
 
 export const PERIODO_PRESETS: { value: PeriodoPreset; label: string }[] = [
+  { value: "todos", label: "Todo o período" },
   { value: "hoje", label: "Hoje" },
   { value: "7d", label: "Últimos 7 dias" },
   { value: "30d", label: "Últimos 30 dias" },
@@ -29,6 +30,8 @@ export function resolverPeriodo(preset: PeriodoPreset, personalizado?: { de: str
   const ate = isoOf(hoje);
 
   switch (preset) {
+    case "todos":
+      return { de: "0000-01-01", ate: "9999-12-31" };
     case "hoje":
       return { de: ate, ate };
     case "7d": {
@@ -99,4 +102,53 @@ export function calcularProdutividade(
 
   const taxaConclusao = atribuidas > 0 ? (concluidas / atribuidas) * 100 : 0;
   return { atribuidas, concluidas, taxaConclusao };
+}
+
+export type PrazoBucket = "no-prazo" | "prestes" | "expirada";
+
+export const prazoColors: Record<PrazoBucket, string> = {
+  "no-prazo": "#22C55E",
+  prestes: "#FBBF24",
+  expirada: "#EF4444",
+};
+
+export const PRAZO_LABELS: Record<PrazoBucket, string> = {
+  "no-prazo": "No Prazo",
+  prestes: "Prestes a Expirar",
+  expirada: "Expiradas",
+};
+
+export function classificarPrazo(t: Tarefa): PrazoBucket | null {
+  if (!t.data_vencimento) return null;
+  const venc = new Date(t.data_vencimento).getTime();
+  const agora = Date.now();
+  const diffH = (venc - agora) / 36e5;
+  if (t.status !== "Concluído" && diffH < 0) return "expirada";
+  if (diffH <= 48) return "prestes";
+  return "no-prazo";
+}
+
+export interface MetricasPrazos {
+  counts: Record<PrazoBucket, number>;
+  total: number;
+  pct: Record<PrazoBucket, number>;
+}
+
+export function calcPrazos(list: Tarefa[]): MetricasPrazos {
+  const buckets = { "no-prazo": 0, prestes: 0, expirada: 0 } as Record<PrazoBucket, number>;
+  for (const t of list) {
+    const b = classificarPrazo(t);
+    if (b) buckets[b]++;
+  }
+  const total = buckets["no-prazo"] + buckets.prestes + buckets.expirada;
+  const divisor = total || 1;
+  return {
+    counts: buckets,
+    total,
+    pct: {
+      "no-prazo": Math.round((buckets["no-prazo"] / divisor) * 100),
+      prestes: Math.round((buckets.prestes / divisor) * 100),
+      expirada: Math.round((buckets.expirada / divisor) * 100),
+    },
+  };
 }

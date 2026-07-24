@@ -19,6 +19,7 @@ import { DemandasView } from "@/components/dashboard/DemandasView";
 import { LinksView } from "@/components/dashboard/LinksView";
 import { FinalizadosView } from "@/components/dashboard/FinalizadosView";
 import { IdeiasView } from "@/components/dashboard/IdeiasView";
+import { ProjectsView } from "@/components/dashboard/ProjectsView";
 import { ClientPortal } from "@/components/portal/ClientPortal";
 import { getMyPortalContext } from "@/lib/data.functions";
 import { Plus } from "lucide-react";
@@ -202,6 +203,14 @@ function WorkspaceContent() {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
         <IdeiasView />
+      </div>
+    );
+  }
+
+  if (workspace.tipo === "projetos") {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
+        <ProjectsView />
       </div>
     );
   }

@@ -20,6 +20,11 @@ import {
   toggleChecklistItem as toggleChecklistItemFn,
   deleteChecklistItem as deleteChecklistItemFn,
 } from "./data.functions";
+import {
+  createProjeto as createProjetoFn,
+  updateProjeto as updateProjetoFn,
+  deleteProjeto as deleteProjetoFn,
+} from "./projetos.functions";
 
 export interface Membro {
   id: string;
@@ -48,12 +53,18 @@ export type WorkspaceView =
   | { tipo: "links" }
   | { tipo: "finalizados" }
   | { tipo: "ideias" }
+  | { tipo: "projetos" }
   | { tipo: "cliente"; clienteId: string };
 
 export type MainView = "Quadro" | "Calendário";
 // Backwards-compat: components still import this constant; it is overwritten
 // from the live profile at runtime by TasksProvider.
 export let USUARIO_LOGADO_INICIAIS = "EU";
+
+export interface Projeto {
+  id: string;
+  nome: string;
+}
 
 export interface Plano {
   id: string;
@@ -77,6 +88,10 @@ interface TasksCtx {
   membros: Membro[];
   planos: Plano[];
   transacoes: Transacao[];
+  projetos: Projeto[];
+  addProjeto: (nome: string) => Promise<{ id: string }>;
+  renomearProjeto: (id: string, nome: string) => void;
+  removerProjeto: (id: string) => void;
   myCargo: "Admin" | "Supervisor" | "Membro";
   myIniciais: string;
   myId: string;
@@ -165,6 +180,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const updatePlanoServerFn = useServerFn(updatePlanoFn);
   const addAvulsoFn = useServerFn(addServicoAvulsoFn);
   const deleteTransFn = useServerFn(deleteTransacaoFn);
+  const createProjetoServerFn = useServerFn(createProjetoFn);
+  const updateProjetoServerFn = useServerFn(updateProjetoFn);
+  const deleteProjetoServerFn = useServerFn(deleteProjetoFn);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
@@ -176,6 +194,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const membros = data?.membros ?? [];
   const planos = (data?.planos ?? []) as Plano[];
   const transacoes = (data?.transacoes ?? []) as Transacao[];
+  const projetos = (data?.projetos ?? []) as Projeto[];
   const myCargo: "Admin" | "Supervisor" | "Membro" =
     (membros.find((m) => m.id === data?.me?.id)?.cargo as "Admin" | "Supervisor" | "Membro") ?? "Membro";
   if (data?.me?.iniciais) USUARIO_LOGADO_INICIAIS = data.me.iniciais;
@@ -187,6 +206,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       createFn({
         data: {
           cliente_id: vars.cliente_id || null,
+          projeto_id: vars.projeto_id || null,
           titulo: vars.titulo,
           status: vars.status,
           prioridade: vars.prioridade,
@@ -214,6 +234,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
             complexidade: vars.patch.complexidade,
             descricao: vars.patch.descricao,
             data_vencimento: vars.patch.data_vencimento,
+            projeto_id: vars.patch.projeto_id !== undefined ? vars.patch.projeto_id : undefined,
             responsavel_ids: vars.patch.responsaveis?.map((r) => r.id),
           },
         },
@@ -323,6 +344,33 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao excluir"),
   });
 
+  const createProjetoMut = useMutation({
+    mutationFn: (nome: string) => createProjetoServerFn({ data: { nome } }),
+    onSuccess: () => {
+      toast.success("Projeto criado");
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao criar projeto"),
+  });
+
+  const updateProjetoMut = useMutation({
+    mutationFn: (vars: { id: string; nome: string }) => updateProjetoServerFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("Projeto atualizado");
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao atualizar projeto"),
+  });
+
+  const deleteProjetoMut = useMutation({
+    mutationFn: (id: string) => deleteProjetoServerFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Projeto excluído");
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao excluir projeto"),
+  });
+
   const addTarefa = useCallback((t: Omit<Tarefa, "id">) => {
     createMut.mutate(t);
   }, [createMut]);
@@ -366,6 +414,13 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     [avulsoMut],
   );
   const removerTransacao = useCallback((id: string) => deleteTransMut.mutate(id), [deleteTransMut]);
+
+  const addProjeto = useCallback((nome: string) => createProjetoMut.mutateAsync(nome), [createProjetoMut]);
+  const renomearProjeto = useCallback(
+    (id: string, nome: string) => updateProjetoMut.mutate({ id, nome }),
+    [updateProjetoMut],
+  );
+  const removerProjeto = useCallback((id: string) => deleteProjetoMut.mutate(id), [deleteProjetoMut]);
 
   const openTask = useCallback((id: string) => setSelectedTaskId(id), []);
   const closeTask = useCallback(() => setSelectedTaskId(null), []);
@@ -445,6 +500,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       membros,
       planos,
       transacoes,
+      projetos,
+      addProjeto,
+      renomearProjeto,
+      removerProjeto,
       myCargo,
       myIniciais: data?.me?.iniciais ?? USUARIO_LOGADO_INICIAIS,
       myId: data?.me?.id ?? "",
@@ -488,7 +547,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       geralMembroFilter,
       setGeralMembroFilter,
     }),
-    [tarefas, clientes, membros, planos, transacoes, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, addChecklistItem, toggleChecklistItem, removerChecklistItem, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter],
+    [tarefas, clientes, membros, planos, transacoes, projetos, addProjeto, renomearProjeto, removerProjeto, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, addChecklistItem, toggleChecklistItem, removerChecklistItem, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -3,20 +3,9 @@ import { useTasks } from "@/lib/tasks-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter } from "./PeriodFilter";
-import { calcularProdutividade, resolverPeriodo, type Periodo, type PeriodoPreset } from "@/lib/productivity";
+import { ReportDialog } from "./ReportDialog";
+import { calcularProdutividade, calcPrazos, prazoColors, resolverPeriodo, type Periodo, type PeriodoPreset } from "@/lib/productivity";
 import type { Tarefa, Status } from "@/lib/mock-data";
-
-type PrazoBucket = "no-prazo" | "prestes" | "expirada";
-
-function classificarPrazo(t: Tarefa): PrazoBucket | null {
-  if (!t.data_vencimento) return null;
-  const venc = new Date(t.data_vencimento).getTime();
-  const agora = Date.now();
-  const diffH = (venc - agora) / 36e5;
-  if (t.status !== "Concluído" && diffH < 0) return "expirada";
-  if (diffH <= 48) return "prestes";
-  return "no-prazo";
-}
 
 function calcStatus(list: Tarefa[]) {
   const total = list.length || 1;
@@ -38,35 +27,11 @@ function calcStatus(list: Tarefa[]) {
   };
 }
 
-function calcPrazos(list: Tarefa[]) {
-  const buckets = { "no-prazo": 0, prestes: 0, expirada: 0 } as Record<PrazoBucket, number>;
-  for (const t of list) {
-    const b = classificarPrazo(t);
-    if (b) buckets[b]++;
-  }
-  const total = (buckets["no-prazo"] + buckets.prestes + buckets.expirada) || 1;
-  return {
-    counts: buckets,
-    total: total === 1 && buckets["no-prazo"] + buckets.prestes + buckets.expirada === 0 ? 0 : total,
-    pct: {
-      "no-prazo": Math.round((buckets["no-prazo"] / total) * 100),
-      prestes: Math.round((buckets.prestes / total) * 100),
-      expirada: Math.round((buckets.expirada / total) * 100),
-    },
-  };
-}
-
 const statusColors: Record<Status, string> = {
   Pendente: "#F59E0B",
   "Em Progresso": "#3B82F6",
   "Em Análise": "#A855F7",
   "Concluído": "#22C55E",
-};
-
-const prazoColors: Record<PrazoBucket, string> = {
-  "no-prazo": "#22C55E",
-  prestes: "#FBBF24",
-  expirada: "#EF4444",
 };
 
 export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean } = {}) {
@@ -123,6 +88,10 @@ export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean
 
   return (
     <div className="space-y-8 p-6">
+      <div className="flex justify-end">
+        <ReportDialog apenasMinhas={apenasMinhas} />
+      </div>
+
       {!apenasMinhas && (
         <Section title="Visão Geral da Agência" subtitle="Todas as tarefas de todos os clientes">
           <ProgressoCard data={geralStatus} />

@@ -19,6 +19,7 @@ export interface Cliente {
 export interface Tarefa {
   id: string;
   cliente_id: string; // vazio quando tipo === "lembrete"
+  projeto_id?: string | null;
   titulo: string;
   status: Status;
   prioridade: Prioridade;

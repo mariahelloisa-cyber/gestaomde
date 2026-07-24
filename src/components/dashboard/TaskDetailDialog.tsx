@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Check, Flag, ListChecks, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, X } from "lucide-react";
+import { CalendarIcon, Check, ChevronDown, Flag, FolderKanban, ListChecks, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -70,6 +70,7 @@ export function TaskDetailDialog() {
   const {
     tarefas,
     clientes,
+    projetos,
     selectedTaskId,
     closeTask,
     updateTarefa,
@@ -376,6 +377,16 @@ export function TaskDetailDialog() {
                 </div>
               </MetaRow>
             )}
+
+            {tarefa.tipo !== "lembrete" && (
+              <MetaRow label="Projeto">
+                <ProjetoDropdown
+                  value={tarefa.projeto_id ?? null}
+                  projetos={projetos}
+                  onChange={(id) => updateTarefa(tarefa.id, { projeto_id: id })}
+                />
+              </MetaRow>
+            )}
           </aside>
         </div>
       </DialogContent>
@@ -484,6 +495,45 @@ function ComplexidadeDropdown({
             </DropdownMenuItem>
           );
         })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ProjetoDropdown({
+  value,
+  projetos,
+  onChange,
+}: {
+  value: string | null;
+  projetos: { id: string; nome: string }[];
+  onChange: (id: string | null) => void;
+}) {
+  const atual = projetos.find((p) => p.id === value);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-muted">
+          <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+          {atual ? atual.nome : <span className="text-muted-foreground">Sem projeto</span>}
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56">
+        {projetos.length === 0 && (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum projeto cadastrado ainda.</div>
+        )}
+        {projetos.map((p) => (
+          <DropdownMenuItem key={p.id} onClick={() => onChange(p.id)} className="gap-2">
+            <span className="flex-1">{p.nome}</span>
+            {p.id === value && <Check className="h-3.5 w-3.5" />}
+          </DropdownMenuItem>
+        ))}
+        {value && (
+          <DropdownMenuItem onClick={() => onChange(null)} className="text-muted-foreground">
+            Sem projeto
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

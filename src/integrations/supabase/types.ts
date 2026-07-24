@@ -448,6 +448,27 @@ export type Database = {
           },
         ]
       }
+      projetos: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       perfis_usuarios: {
         Row: {
           avatar_url: string | null
@@ -539,6 +560,7 @@ export type Database = {
           escopo: Database["public"]["Enums"]["escopo_item"]
           id: string
           prioridade: Database["public"]["Enums"]["prioridade_tarefa"]
+          projeto_id: string | null
           status: Database["public"]["Enums"]["status_tarefa"]
           tipo: Database["public"]["Enums"]["tipo_item"]
           titulo: string
@@ -556,6 +578,7 @@ export type Database = {
           escopo?: Database["public"]["Enums"]["escopo_item"]
           id?: string
           prioridade?: Database["public"]["Enums"]["prioridade_tarefa"]
+          projeto_id?: string | null
           status?: Database["public"]["Enums"]["status_tarefa"]
           tipo?: Database["public"]["Enums"]["tipo_item"]
           titulo: string
@@ -573,6 +596,7 @@ export type Database = {
           escopo?: Database["public"]["Enums"]["escopo_item"]
           id?: string
           prioridade?: Database["public"]["Enums"]["prioridade_tarefa"]
+          projeto_id?: string | null
           status?: Database["public"]["Enums"]["status_tarefa"]
           tipo?: Database["public"]["Enums"]["tipo_item"]
           titulo?: string
@@ -583,6 +607,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
             referencedColumns: ["id"]
           },
         ]

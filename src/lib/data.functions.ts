@@ -51,18 +51,19 @@ export const getDashboardData = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
 
-    const [profilesRes, clientesRes, tarefasRes, respRes, comentariosRes, checklistRes, planosRes, transRes] = await Promise.all([
+    const [profilesRes, clientesRes, tarefasRes, respRes, comentariosRes, checklistRes, planosRes, transRes, projetosRes] = await Promise.all([
       supabase.from("perfis_usuarios").select("id, nome, email, avatar_url, cargo, status, criado_em"),
       supabase.from("clientes").select("id, nome_empresa, plano, endereco, documento, email, contrato_url, status").order("nome_empresa"),
       supabase
         .from("tarefas")
-        .select("id, cliente_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em")
+        .select("id, cliente_id, projeto_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em")
         .order("data_criacao", { ascending: false }),
       supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id, criado_em"),
       supabase.from("comentarios_tarefa").select("id, tarefa_id, usuario_id, conteudo, criado_em").order("criado_em"),
       supabase.from("tarefa_checklist_itens").select("id, tarefa_id, texto, concluido, criado_em").order("criado_em"),
       supabase.from("configuracoes_planos").select("id, nome_plano, valor_mensal, servicos_inclusos").order("valor_mensal"),
       supabase.from("financeiro_transacoes").select("id, cliente_id, tipo, descricao, valor, data_pagamento").order("data_pagamento", { ascending: false }),
+      supabase.from("projetos").select("id, nome").order("nome"),
     ]);
 
     if (profilesRes.error) throw new Error(profilesRes.error.message);
@@ -73,6 +74,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
     if (checklistRes.error) throw new Error(checklistRes.error.message);
     if (planosRes.error) throw new Error(planosRes.error.message);
     if (transRes.error) throw new Error(transRes.error.message);
+    if (projetosRes.error) throw new Error(projetosRes.error.message);
 
     const profiles = (profilesRes.data ?? []).filter((p) => (p.cargo as string) !== "Cliente");
     const profileById = new Map(profiles.map((p) => [p.id, p]));
@@ -169,6 +171,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
         return {
           id: t.id,
           cliente_id: t.cliente_id ?? "",
+          projeto_id: t.projeto_id ?? null,
           titulo: t.titulo,
           status: normalizeStatus(t.status),
           prioridade: t.prioridade,
@@ -219,13 +222,16 @@ export const getDashboardData = createServerFn({ method: "GET" })
       data_pagamento: t.data_pagamento,
     }));
 
-    return { me, membros, clientes, tarefas, planos, transacoes };
+    const projetos = (projetosRes.data ?? []).map((p) => ({ id: p.id, nome: p.nome }));
+
+    return { me, membros, clientes, tarefas, planos, transacoes, projetos };
   });
 
 /* ---------------- Mutations ---------------- */
 
 const createSchema = z.object({
   cliente_id: z.string().uuid().nullable().optional(),
+  projeto_id: z.string().uuid().nullable().optional(),
   titulo: z.string().min(1).max(500),
   status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).default("Pendente"),
   prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).default("Nenhuma"),
@@ -253,6 +259,7 @@ export const createTarefa = createServerFn({ method: "POST" })
     const isLembrete = data.tipo === "lembrete";
     const insertPayload = {
       cliente_id: isLembrete ? null : (data.cliente_id ?? null),
+      projeto_id: isLembrete ? null : (data.projeto_id ?? null),
       titulo: data.titulo,
       status: data.status,
       prioridade: data.prioridade,
@@ -285,6 +292,7 @@ const updateSchema = z.object({
     complexidade: z.enum(["Fácil", "Média", "Difícil"]).optional(),
     data_vencimento: z.string().optional(),
     descricao: z.string().max(5000).optional(),
+    projeto_id: z.string().uuid().nullable().optional(),
     responsavel_ids: z.array(z.string().uuid()).optional(),
   }),
 });
@@ -310,6 +318,7 @@ export const updateTarefa = createServerFn({ method: "POST" })
       complexidade: "Fácil" | "Média" | "Difícil";
       descricao: string | null;
       data_vencimento: string | null;
+      projeto_id: string | null;
     }> = {};
     if (patch.titulo !== undefined) dbPatch.titulo = patch.titulo;
     if (patch.status !== undefined) dbPatch.status = patch.status;
@@ -317,6 +326,7 @@ export const updateTarefa = createServerFn({ method: "POST" })
     if (patch.complexidade !== undefined) dbPatch.complexidade = patch.complexidade;
     if (patch.descricao !== undefined) dbPatch.descricao = patch.descricao;
     if (patch.data_vencimento !== undefined) dbPatch.data_vencimento = toTimestamp(patch.data_vencimento);
+    if (patch.projeto_id !== undefined) dbPatch.projeto_id = patch.projeto_id;
 
     if (Object.keys(dbPatch).length > 0) {
       const { error } = await supabase.from("tarefas").update(dbPatch).eq("id", id);

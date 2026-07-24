@@ -15,6 +15,7 @@ import {
   Eye,
   FileText,
   Flag,
+  FolderKanban,
   Lock,
   Minus,
   Paperclip,
@@ -296,7 +297,7 @@ export function AddTaskDialog({
   allowLembrete?: boolean;
   semCliente?: boolean;
 }) {
-  const { addTarefa, clientes } = useTasks();
+  const { addTarefa, clientes, projetos } = useTasks();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = (o: boolean) => {
@@ -310,6 +311,7 @@ export function AddTaskDialog({
   const [clienteId, setClienteId] = useState(
     semCliente ? "" : (lockedClienteId ?? clientes[0]?.id ?? ""),
   );
+  const [projetoId, setProjetoId] = useState("");
   const [data, setData] = useState<string>(defaultDate ?? "");
   const [status, setStatus] = useState<Status>(defaultStatus);
   const [prioridade, setPrioridade] = useState<Prioridade>("Nenhuma");
@@ -326,6 +328,7 @@ export function AddTaskDialog({
     if (!isLembrete && !semCliente && !clienteId) return;
     addTarefa({
       cliente_id: isLembrete || semCliente ? "" : clienteId,
+      projeto_id: isLembrete ? null : projetoId || null,
       titulo: titulo.trim(),
       status: isLembrete ? "Pendente" : status,
       prioridade: isLembrete ? "Nenhuma" : prioridade,
@@ -420,28 +423,57 @@ export function AddTaskDialog({
             </div>
           )}
 
-          {/* Contexto: cliente / escopo */}
-          {!isLembrete && !semCliente && (
+          {/* Contexto: cliente / projeto / escopo */}
+          {!isLembrete && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
+              {!semCliente && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      disabled={!!lockedClienteId}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-xs text-foreground/80 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                      {clienteAtual?.nome_empresa ?? "Cliente"}
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    {clientes.map((c) => (
+                      <DropdownMenuItem key={c.id} onClick={() => setClienteId(c.id)} className="gap-2">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.cor }} />
+                        <span className="flex-1">{c.nome_empresa}</span>
+                        {c.id === clienteId && <Check className="h-3.5 w-3.5" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button
-                    disabled={!!lockedClienteId}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-xs text-foreground/80 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                    {clienteAtual?.nome_empresa ?? "Projeto"}
+                  <button className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-xs text-foreground/80 hover:bg-muted">
+                    <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                    {projetos.find((p) => p.id === projetoId)?.nome ?? "Projeto"}
                     <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
-                  {clientes.map((c) => (
-                    <DropdownMenuItem key={c.id} onClick={() => setClienteId(c.id)} className="gap-2">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.cor }} />
-                      <span className="flex-1">{c.nome_empresa}</span>
-                      {c.id === clienteId && <Check className="h-3.5 w-3.5" />}
+                  {projetos.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      Nenhum projeto cadastrado ainda.
+                    </div>
+                  )}
+                  {projetos.map((p) => (
+                    <DropdownMenuItem key={p.id} onClick={() => setProjetoId(p.id)} className="gap-2">
+                      <span className="flex-1">{p.nome}</span>
+                      {p.id === projetoId && <Check className="h-3.5 w-3.5" />}
                     </DropdownMenuItem>
                   ))}
+                  {projetoId && (
+                    <DropdownMenuItem onClick={() => setProjetoId("")} className="text-muted-foreground">
+                      Nenhum projeto
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
