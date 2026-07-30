@@ -8,20 +8,29 @@ const SITE_URL = "https://xn--gestomde-uza.tec.br";
 
 /* ---------------- Helpers ---------------- */
 
-function colorFromId(id: string): string {
-  const palette = ["#7B68EE", "#3B82F6", "#22C55E", "#F97316", "#EF4444", "#F59E0B", "#06B6D4", "#EC4899"];
+export function colorFromId(id: string): string {
+  const palette = [
+    "#7B68EE",
+    "#3B82F6",
+    "#22C55E",
+    "#F97316",
+    "#EF4444",
+    "#F59E0B",
+    "#06B6D4",
+    "#EC4899",
+  ];
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return palette[h % palette.length];
 }
 
-function initialsFromName(nome: string): string {
+export function initialsFromName(nome: string): string {
   const parts = nome.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function toDateOnly(value: string | null | undefined): string {
+export function toDateOnly(value: string | null | undefined): string {
   if (!value) return "";
   return new Date(value).toISOString().slice(0, 10);
 }
@@ -33,14 +42,16 @@ function toTimestamp(yyyymmdd: string | undefined | null): string | null {
 }
 
 /** Tolera valores de status legados/inesperados que não existam mais no enum. */
-function normalizeStatus(raw: string): "Pendente" | "Em Progresso" | "Em Análise" | "Concluído" {
+export function normalizeStatus(
+  raw: string,
+): "Pendente" | "Em Progresso" | "Em Análise" | "Concluído" {
   return raw === "Pendente" || raw === "Em Progresso" || raw === "Em Análise" || raw === "Concluído"
     ? raw
     : "Pendente";
 }
 
 /** Tolera valores de complexidade legados/inesperados que não existam mais no enum. */
-function normalizeComplexidade(raw: string): "Fácil" | "Média" | "Difícil" {
+export function normalizeComplexidade(raw: string): "Fácil" | "Média" | "Difícil" {
   return raw === "Fácil" || raw === "Média" || raw === "Difícil" ? raw : "Média";
 }
 
@@ -51,18 +62,47 @@ export const getDashboardData = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
 
-    const [profilesRes, clientesRes, tarefasRes, respRes, comentariosRes, checklistRes, planosRes, transRes, projetosRes] = await Promise.all([
-      supabase.from("perfis_usuarios").select("id, nome, email, avatar_url, cargo, status, criado_em"),
-      supabase.from("clientes").select("id, nome_empresa, plano, endereco, documento, email, contrato_url, status").order("nome_empresa"),
+    const [
+      profilesRes,
+      clientesRes,
+      tarefasRes,
+      respRes,
+      comentariosRes,
+      checklistRes,
+      planosRes,
+      transRes,
+      projetosRes,
+    ] = await Promise.all([
+      supabase
+        .from("perfis_usuarios")
+        .select("id, nome, email, avatar_url, cargo, status, criado_em"),
+      supabase
+        .from("clientes")
+        .select("id, nome_empresa, plano, endereco, documento, email, contrato_url, status")
+        .order("nome_empresa"),
       supabase
         .from("tarefas")
-        .select("id, cliente_id, projeto_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em")
+        .select(
+          "id, cliente_id, projeto_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em, audio, anexos",
+        )
         .order("data_criacao", { ascending: false }),
       supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id, criado_em"),
-      supabase.from("comentarios_tarefa").select("id, tarefa_id, usuario_id, conteudo, criado_em").order("criado_em"),
-      supabase.from("tarefa_checklist_itens").select("id, tarefa_id, texto, concluido, criado_em").order("criado_em"),
-      supabase.from("configuracoes_planos").select("id, nome_plano, valor_mensal, servicos_inclusos").order("valor_mensal"),
-      supabase.from("financeiro_transacoes").select("id, cliente_id, tipo, descricao, valor, data_pagamento").order("data_pagamento", { ascending: false }),
+      supabase
+        .from("comentarios_tarefa")
+        .select("id, tarefa_id, usuario_id, conteudo, criado_em")
+        .order("criado_em"),
+      supabase
+        .from("tarefa_checklist_itens")
+        .select("id, tarefa_id, texto, concluido, criado_em")
+        .order("criado_em"),
+      supabase
+        .from("configuracoes_planos")
+        .select("id, nome_plano, valor_mensal, servicos_inclusos")
+        .order("valor_mensal"),
+      supabase
+        .from("financeiro_transacoes")
+        .select("id, cliente_id, tipo, descricao, valor, data_pagamento")
+        .order("data_pagamento", { ascending: false }),
       supabase.from("projetos").select("id, nome").order("nome"),
     ]);
 
@@ -99,7 +139,15 @@ export const getDashboardData = createServerFn({ method: "GET" })
       respByTarefa.set(r.tarefa_id, arr);
     }
 
-    const comentariosByTarefa = new Map<string, Array<{ id: string; autor: { nome: string; iniciais: string; cor: string }; conteudo: string; criado_em: string }>>();
+    const comentariosByTarefa = new Map<
+      string,
+      Array<{
+        id: string;
+        autor: { nome: string; iniciais: string; cor: string };
+        conteudo: string;
+        criado_em: string;
+      }>
+    >();
     for (const c of comentariosRes.data ?? []) {
       const profile = profileById.get(c.usuario_id);
       const nome = profile?.nome ?? "Usuário";
@@ -114,12 +162,49 @@ export const getDashboardData = createServerFn({ method: "GET" })
       comentariosByTarefa.set(c.tarefa_id, arr);
     }
 
-    const checklistByTarefa = new Map<string, Array<{ id: string; texto: string; concluido: boolean }>>();
+    const checklistByTarefa = new Map<
+      string,
+      Array<{ id: string; texto: string; concluido: boolean }>
+    >();
     for (const item of checklistRes.data ?? []) {
       const arr = checklistByTarefa.get(item.tarefa_id) ?? [];
       arr.push({ id: item.id, texto: item.texto, concluido: item.concluido });
       checklistByTarefa.set(item.tarefa_id, arr);
     }
+
+    // Áudios e anexos de tarefas ficam no mesmo bucket privado das demandas —
+    // cada um precisa de uma signed URL própria (válida por 1h) pra ser aberto.
+    const audioUrlByTarefaId = new Map<string, string | null>();
+    const anexosComUrlByTarefaId = new Map<
+      string,
+      Array<{ path: string; nome_arquivo: string; url: string | null }>
+    >();
+    await Promise.all([
+      ...(tarefasRes.data ?? [])
+        .filter((t) => t.audio)
+        .map(async (t) => {
+          const audio = t.audio as { path: string } | null;
+          if (!audio?.path) return;
+          const { data: signed } = await supabaseAdmin.storage
+            .from("demandas-anexos")
+            .createSignedUrl(audio.path, 60 * 60);
+          audioUrlByTarefaId.set(t.id, signed?.signedUrl ?? null);
+        }),
+      ...(tarefasRes.data ?? [])
+        .filter((t) => Array.isArray(t.anexos) && t.anexos.length > 0)
+        .map(async (t) => {
+          const anexos = t.anexos as Array<{ path: string; nome_arquivo: string }>;
+          const comUrl = await Promise.all(
+            anexos.map(async (a) => {
+              const { data: signed } = await supabaseAdmin.storage
+                .from("demandas-anexos")
+                .createSignedUrl(a.path, 60 * 60);
+              return { ...a, url: signed?.signedUrl ?? null };
+            }),
+          );
+          anexosComUrlByTarefaId.set(t.id, comUrl);
+        }),
+    ]);
 
     const clientes = (clientesRes.data ?? []).map((c) => ({
       id: c.id,
@@ -134,9 +219,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
     }));
 
     const activeClientIds = new Set(
-      (clientesRes.data ?? [])
-        .filter((c) => (c.status ?? "ativo") === "ativo")
-        .map((c) => c.id)
+      (clientesRes.data ?? []).filter((c) => (c.status ?? "ativo") === "ativo").map((c) => c.id),
     );
 
     // Membros comuns só enxergam tarefas em que estão designados como
@@ -165,9 +248,15 @@ export const getDashboardData = createServerFn({ method: "GET" })
             };
           })
           .filter(
-            (x): x is { id: string; nome: string; iniciais: string; atribuido_em: string } => x !== null,
+            (x): x is { id: string; nome: string; iniciais: string; atribuido_em: string } =>
+              x !== null,
           );
         const criadoPorProfile = t.criado_por ? profileById.get(t.criado_por) : undefined;
+        const audioRaw = t.audio as {
+          path: string;
+          nome_arquivo: string;
+          duracao_seg?: number;
+        } | null;
         return {
           id: t.id,
           cliente_id: t.cliente_id ?? "",
@@ -180,6 +269,8 @@ export const getDashboardData = createServerFn({ method: "GET" })
           data_vencimento: toDateOnly(t.data_vencimento),
           concluido_em: t.concluido_em ?? null,
           descricao: t.descricao ?? undefined,
+          audio: audioRaw ? { ...audioRaw, url: audioUrlByTarefaId.get(t.id) ?? null } : null,
+          anexos: anexosComUrlByTarefaId.get(t.id) ?? [],
           tipo: t.tipo,
           escopo: t.escopo,
           criado_por: criadoPorProfile ? initialsFromName(criadoPorProfile.nome) : undefined,
@@ -250,7 +341,11 @@ export const createTarefa = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
 
     if (data.status === "Concluído") {
-      const { data: me } = await supabase.from("perfis_usuarios").select("cargo").eq("id", userId).maybeSingle();
+      const { data: me } = await supabase
+        .from("perfis_usuarios")
+        .select("cargo")
+        .eq("id", userId)
+        .maybeSingle();
       if ((me?.cargo as string) !== "Admin") {
         throw new Error("Apenas Admins podem marcar tarefas como concluídas.");
       }
@@ -271,7 +366,11 @@ export const createTarefa = createServerFn({ method: "POST" })
       criado_por: userId,
     };
 
-    const { data: nova, error } = await supabase.from("tarefas").insert(insertPayload).select("id").single();
+    const { data: nova, error } = await supabase
+      .from("tarefas")
+      .insert(insertPayload)
+      .select("id")
+      .single();
     if (error || !nova) throw new Error(error?.message ?? "Falha ao criar tarefa");
 
     if (!isLembrete && data.responsavel_ids.length > 0) {
@@ -305,7 +404,11 @@ export const updateTarefa = createServerFn({ method: "POST" })
     const { id, patch } = data;
 
     if (patch.status === "Concluído") {
-      const { data: me } = await supabase.from("perfis_usuarios").select("cargo").eq("id", userId).maybeSingle();
+      const { data: me } = await supabase
+        .from("perfis_usuarios")
+        .select("cargo")
+        .eq("id", userId)
+        .maybeSingle();
       if ((me?.cargo as string) !== "Admin") {
         throw new Error("Apenas Admins podem marcar tarefas como concluídas.");
       }
@@ -319,14 +422,35 @@ export const updateTarefa = createServerFn({ method: "POST" })
       descricao: string | null;
       data_vencimento: string | null;
       projeto_id: string | null;
+      audio: null;
+      anexos: [];
     }> = {};
     if (patch.titulo !== undefined) dbPatch.titulo = patch.titulo;
     if (patch.status !== undefined) dbPatch.status = patch.status;
     if (patch.prioridade !== undefined) dbPatch.prioridade = patch.prioridade;
     if (patch.complexidade !== undefined) dbPatch.complexidade = patch.complexidade;
     if (patch.descricao !== undefined) dbPatch.descricao = patch.descricao;
-    if (patch.data_vencimento !== undefined) dbPatch.data_vencimento = toTimestamp(patch.data_vencimento);
+    if (patch.data_vencimento !== undefined)
+      dbPatch.data_vencimento = toTimestamp(patch.data_vencimento);
     if (patch.projeto_id !== undefined) dbPatch.projeto_id = patch.projeto_id;
+
+    // Tarefa concluída não precisa mais guardar áudio/anexos — apaga do
+    // storage pra não pesar o bucket e limpa as referências no banco.
+    if (patch.status === "Concluído") {
+      const { data: atual } = await supabase
+        .from("tarefas")
+        .select("audio, anexos")
+        .eq("id", id)
+        .maybeSingle();
+      const audio = atual?.audio as { path: string } | null;
+      const anexos = Array.isArray(atual?.anexos) ? (atual.anexos as Array<{ path: string }>) : [];
+      const paths = [...(audio?.path ? [audio.path] : []), ...anexos.map((a) => a.path)];
+      if (paths.length > 0) {
+        await supabaseAdmin.storage.from("demandas-anexos").remove(paths);
+        if (audio?.path) dbPatch.audio = null;
+        if (anexos.length > 0) dbPatch.anexos = [];
+      }
+    }
 
     if (Object.keys(dbPatch).length > 0) {
       const { error } = await supabase.from("tarefas").update(dbPatch).eq("id", id);
@@ -466,7 +590,11 @@ export const getMyRole = createServerFn({ method: "GET" })
       .eq("id", userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return { cargo: (data?.cargo ?? "Membro") as "Admin" | "Supervisor" | "Membro", nome: data?.nome ?? "", email: data?.email ?? "" };
+    return {
+      cargo: (data?.cargo ?? "Membro") as "Admin" | "Supervisor" | "Membro",
+      nome: data?.nome ?? "",
+      email: data?.email ?? "",
+    };
   });
 
 /** Contexto do usuário logado para decidir se ele cai no portal do cliente ou no painel interno. */
@@ -505,9 +633,7 @@ export const createInvites = createServerFn({ method: "POST" })
       cliente_id: data.cargo === "Cliente" ? (data.cliente_id ?? null) : null,
     }));
 
-    const { error } = await supabase
-      .from("convites")
-      .upsert(rows, { onConflict: "email" });
+    const { error } = await supabase.from("convites").upsert(rows, { onConflict: "email" });
 
     if (error) {
       if (error.code === "42501" || /row-level security/i.test(error.message)) {

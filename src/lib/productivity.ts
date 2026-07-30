@@ -86,8 +86,14 @@ export interface MetricasProdutividade {
  *   atual da tarefa já não seja mais "Concluído" no momento da consulta
  *   (nesse caso concluido_em já teria sido zerado pelo banco na reabertura).
  */
+interface TarefaProdutividadeLike {
+  responsaveis: { id: string; atribuido_em?: string }[];
+  status: Tarefa["status"];
+  concluido_em?: string | null;
+}
+
 export function calcularProdutividade(
-  tarefasDoMembro: Tarefa[],
+  tarefasDoMembro: TarefaProdutividadeLike[],
   membroId: string,
   periodo: Periodo,
 ): MetricasProdutividade {
@@ -118,7 +124,12 @@ export const PRAZO_LABELS: Record<PrazoBucket, string> = {
   expirada: "Expiradas",
 };
 
-export function classificarPrazo(t: Tarefa): PrazoBucket | null {
+interface TarefaPrazoLike {
+  status: Tarefa["status"];
+  data_vencimento: string;
+}
+
+export function classificarPrazo(t: TarefaPrazoLike): PrazoBucket | null {
   if (!t.data_vencimento) return null;
   const venc = new Date(t.data_vencimento).getTime();
   const agora = Date.now();
@@ -134,7 +145,7 @@ export interface MetricasPrazos {
   pct: Record<PrazoBucket, number>;
 }
 
-export function calcPrazos(list: Tarefa[]): MetricasPrazos {
+export function calcPrazos(list: TarefaPrazoLike[]): MetricasPrazos {
   const buckets = { "no-prazo": 0, prestes: 0, expirada: 0 } as Record<PrazoBucket, number>;
   for (const t of list) {
     const b = classificarPrazo(t);

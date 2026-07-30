@@ -551,6 +551,8 @@ export type Database = {
       }
       tarefas: {
         Row: {
+          anexos: Json
+          audio: Json | null
           aviso_expirado_enviado_em: string | null
           aviso_lembrete_enviado_em: string | null
           cliente_id: string | null
@@ -569,6 +571,8 @@ export type Database = {
           titulo: string
         }
         Insert: {
+          anexos?: Json
+          audio?: Json | null
           aviso_expirado_enviado_em?: string | null
           aviso_lembrete_enviado_em?: string | null
           cliente_id?: string | null
@@ -587,6 +591,8 @@ export type Database = {
           titulo: string
         }
         Update: {
+          anexos?: Json
+          audio?: Json | null
           aviso_expirado_enviado_em?: string | null
           aviso_lembrete_enviado_em?: string | null
           cliente_id?: string | null

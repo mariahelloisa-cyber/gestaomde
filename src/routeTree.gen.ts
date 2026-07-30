@@ -13,6 +13,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as PainelPublicoTokenRouteImport } from './routes/painel-publico.$token'
 import { Route as DemandasNovaRouteImport } from './routes/demandas.nova'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as ApiPublicHooksEmailIdeiaRouteImport } from './routes/api/public/hooks/email-ideia'
@@ -38,6 +39,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const PainelPublicoTokenRoute = PainelPublicoTokenRouteImport.update({
+  id: '/painel-publico/$token',
+  path: '/painel-publico/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DemandasNovaRoute = DemandasNovaRouteImport.update({
   id: '/demandas/nova',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/demandas/nova': typeof DemandasNovaRoute
+  '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/demandas/nova': typeof DemandasNovaRoute
+  '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/': typeof AuthenticatedIndexRoute
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/demandas/nova': typeof DemandasNovaRoute
+  '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/auth/callback'
     | '/demandas/nova'
+    | '/painel-publico/$token'
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/auth/callback'
     | '/demandas/nova'
+    | '/painel-publico/$token'
     | '/'
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/auth/callback'
     | '/demandas/nova'
+    | '/painel-publico/$token'
     | '/_authenticated/'
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   DemandasNovaRoute: typeof DemandasNovaRoute
+  PainelPublicoTokenRoute: typeof PainelPublicoTokenRoute
   ApiPublicHooksEmailAssignmentRoute: typeof ApiPublicHooksEmailAssignmentRoute
   ApiPublicHooksEmailDailyRoute: typeof ApiPublicHooksEmailDailyRoute
   ApiPublicHooksEmailEmAnaliseRoute: typeof ApiPublicHooksEmailEmAnaliseRoute
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/painel-publico/$token': {
+      id: '/painel-publico/$token'
+      path: '/painel-publico/$token'
+      fullPath: '/painel-publico/$token'
+      preLoaderRoute: typeof PainelPublicoTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/demandas/nova': {
       id: '/demandas/nova'
@@ -251,6 +271,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   DemandasNovaRoute: DemandasNovaRoute,
+  PainelPublicoTokenRoute: PainelPublicoTokenRoute,
   ApiPublicHooksEmailAssignmentRoute: ApiPublicHooksEmailAssignmentRoute,
   ApiPublicHooksEmailDailyRoute: ApiPublicHooksEmailDailyRoute,
   ApiPublicHooksEmailEmAnaliseRoute: ApiPublicHooksEmailEmAnaliseRoute,

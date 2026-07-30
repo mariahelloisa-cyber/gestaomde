@@ -33,6 +33,10 @@ export interface Tarefa {
   tipo?: TipoItem; // default: "tarefa"
   escopo?: EscopoItem; // relevante apenas para lembretes; default "geral"
   criado_por?: string; // iniciais do usuário criador (privado p/ lembretes)
+  // Nota de voz e anexos trazidos de uma demanda externa aceita. Excluídos do
+  // storage (e zerados aqui) assim que a tarefa é marcada como "Concluído".
+  audio?: { path: string; nome_arquivo: string; duracao_seg?: number; url: string | null } | null;
+  anexos?: { path: string; nome_arquivo: string; url: string | null }[];
 }
 
 export interface Comentario {

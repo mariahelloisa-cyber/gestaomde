@@ -3,9 +3,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import {
-  ArrowDown,
-  ArrowRight,
-  ArrowUp,
   Calendar as CalendarIcon,
   Check,
   ChevronDown,
@@ -17,12 +14,8 @@ import {
   Flag,
   FolderKanban,
   Lock,
-  Minus,
   Paperclip,
   Plus,
-  SignalHigh,
-  SignalLow,
-  SignalMedium,
   User,
   X,
 } from "lucide-react";
@@ -31,7 +24,6 @@ import {
   prioridadeOrdem,
   complexidadeCor,
   complexidadePillStyle,
-  rotuloData,
   statusCor,
   statusPillStyle,
   prioridadePillStyle,
@@ -44,47 +36,17 @@ import {
   type EscopoItem,
 } from "@/lib/mock-data";
 import { useTasks, USUARIO_LOGADO_INICIAIS } from "@/lib/tasks-store";
+import { TaskCard, complexidadeIcon } from "./task-card";
 import { cn } from "@/lib/utils";
-import {
-  Sheet,
-  SheetContent,
-  
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-
-const prioridadeIcon: Record<Prioridade, typeof ArrowUp> = {
-  Alta: ArrowUp,
-  "Média": ArrowRight,
-  Baixa: ArrowDown,
-  Nenhuma: Minus,
-};
-
-const complexidadeIcon: Record<Complexidade, typeof SignalLow> = {
-  "Fácil": SignalLow,
-  "Média": SignalMedium,
-  "Difícil": SignalHigh,
-};
-
-function isAtrasada(t: Tarefa): boolean {
-  if (t.status === "Concluído" || !t.data_vencimento) return false;
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const venc = new Date(t.data_vencimento.length === 10 ? `${t.data_vencimento}T00:00:00` : t.data_vencimento);
-  return venc.getTime() < hoje.getTime();
-}
 
 const colunas: { status: Status; label: string; icon: typeof Clock }[] = [
   { status: "Pendente", label: "Pendentes", icon: Clock },
@@ -93,15 +55,27 @@ const colunas: { status: Status; label: string; icon: typeof Clock }[] = [
   { status: "Concluído", label: "Concluídas", icon: Check },
 ];
 
-export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: string; semCliente?: boolean } = {}) {
-  const { tarefas, updateTarefa, openTask, myId, myCargo, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter } = useTasks();
+export function KanbanView({
+  clienteFilterId,
+  semCliente,
+}: { clienteFilterId?: string; semCliente?: boolean } = {}) {
+  const {
+    tarefas,
+    updateTarefa,
+    openTask,
+    myId,
+    myCargo,
+    meuStatusFilter,
+    geralStatusFilter,
+    geralEmpresaFilter,
+    geralMembroFilter,
+  } = useTasks();
   const apenasMinhas = !semCliente && !clienteFilterId;
   const isAdmin = myCargo === "Admin";
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // No escopo "geral" (semCliente) os filtros de empresa e membro vêm do
-  const empresaEfetiva = semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
-
-
+  const empresaEfetiva =
+    semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
 
   const onDrop = (status: Status) => {
     if (!draggingId) return;
@@ -123,7 +97,11 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
           if (semCliente) {
             if (geralStatusFilter && t.status !== geralStatusFilter) return false;
             if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
-            if (geralMembroFilter !== "todos" && !t.responsaveis.some((r) => r.id === geralMembroFilter)) return false;
+            if (
+              geralMembroFilter !== "todos" &&
+              !t.responsaveis.some((r) => r.id === geralMembroFilter)
+            )
+              return false;
             return true;
           }
           if (clienteFilterId) return t.cliente_id === clienteFilterId;
@@ -166,7 +144,12 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
               <div className="flex items-center gap-1">
                 <span className="text-xs font-medium text-muted-foreground">{list.length}</span>
                 {(c.status !== "Concluído" || isAdmin) && (
-                  <AddTaskDialog defaultStatus={c.status} compact lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
+                  <AddTaskDialog
+                    defaultStatus={c.status}
+                    compact
+                    lockedClienteId={clienteFilterId ?? empresaEfetiva}
+                    semCliente={semCliente && !empresaEfetiva}
+                  />
                 )}
               </div>
             </div>
@@ -188,7 +171,11 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
                 </div>
               )}
               {(c.status !== "Concluído" || isAdmin) && (
-                <AddTaskDialog defaultStatus={c.status} lockedClienteId={clienteFilterId ?? empresaEfetiva} semCliente={semCliente && !empresaEfetiva} />
+                <AddTaskDialog
+                  defaultStatus={c.status}
+                  lockedClienteId={clienteFilterId ?? empresaEfetiva}
+                  semCliente={semCliente && !empresaEfetiva}
+                />
               )}
             </div>
           </div>
@@ -209,72 +196,23 @@ function CardTarefa({
   onDragEnd: () => void;
   onOpen: () => void;
 }) {
-  const { clientes } = useTasks();
+  const { clientes, membros } = useTasks();
   const cliente = clientes.find((c) => c.id === tarefa.cliente_id);
-  const atrasada = isAtrasada(tarefa);
-  const PrioIcon = prioridadeIcon[tarefa.prioridade];
-  const prioCor = prioridadeCor[tarefa.prioridade];
-  const ComplexIcon = complexidadeIcon[tarefa.complexidade];
-  const complexCor = complexidadeCor[tarefa.complexidade];
+  const responsaveisComCor = tarefa.responsaveis.map((r) => ({
+    ...r,
+    cor: membros.find((m) => m.id === r.id)?.cor ?? "#7B68EE",
+  }));
 
   return (
-    <div
+    <TaskCard
+      tarefa={tarefa}
+      cliente={cliente}
+      responsaveis={responsaveisComCor}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onOpen}
-      className="task-surface group shrink-0 cursor-grab overflow-hidden rounded-md border border-border p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
-    >
-      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-        <span
-          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
-          style={{
-            color: prioCor,
-            backgroundColor: `color-mix(in oklab, ${prioCor} 16%, transparent)`,
-            borderColor: `color-mix(in oklab, ${prioCor} 45%, transparent)`,
-          }}
-        >
-          <PrioIcon className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} />
-          {tarefa.prioridade}
-        </span>
-        <span
-          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
-          style={{
-            color: complexCor,
-            backgroundColor: `color-mix(in oklab, ${complexCor} 16%, transparent)`,
-            borderColor: `color-mix(in oklab, ${complexCor} 45%, transparent)`,
-          }}
-        >
-          <ComplexIcon className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} />
-          {tarefa.complexidade}
-        </span>
-        {atrasada && (
-          <span className="inline-flex shrink-0 items-center rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
-            Atrasada
-          </span>
-        )}
-      </div>
-      <p className="mb-1 break-words text-sm font-medium leading-snug">{tarefa.titulo}</p>
-      {cliente && (
-        <p className="mb-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <span
-            className="h-1.5 w-1.5 shrink-0 rounded-full"
-            style={{ backgroundColor: cliente.cor }}
-          />
-          <span className="min-w-0 truncate">{cliente.nome_empresa}</span>
-        </p>
-      )}
-      {tarefa.descricao && (
-        <p className="mb-2.5 truncate text-xs text-muted-foreground">{tarefa.descricao}</p>
-      )}
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <CalendarIcon className="h-3 w-3" />
-          {rotuloData(tarefa.data_vencimento)}
-        </span>
-        <AvatarStack responsaveis={tarefa.responsaveis} />
-      </div>
-    </div>
+    />
   );
 }
 
@@ -325,14 +263,18 @@ export function AddTaskDialog({
       setClienteId(lockedClienteId);
       return;
     }
-    setClienteId((atual) => (atual && clientes.some((c) => c.id === atual) ? atual : (clientes[0]?.id ?? "")));
+    setClienteId((atual) =>
+      atual && clientes.some((c) => c.id === atual) ? atual : (clientes[0]?.id ?? ""),
+    );
   }, [clientes, lockedClienteId, semCliente]);
   const [projetoId, setProjetoId] = useState("");
   const [data, setData] = useState<string>(defaultDate ?? "");
   const [status, setStatus] = useState<Status>(defaultStatus);
   const [prioridade, setPrioridade] = useState<Prioridade>("Nenhuma");
   const [complexidade, setComplexidade] = useState<Complexidade>("Média");
-  const [responsaveis, setResponsaveis] = useState<{ id: string; nome: string; iniciais: string }[]>([]);
+  const [responsaveis, setResponsaveis] = useState<
+    { id: string; nome: string; iniciais: string }[]
+  >([]);
   const [anexos, setAnexos] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -365,18 +307,17 @@ export function AddTaskDialog({
     <Sheet open={open} onOpenChange={setOpen}>
       {trigger !== null && (
         <SheetTrigger asChild>
-          {trigger ?? (
-          compact ? (
-            <button className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Plus className="h-4 w-4" />
-            </button>
-          ) : (
-            <button className="mt-1 flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Plus className="h-3.5 w-3.5" />
-              Adicionar Tarefa
-            </button>
-          )
-          )}
+          {trigger ??
+            (compact ? (
+              <button className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Plus className="h-4 w-4" />
+              </button>
+            ) : (
+              <button className="mt-1 flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Plus className="h-3.5 w-3.5" />
+                Adicionar Tarefa
+              </button>
+            ))}
         </SheetTrigger>
       )}
       <SheetContent
@@ -388,12 +329,11 @@ export function AddTaskDialog({
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 pt-5">
           <div className="flex items-end gap-4">
-            {(allowLembrete ? (["tarefa", "lembrete"] as TipoItem[]) : (["tarefa"] as TipoItem[])).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTipo(t)}
-                className="relative pb-1"
-              >
+            {(allowLembrete
+              ? (["tarefa", "lembrete"] as TipoItem[])
+              : (["tarefa"] as TipoItem[])
+            ).map((t) => (
+              <button key={t} onClick={() => setTipo(t)} className="relative pb-1">
                 <span
                   className={cn(
                     "text-xs font-medium uppercase tracking-wide",
@@ -455,7 +395,11 @@ export function AddTaskDialog({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-56">
                     {clientes.map((c) => (
-                      <DropdownMenuItem key={c.id} onClick={() => setClienteId(c.id)} className="gap-2">
+                      <DropdownMenuItem
+                        key={c.id}
+                        onClick={() => setClienteId(c.id)}
+                        className="gap-2"
+                      >
                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.cor }} />
                         <span className="flex-1">{c.nome_empresa}</span>
                         {c.id === clienteId && <Check className="h-3.5 w-3.5" />}
@@ -479,13 +423,20 @@ export function AddTaskDialog({
                     </div>
                   )}
                   {projetos.map((p) => (
-                    <DropdownMenuItem key={p.id} onClick={() => setProjetoId(p.id)} className="gap-2">
+                    <DropdownMenuItem
+                      key={p.id}
+                      onClick={() => setProjetoId(p.id)}
+                      className="gap-2"
+                    >
                       <span className="flex-1">{p.nome}</span>
                       {p.id === projetoId && <Check className="h-3.5 w-3.5" />}
                     </DropdownMenuItem>
                   ))}
                   {projetoId && (
-                    <DropdownMenuItem onClick={() => setProjetoId("")} className="text-muted-foreground">
+                    <DropdownMenuItem
+                      onClick={() => setProjetoId("")}
+                      className="text-muted-foreground"
+                    >
                       Nenhum projeto
                     </DropdownMenuItem>
                   )}
@@ -573,7 +524,9 @@ export function AddTaskDialog({
             {anexos.length > 0 && (
               <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
                 {anexos.map((a, i) => (
-                  <li key={i} className="truncate">• {a.name}</li>
+                  <li key={i} className="truncate">
+                    • {a.name}
+                  </li>
                 ))}
               </ul>
             )}
@@ -717,41 +670,6 @@ function ResponsavelPill({
   );
 }
 
-function AvatarStack({ responsaveis }: { responsaveis: { id: string; nome: string; iniciais: string }[] }) {
-  const { membros } = useTasks();
-  if (responsaveis.length === 0) {
-    return (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">
-        <User className="h-3 w-3" />
-      </div>
-    );
-  }
-  const visiveis = responsaveis.slice(0, 3);
-  const extras = responsaveis.length - visiveis.length;
-  return (
-    <div className="flex -space-x-1.5">
-      {visiveis.map((r) => {
-        const cor = membros.find((m) => m.id === r.id)?.cor ?? "#7B68EE";
-        return (
-          <div
-            key={r.id}
-            title={r.nome}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-background"
-            style={{ backgroundColor: cor }}
-          >
-            {r.iniciais}
-          </div>
-        );
-      })}
-      {extras > 0 && (
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground ring-2 ring-background">
-          +{extras}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function DataPill({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const parsed = value ? new Date(value.length === 10 ? value + "T00:00:00" : value) : null;
   const date = parsed && !isNaN(parsed.getTime()) ? parsed : undefined;
@@ -846,13 +764,7 @@ function ComplexidadePill({
   );
 }
 
-function EscopoPill({
-  value,
-  onChange,
-}: {
-  value: EscopoItem;
-  onChange: (e: EscopoItem) => void;
-}) {
+function EscopoPill({ value, onChange }: { value: EscopoItem; onChange: (e: EscopoItem) => void }) {
   const opts: { id: EscopoItem; label: string; desc: string; Icon: typeof Eye }[] = [
     { id: "geral", label: "Geral", desc: "Visível para toda a equipe", Icon: Eye },
     { id: "pessoal", label: "Pessoal", desc: "Apenas você verá este lembrete", Icon: Lock },

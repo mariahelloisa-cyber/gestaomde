@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Check, ChevronDown, Flag, FolderKanban, ListChecks, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, X } from "lucide-react";
+import { CalendarIcon, Check, ChevronDown, Flag, FolderKanban, ListChecks, Mic, Paperclip, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -211,6 +211,47 @@ export function TaskDetailDialog() {
               placeholder="Escreva uma descrição..."
               className="mt-4 min-h-[120px] resize-none border-border/60 bg-[var(--surface-1)] text-sm shadow-none focus-visible:ring-1"
             />
+
+            {/* Áudio (trazido de uma demanda externa aceita) */}
+            {tarefa.audio?.url && (
+              <div className="mt-4 rounded-md border border-border bg-[var(--surface-1)] p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Mic className="h-3.5 w-3.5" />
+                  Áudio da demanda
+                </div>
+                <audio controls src={tarefa.audio.url} className="w-full" />
+              </div>
+            )}
+
+            {/* Anexos (trazidos de uma demanda externa aceita) */}
+            {(tarefa.anexos ?? []).length > 0 && (
+              <div className="mt-4 rounded-md border border-border bg-[var(--surface-1)] p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Anexos da demanda
+                </div>
+                <ul className="flex flex-col gap-1">
+                  {(tarefa.anexos ?? []).map((a) =>
+                    a.url ? (
+                      <li key={a.path}>
+                        <a
+                          href={a.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-sm text-primary underline-offset-2 hover:underline"
+                        >
+                          {a.nome_arquivo}
+                        </a>
+                      </li>
+                    ) : (
+                      <li key={a.path} className="truncate text-sm text-muted-foreground">
+                        {a.nome_arquivo}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            )}
 
             {/* Checklist */}
             <div className="mt-6">

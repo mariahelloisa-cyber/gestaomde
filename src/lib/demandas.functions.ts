@@ -105,7 +105,7 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
 
     const { data: dem, error: errDem } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id")
+      .select("id, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id, audio, anexos")
       .eq("id", data.id)
       .single();
     if (errDem || !dem) throw new Error(errDem?.message ?? "Demanda não encontrada");
@@ -138,6 +138,10 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
         tipo: "tarefa",
         escopo: "geral",
         criado_por: userId,
+        // Mesma referência de storage da demanda — áudio e anexos não são
+        // duplicados, só passam a acompanhar a tarefa também.
+        audio: dem.audio ?? null,
+        anexos: dem.anexos ?? [],
       })
       .select("id")
       .single();

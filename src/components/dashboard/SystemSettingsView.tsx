@@ -1,15 +1,29 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Mail, Loader2, Send } from "lucide-react";
+import { Mail, Loader2, Send, Link2, Copy, RefreshCw, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useTasks } from "@/lib/tasks-store";
 import {
   getEmailConfig,
   saveEmailConfig,
   sendEmailTest,
+  getPainelPublicoLink,
+  gerarPainelPublicoLink,
+  revogarPainelPublicoLink,
 } from "@/lib/system-settings.functions";
 
 export function SystemSettingsView() {
@@ -17,6 +31,9 @@ export function SystemSettingsView() {
   const getCfg = useServerFn(getEmailConfig);
   const saveCfg = useServerFn(saveEmailConfig);
   const sendTest = useServerFn(sendEmailTest);
+  const getLinkFn = useServerFn(getPainelPublicoLink);
+  const gerarLinkFn = useServerFn(gerarPainelPublicoLink);
+  const revogarLinkFn = useServerFn(revogarPainelPublicoLink);
 
   const [apiKey, setApiKey] = useState("");
   const [fromEmail, setFromEmail] = useState("");
@@ -30,6 +47,10 @@ export function SystemSettingsView() {
   const [testSubject, setTestSubject] = useState("Teste de envio do painel");
   const [testMsg, setTestMsg] = useState("Olá! Esta é uma mensagem de teste enviada pelo painel.");
   const [testing, setTesting] = useState(false);
+
+  const [painelToken, setPainelToken] = useState<string | null>(null);
+  const [painelLoading, setPainelLoading] = useState(true);
+  const [painelBusy, setPainelBusy] = useState(false);
 
   useEffect(() => {
     if (myCargo !== "Admin" && myCargo !== "Supervisor") {
@@ -52,6 +73,23 @@ export function SystemSettingsView() {
     })();
   }, [getCfg, myCargo]);
 
+  useEffect(() => {
+    if (myCargo !== "Admin" && myCargo !== "Supervisor") {
+      setPainelLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const r = await getLinkFn();
+        setPainelToken(r.token);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao carregar o painel público.");
+      } finally {
+        setPainelLoading(false);
+      }
+    })();
+  }, [getLinkFn, myCargo]);
+
   if (myCargo !== "Admin" && myCargo !== "Supervisor") {
     return (
       <div className="mx-auto max-w-2xl p-8">
@@ -61,6 +99,47 @@ export function SystemSettingsView() {
       </div>
     );
   }
+
+  const painelUrl =
+    painelToken && typeof window !== "undefined"
+      ? `${window.location.origin}/painel-publico/${painelToken}`
+      : "";
+
+  const copiarPainelLink = async () => {
+    if (!painelUrl) return;
+    try {
+      await navigator.clipboard.writeText(painelUrl);
+      toast.success("Link copiado!");
+    } catch {
+      toast.error("Não foi possível copiar. Copie manualmente.");
+    }
+  };
+
+  const gerarNovoLink = async () => {
+    setPainelBusy(true);
+    try {
+      const r = await gerarLinkFn();
+      setPainelToken(r.token);
+      toast.success("Novo link gerado. O link anterior parou de funcionar.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar o link.");
+    } finally {
+      setPainelBusy(false);
+    }
+  };
+
+  const desativarLink = async () => {
+    setPainelBusy(true);
+    try {
+      await revogarLinkFn();
+      setPainelToken(null);
+      toast.success("Painel público desativado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao desativar o link.");
+    } finally {
+      setPainelBusy(false);
+    }
+  };
 
   const onSave = async () => {
     if (!apiKey.trim() || !fromEmail.trim()) {
@@ -131,9 +210,7 @@ export function SystemSettingsView() {
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxx"
               />
-              <p className="text-xs text-muted-foreground">
-                Gere em resend.com → API Keys.
-              </p>
+              <p className="text-xs text-muted-foreground">Gere em resend.com → API Keys.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -214,10 +291,103 @@ export function SystemSettingsView() {
         </Button>
       </section>
 
+      <section className="space-y-4 rounded-lg border border-border bg-white p-6 text-black shadow-sm">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-medium">Painel público</h2>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Link sem login para gestores acompanharem o dashboard (visão geral, tarefas por projeto e
+          produtividade) em tempo quase real. Quem tiver o link não precisa de conta e não vê mais
+          nenhuma outra página do sistema.
+        </p>
+
+        {painelLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+          </div>
+        ) : painelUrl ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Input readOnly value={painelUrl} className="font-mono text-xs" />
+              <Button type="button" variant="secondary" onClick={copiarPainelLink}>
+                <Copy className="h-4 w-4" />
+                Copiar
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="secondary" disabled={painelBusy}>
+                    <RefreshCw className="h-4 w-4" />
+                    Gerar novo link
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Gerar um novo link?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      O link atual para de funcionar imediatamente. Quem já tiver o link antigo
+                      perde o acesso ao painel.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={gerarNovoLink}>Gerar novo link</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    disabled={painelBusy}
+                  >
+                    <Ban className="h-4 w-4" />
+                    Desativar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Desativar o painel público?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      O link atual para de funcionar. Você pode gerar um novo depois, quando quiser.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={desativarLink}
+                    >
+                      Desativar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        ) : (
+          <Button type="button" onClick={gerarNovoLink} disabled={painelBusy}>
+            {painelBusy ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Link2 className="mr-2 h-4 w-4" />
+            )}
+            Gerar link do painel público
+          </Button>
+        )}
+      </section>
+
       <section className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
         <p className="mb-1 font-medium text-foreground">Como funciona</p>
         <ul className="list-inside list-disc space-y-1">
-          <li>Convite: ao convidar alguém em Membros, o e-mail com o link de cadastro sai na hora.</li>
+          <li>
+            Convite: ao convidar alguém em Membros, o e-mail com o link de cadastro sai na hora.
+          </li>
           <li>Designação: ao adicionar um responsável a uma tarefa, o e-mail sai na hora.</li>
           <li>Lembrete: tarefas que vencem em menos de 24h recebem aviso uma vez por dia.</li>
           <li>Expirado: tarefas pendentes que passaram do prazo recebem aviso uma vez.</li>

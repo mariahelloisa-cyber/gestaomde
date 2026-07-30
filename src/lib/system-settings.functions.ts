@@ -85,6 +85,52 @@ const testSchema = z.object({
   mensagem: z.string().trim().min(1).max(2000),
 });
 
+/** Admin: lê o token do painel público (se algum já foi gerado). */
+export const getPainelPublicoLink = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context.userId);
+    const { data, error } = await supabaseAdmin
+      .from("configuracoes_sistema")
+      .select("valor")
+      .eq("chave", "painel_publico_token")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { token: data?.valor ?? null };
+  });
+
+/** Admin: gera (ou substitui) o token do painel público — invalida qualquer link anterior. */
+export const gerarPainelPublicoLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context.userId);
+    const token = crypto.randomUUID();
+    const { error } = await supabaseAdmin.from("configuracoes_sistema").upsert(
+      {
+        chave: "painel_publico_token",
+        valor: token,
+        atualizado_por: context.userId,
+        atualizado_em: new Date().toISOString(),
+      },
+      { onConflict: "chave" },
+    );
+    if (error) throw new Error(error.message);
+    return { token };
+  });
+
+/** Admin: desativa o painel público até que um novo link seja gerado. */
+export const revogarPainelPublicoLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context.userId);
+    const { error } = await supabaseAdmin
+      .from("configuracoes_sistema")
+      .delete()
+      .eq("chave", "painel_publico_token");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const sendEmailTest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => testSchema.parse(input))
