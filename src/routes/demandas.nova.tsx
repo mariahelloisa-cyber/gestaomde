@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createDemandaExterna } from "@/lib/demandas.functions";
@@ -8,10 +8,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, X, FileText, CheckCircle2, Mic, Square, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Calendar,
+  CheckCircle2,
+  FileText,
+  Info,
+  Loader2,
+  Lock,
+  Mail,
+  Mic,
+  Plus,
+  Send,
+  Square,
+  Trash2,
+  UploadCloud,
+  User,
+  X,
+} from "lucide-react";
 
 const AUDIO_MIME_CANDIDATOS = ["audio/webm", "audio/mp4", "audio/ogg"];
 const AUDIO_DURACAO_MAX_SEG = 180;
+const DESCRICAO_MAX = 5000;
+const ANEXO_TAMANHO_MAX_MB = 10;
 
 function mimeSuportado(): string {
   for (const mime of AUDIO_MIME_CANDIDATOS) {
@@ -42,6 +61,23 @@ export const Route = createFileRoute("/demandas/nova")({
   component: NovaDemandaPage,
 });
 
+function FieldRow({
+  icon: Icon,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-2">{children}</div>
+    </div>
+  );
+}
+
 function NovaDemandaPage() {
   const createFn = useServerFn(createDemandaExterna);
 
@@ -50,6 +86,7 @@ function NovaDemandaPage() {
   const [descricao, setDescricao] = useState("");
   const [prazo, setPrazo] = useState("");
   const [arquivos, setArquivos] = useState<File[]>([]);
+  const [arrastandoArquivo, setArrastandoArquivo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
 
@@ -82,13 +119,17 @@ function NovaDemandaPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      const recorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime })
+        : new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mime || "audio/webm" });
+        const blob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || mime || "audio/webm",
+        });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach((t) => t.stop());
@@ -125,8 +166,8 @@ function NovaDemandaPage() {
         toast.error(`"${f.name}" não é PDF.`);
         continue;
       }
-      if (f.size > 10 * 1024 * 1024) {
-        toast.error(`"${f.name}" passa de 10 MB.`);
+      if (f.size > ANEXO_TAMANHO_MAX_MB * 1024 * 1024) {
+        toast.error(`"${f.name}" passa de ${ANEXO_TAMANHO_MAX_MB} MB.`);
         continue;
       }
       novos.push(f);
@@ -145,7 +186,6 @@ function NovaDemandaPage() {
     try {
       const anexos: Array<{ path: string; nome_arquivo: string }> = [];
       for (const file of arquivos) {
-        const ext = file.name.split(".").pop() ?? "pdf";
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${crypto.randomUUID()}/${Date.now()}-${safeName}`;
         const { error: upErr } = await supabase.storage
@@ -186,8 +226,8 @@ function NovaDemandaPage() {
 
   if (enviado) {
     return (
-      <div className="min-h-screen bg-[var(--surface-1)] py-16">
-        <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-10 text-center shadow-sm">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--surface-1)] px-4 py-16">
+        <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-10 text-center shadow-sm">
           <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
           <h1 className="mt-4 text-xl font-semibold">Demanda enviada!</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -215,46 +255,102 @@ function NovaDemandaPage() {
   return (
     <div className="min-h-screen bg-[var(--surface-1)] py-10">
       <div className="mx-auto max-w-2xl px-4">
-        <header className="mb-8">
-          <h1 className="text-2xl font-semibold">Nova Demanda</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Preencha os campos abaixo e envie sua solicitação para a equipe.
-          </p>
+        <header className="mb-6 flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+            <Plus className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Nova Demanda</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Preencha os campos abaixo e envie sua solicitação para a equipe.
+            </p>
+          </div>
         </header>
 
-        <div className="space-y-6 rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="grid gap-2">
-            <Label htmlFor="nome">Seu nome *</Label>
-            <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={200} />
+        <div className="space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <FieldRow icon={User}>
+              <Label htmlFor="nome" className="font-semibold">
+                Seu nome *
+              </Label>
+              <Input
+                id="nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                maxLength={200}
+                placeholder="Digite seu nome completo"
+              />
+            </FieldRow>
+
+            <FieldRow icon={Mail}>
+              <Label htmlFor="email" className="font-semibold">
+                E-mail (opcional)
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                maxLength={255}
+                placeholder="Digite seu e-mail"
+              />
+            </FieldRow>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="email">E-mail (opcional)</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="descricao">Descrição *</Label>
+          <FieldRow icon={FileText}>
+            <Label htmlFor="descricao" className="font-semibold">
+              Descrição *
+            </Label>
             <Textarea
               id="descricao"
               rows={6}
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              maxLength={5000}
+              maxLength={DESCRICAO_MAX}
               placeholder="Detalhe a demanda, contexto, objetivos…"
             />
-          </div>
+            <div className="text-right text-xs text-muted-foreground">
+              {descricao.length}/{DESCRICAO_MAX}
+            </div>
+          </FieldRow>
 
-          <div className="grid gap-2">
-            <Label htmlFor="prazo">Prazo sugerido</Label>
-            <Input id="prazo" type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
-          </div>
+          <FieldRow icon={Calendar}>
+            <Label htmlFor="prazo" className="font-semibold">
+              Prazo sugerido
+            </Label>
+            <Input
+              id="prazo"
+              type="date"
+              value={prazo}
+              onChange={(e) => setPrazo(e.target.value)}
+            />
+          </FieldRow>
 
-          <div className="grid gap-2">
-            <Label>Anexos (PDF — até 10 arquivos)</Label>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-4 py-6 text-sm text-muted-foreground hover:bg-muted">
-              <Upload className="h-4 w-4" />
-              Clique para selecionar PDFs
+          <FieldRow icon={FileText}>
+            <Label className="font-semibold">Anexos (PDF — até 10 arquivos)</Label>
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setArrastandoArquivo(true);
+              }}
+              onDragLeave={() => setArrastandoArquivo(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setArrastandoArquivo(false);
+                onFiles(e.dataTransfer.files);
+              }}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border bg-background px-4 py-8 text-center transition-colors hover:bg-muted",
+                arrastandoArquivo && "border-primary bg-primary/5",
+              )}
+            >
+              <UploadCloud className="mb-1 h-6 w-6 text-primary" />
+              <span className="text-sm font-semibold text-foreground">
+                Clique para selecionar PDFs
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Ou arraste e solte os arquivos aqui
+              </span>
               <input
                 type="file"
                 accept="application/pdf"
@@ -263,37 +359,55 @@ function NovaDemandaPage() {
                 onChange={(e) => onFiles(e.target.files)}
               />
             </label>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              Máximo de 10 arquivos • Formato: PDF • Tamanho máximo por arquivo:{" "}
+              {ANEXO_TAMANHO_MAX_MB}MB
+            </p>
             {arquivos.length > 0 && (
-              <ul className="mt-2 space-y-1">
+              <ul className="space-y-1">
                 {arquivos.map((f, i) => (
-                  <li key={i} className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm">
+                  <li
+                    key={i}
+                    className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  >
                     <span className="flex items-center gap-2 truncate">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="truncate">{f.name}</span>
                     </span>
-                    <button onClick={() => remover(i)} className="text-muted-foreground hover:text-foreground">
+                    <button
+                      onClick={() => remover(i)}
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
                       <X className="h-4 w-4" />
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
+          </FieldRow>
 
-          <div className="grid gap-2">
-            <Label>Áudio (opcional — até {formatarDuracao(AUDIO_DURACAO_MAX_SEG)})</Label>
+          <hr className="border-border" />
+
+          <FieldRow icon={Mic}>
+            <Label className="font-semibold">
+              Áudio (opcional — até {formatarDuracao(AUDIO_DURACAO_MAX_SEG)})
+            </Label>
             {!audioUrl && !gravando && (
               <button
                 type="button"
                 onClick={iniciarGravacao}
-                className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-4 py-6 text-sm text-muted-foreground hover:bg-muted"
+                className="flex w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border bg-background px-4 py-8 text-center transition-colors hover:bg-muted"
               >
-                <Mic className="h-4 w-4" />
-                Gravar um áudio
+                <Mic className="mb-1 h-6 w-6 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Gravar um áudio</span>
+                <span className="text-xs text-muted-foreground">
+                  Clique para iniciar a gravação
+                </span>
               </button>
             )}
             {gravando && (
-              <div className="flex items-center justify-between rounded-md border border-border bg-background px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
                 <span className="flex items-center gap-2 text-sm text-destructive">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
                   Gravando… {formatarDuracao(duracaoSeg)}
@@ -304,20 +418,38 @@ function NovaDemandaPage() {
               </div>
             )}
             {audioUrl && !gravando && (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
                 <audio controls src={audioUrl} className="h-9 flex-1" />
-                <button onClick={removerAudio} className="text-muted-foreground hover:text-destructive" title="Remover áudio">
+                <button
+                  onClick={removerAudio}
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  title="Remover áudio"
+                >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             )}
-          </div>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              Duração máxima: {formatarDuracao(AUDIO_DURACAO_MAX_SEG)}
+            </p>
+          </FieldRow>
 
-          <Button onClick={enviar} disabled={enviando} className="w-full">
-            {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          <Button onClick={enviar} disabled={enviando} className="h-12 w-full rounded-xl text-base">
+            {enviando ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
             {enviando ? "Enviando…" : "Enviar demanda"}
           </Button>
         </div>
+
+        <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          <Lock className="h-3.5 w-3.5 shrink-0" />
+          Suas informações estão seguras e serão utilizadas apenas para atendimento da sua
+          solicitação.
+        </p>
       </div>
     </div>
   );

@@ -382,18 +382,6 @@ export function SystemSettingsView() {
         )}
       </section>
 
-      <section className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
-        <p className="mb-1 font-medium text-foreground">Como funciona</p>
-        <ul className="list-inside list-disc space-y-1">
-          <li>
-            Convite: ao convidar alguém em Membros, o e-mail com o link de cadastro sai na hora.
-          </li>
-          <li>Designação: ao adicionar um responsável a uma tarefa, o e-mail sai na hora.</li>
-          <li>Lembrete: tarefas que vencem em menos de 24h recebem aviso uma vez por dia.</li>
-          <li>Expirado: tarefas pendentes que passaram do prazo recebem aviso uma vez.</li>
-          <li>O membro precisa ter e-mail cadastrado no perfil para receber avisos de tarefa.</li>
-        </ul>
-      </section>
     </div>
   );
 }

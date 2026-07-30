@@ -34,7 +34,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Check, X, ArrowRightLeft, Calendar, Mail, Inbox, Copy, ExternalLink, Mic } from "lucide-react";
+import {
+  FileText,
+  Check,
+  X,
+  ArrowRightLeft,
+  Calendar,
+  Mail,
+  Inbox,
+  Copy,
+  ExternalLink,
+  Mic,
+  Link2,
+  Globe,
+} from "lucide-react";
 
 type Demanda = Awaited<ReturnType<typeof listDemandas>>[number];
 
@@ -57,13 +70,17 @@ export function DemandasView() {
   };
 
   const aceitarMut = useMutation({
-    mutationFn: (vars: { id: string; responsavel_id: string }) =>
-      aceitarFn({ data: vars }),
-    onSuccess: () => { toast.success("Demanda aceita — tarefa criada."); invalidate(); },
+    mutationFn: (vars: { id: string; responsavel_id: string }) => aceitarFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("Demanda aceita — tarefa criada.");
+      invalidate();
+    },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
   });
 
-  const [aceitarState, setAceitarState] = useState<{ id: string; responsavel_id: string } | null>(null);
+  const [aceitarState, setAceitarState] = useState<{ id: string; responsavel_id: string } | null>(
+    null,
+  );
 
   const [recusaOpen, setRecusaOpen] = useState<string | null>(null);
   const recusarMut = useMutation({
@@ -87,7 +104,8 @@ export function DemandasView() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro"),
   });
 
-  const nomePor = (id: string | null) => (id ? membros.find((m) => m.id === id)?.nome ?? "—" : "—");
+  const nomePor = (id: string | null) =>
+    id ? (membros.find((m) => m.id === id)?.nome ?? "—") : "—";
 
   const publicUrl =
     typeof window !== "undefined" ? `${window.location.origin}/demandas/nova` : "/demandas/nova";
@@ -110,22 +128,36 @@ export function DemandasView() {
             Solicitações enviadas pelo portal externo.
           </p>
         </div>
-        <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center">
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-medium text-muted-foreground">
-              Link público para envio de demandas
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Link2 className="h-4.5 w-4.5" />
             </div>
-            <div className="mt-1 truncate font-mono text-sm">{publicUrl}</div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">
+                Link público para envio de demandas
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Compartilhe este link para que outras pessoas possam enviar demandas.
+              </p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={copiarLink}>
-              <Copy className="mr-1 h-4 w-4" /> Copiar link
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="mr-1 h-4 w-4" /> Abrir
-              </a>
-            </Button>
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-[var(--surface-2)] px-3 py-2">
+              <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate font-mono text-sm text-foreground/90">{publicUrl}</span>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button size="sm" variant="outline" onClick={copiarLink}>
+                <Copy className="mr-1 h-4 w-4" /> Copiar link
+              </Button>
+              <Button size="sm" asChild>
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-1 h-4 w-4" /> Abrir
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -146,7 +178,9 @@ export function DemandasView() {
               key={d.id}
               d={d}
               nomeResponsavel={nomePor(d.responsavel_id)}
-              onAceitar={() => setAceitarState({ id: d.id, responsavel_id: d.responsavel_id ?? "" })}
+              onAceitar={() =>
+                setAceitarState({ id: d.id, responsavel_id: d.responsavel_id ?? "" })
+              }
               onAbrirRecusa={() => setRecusaOpen(d.id)}
               onAbrirTransferir={() => setTransferirState({ id: d.id, novo: "" })}
               busy={aceitarMut.isPending}
@@ -173,12 +207,16 @@ export function DemandasView() {
             </SelectTrigger>
             <SelectContent>
               {membros.map((m) => (
-                <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                <SelectItem key={m.id} value={m.id}>
+                  {m.nome}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAceitarState(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setAceitarState(null)}>
+              Cancelar
+            </Button>
             <Button
               onClick={() => {
                 if (!aceitarState?.responsavel_id) return;
@@ -232,16 +270,23 @@ export function DemandasView() {
             </SelectTrigger>
             <SelectContent>
               {membros.map((m) => (
-                <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                <SelectItem key={m.id} value={m.id}>
+                  {m.nome}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferirState(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setTransferirState(null)}>
+              Cancelar
+            </Button>
             <Button
               onClick={() =>
                 transferirState?.novo &&
-                transferirMut.mutate({ id: transferirState.id, novo_responsavel_id: transferirState.novo })
+                transferirMut.mutate({
+                  id: transferirState.id,
+                  novo_responsavel_id: transferirState.novo,
+                })
               }
               disabled={!transferirState?.novo || transferirMut.isPending}
             >
@@ -278,7 +323,10 @@ function DemandaCard({
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-600">
             {d.solicitante_email && (
-              <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{d.solicitante_email}</span>
+              <span className="flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                {d.solicitante_email}
+              </span>
             )}
             {d.prazo_sugerido && (
               <span className="flex items-center gap-1">
@@ -286,7 +334,9 @@ function DemandaCard({
                 Prazo: {new Date(d.prazo_sugerido).toLocaleDateString("pt-BR")}
               </span>
             )}
-            <span>Responsável: <strong className="text-black">{nomeResponsavel}</strong></span>
+            <span>
+              Responsável: <strong className="text-black">{nomeResponsavel}</strong>
+            </span>
           </div>
         </div>
       </div>
