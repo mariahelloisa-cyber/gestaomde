@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useTasks } from "@/lib/tasks-store";
+import { useTasks, type Projeto } from "@/lib/tasks-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter } from "./PeriodFilter";
@@ -34,9 +34,41 @@ const statusColors: Record<Status, string> = {
   "Concluído": "#22C55E",
 };
 
+interface ProjetoContagem {
+  id: string;
+  nome: string;
+  total: number;
+}
+
+function contarTarefasPorProjeto(list: Tarefa[], projetos: Projeto[]): ProjetoContagem[] {
+  const porId = new Map<string, number>();
+  let semProjeto = 0;
+  for (const t of list) {
+    if (t.projeto_id) porId.set(t.projeto_id, (porId.get(t.projeto_id) ?? 0) + 1);
+    else semProjeto++;
+  }
+  const linhas: ProjetoContagem[] = projetos.map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    total: porId.get(p.id) ?? 0,
+  }));
+  if (semProjeto > 0) linhas.push({ id: "__sem_projeto__", nome: "Sem projeto", total: semProjeto });
+  return linhas.sort((a, b) => b.total - a.total);
+}
+
+/** Arredonda para cima até um número "redondo" (1/2/5 x 10^n), pra servir de eixo do gráfico. */
+function tetoAmigavel(valor: number): number {
+  if (valor <= 5) return 5;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(valor)));
+  const resto = valor / magnitude;
+  const passo = resto <= 1 ? 1 : resto <= 2 ? 2 : resto <= 5 ? 5 : 10;
+  return passo * magnitude;
+}
+
 export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean } = {}) {
-  const { tarefas, myId, loading, membros } = useTasks();
+  const { tarefas, myId, loading, membros, projetos } = useTasks();
   const [membroSelecionadoId, setMembroSelecionadoId] = useState<string>("");
+  const [projetoSelecionadoId, setProjetoSelecionadoId] = useState<string>("");
   const [preset, setPreset] = useState<PeriodoPreset>("30d");
   const [customDe, setCustomDe] = useState("");
   const [customAte, setCustomAte] = useState("");
@@ -70,6 +102,19 @@ export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean
   const geralStatus = useMemo(() => calcStatus(todas), [todas]);
   const geralPrazos = useMemo(() => calcPrazos(todas), [todas]);
 
+  const projetosOrdenados = useMemo(
+    () => [...projetos].sort((a, b) => a.nome.localeCompare(b.nome)),
+    [projetos],
+  );
+  const contagemProjetos = useMemo(() => contarTarefasPorProjeto(todas, projetos), [todas, projetos]);
+  const projetoSelecionado = projetosOrdenados.find((p) => p.id === projetoSelecionadoId);
+  const tarefasProjeto = useMemo(
+    () => (projetoSelecionado ? todas.filter((t) => t.projeto_id === projetoSelecionado.id) : []),
+    [todas, projetoSelecionado],
+  );
+  const statusProjeto = useMemo(() => calcStatus(tarefasProjeto), [tarefasProjeto]);
+  const prazosProjeto = useMemo(() => calcPrazos(tarefasProjeto), [tarefasProjeto]);
+
   if (loading) {
     return (
       <div className="space-y-8 p-6">
@@ -97,6 +142,56 @@ export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean
           <ProgressoCard data={geralStatus} />
           <PrazosCard data={geralPrazos} />
         </Section>
+      )}
+
+      {!apenasMinhas && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Tarefas por Projeto</h2>
+            <p className="text-xs text-muted-foreground">Quantidade de tarefas ativas em cada projeto</p>
+          </div>
+
+          <Card title="Volume por Projeto">
+            {contagemProjetos.length > 0 ? (
+              <ProjetosBarChart rows={contagemProjetos} />
+            ) : (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                Nenhum projeto cadastrado ainda.
+              </div>
+            )}
+          </Card>
+
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-foreground">Detalhamento por Projeto</h3>
+              <Select value={projetoSelecionadoId} onValueChange={setProjetoSelecionadoId}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Selecione um projeto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projetosOrdenados.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {projetoSelecionado ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ProgressoCard data={statusProjeto} />
+                <PrazosCard data={prazosProjeto} />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                {projetosOrdenados.length === 0
+                  ? "Nenhum projeto cadastrado ainda."
+                  : "Selecione um projeto acima para ver finalizadas, em andamento, em análise, pendentes e atrasadas."}
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       <section className="space-y-6">
@@ -318,6 +413,65 @@ function ProgressoCard({ data }: { data: ReturnType<typeof calcStatus> }) {
         />
       </div>
     </Card>
+  );
+}
+
+function ProjetosBarChart({ rows }: { rows: ProjetoContagem[] }) {
+  const maiorValor = Math.max(1, ...rows.map((r) => r.total));
+  const teto = tetoAmigavel(maiorValor);
+  const marcas = 4;
+  const passo = teto / marcas;
+
+  return (
+    <div>
+      <div className="grid grid-cols-[1fr_9rem] gap-x-3">
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-0 flex justify-between">
+            {Array.from({ length: marcas + 1 }).map((_, i) => (
+              <span key={i} className="h-full w-px bg-border/40" />
+            ))}
+          </div>
+          <div className="relative space-y-2.5 py-0.5">
+            {rows.map((r) => (
+              <div key={r.id} className="flex h-7 items-center">
+                {r.total > 0 ? (
+                  <div
+                    className="flex h-full min-w-[2.25rem] items-center justify-end rounded-md pr-2 text-xs font-semibold text-white shadow-sm"
+                    style={{
+                      width: `${Math.max((r.total / teto) * 100, 4)}%`,
+                      background: "linear-gradient(90deg, #14b8a6, #3b82f6)",
+                    }}
+                  >
+                    {r.total}
+                  </div>
+                ) : (
+                  <span className="pl-1 text-xs text-muted-foreground">0</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2.5 py-0.5">
+          {rows.map((r) => (
+            <div
+              key={r.id}
+              className="flex h-7 items-center truncate text-xs text-foreground/90"
+              title={r.nome}
+            >
+              {r.nome}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-[1fr_9rem] gap-x-3">
+        <div className="mt-1.5 flex justify-between text-[10px] tabular-nums text-muted-foreground">
+          {Array.from({ length: marcas + 1 }).map((_, i) => (
+            <span key={i}>{Math.round(passo * i)}</span>
+          ))}
+        </div>
+        <div />
+      </div>
+    </div>
   );
 }
 

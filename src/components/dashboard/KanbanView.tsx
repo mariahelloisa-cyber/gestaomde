@@ -99,8 +99,8 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
   const isAdmin = myCargo === "Admin";
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // No escopo "geral" (semCliente) os filtros de empresa e membro vêm do
-  // contexto e podem restringir a visão, mesmo sendo o escopo da agência inteira.
   const empresaEfetiva = semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
+
 
 
   const onDrop = (status: Status) => {
