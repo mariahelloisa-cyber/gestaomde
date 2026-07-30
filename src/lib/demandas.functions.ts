@@ -9,12 +9,19 @@ const anexoSchema = z.object({
   nome_arquivo: z.string().min(1).max(255),
 });
 
+const audioSchema = z.object({
+  path: z.string().min(1).max(500),
+  nome_arquivo: z.string().min(1).max(255),
+  duracao_seg: z.number().int().min(0).max(600).optional(),
+});
+
 const createDemandaSchema = z.object({
   solicitante_nome: z.string().trim().min(1).max(200),
   solicitante_email: z.string().trim().toLowerCase().email().max(255).optional().or(z.literal("")),
   descricao: z.string().trim().min(1).max(5000),
   prazo_sugerido: z.string().optional(),
   anexos: z.array(anexoSchema).max(10).default([]),
+  audio: audioSchema.nullable().optional(),
 });
 
 export const createDemandaExterna = createServerFn({ method: "POST" })
@@ -30,6 +37,7 @@ export const createDemandaExterna = createServerFn({ method: "POST" })
         descricao: data.descricao,
         prazo_sugerido: data.prazo_sugerido || null,
         anexos: data.anexos,
+        audio: data.audio ?? null,
         status: "pendente",
       })
       .select("id")
@@ -51,7 +59,7 @@ export const listDemandas = createServerFn({ method: "GET" })
     // na aba Tarefas) e recusadas são excluídas na hora — nunca aparecem aqui.
     const { data, error } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, solicitante_email, responsavel_id, descricao, prazo_sugerido, anexos, status, tarefa_id, criado_em")
+      .select("id, solicitante_nome, solicitante_email, responsavel_id, descricao, prazo_sugerido, anexos, audio, status, tarefa_id, criado_em")
       .eq("status", "pendente")
       .order("criado_em", { ascending: false });
     if (error) throw new Error(error.message);
@@ -68,7 +76,15 @@ export const listDemandas = createServerFn({ method: "GET" })
             return { ...a, url: signed?.signedUrl ?? null };
           }),
         );
-        return { ...d, anexos: anexosComUrl };
+        const audio = d.audio as { path: string; nome_arquivo: string; duracao_seg?: number } | null;
+        let audioComUrl: (typeof audio & { url: string | null }) | null = null;
+        if (audio) {
+          const { data: signed } = await supabaseAdmin.storage
+            .from("demandas-anexos")
+            .createSignedUrl(audio.path, 60 * 60);
+          audioComUrl = { ...audio, url: signed?.signedUrl ?? null };
+        }
+        return { ...d, anexos: anexosComUrl, audio: audioComUrl };
       }),
     );
     return enriched;
@@ -156,13 +172,15 @@ export const recusarDemanda = createServerFn({ method: "POST" })
 
     const { data: dem } = await supabase
       .from("demandas_externas")
-      .select("anexos")
+      .select("anexos, audio")
       .eq("id", data.id)
       .single();
 
     const anexos = Array.isArray(dem?.anexos) ? (dem.anexos as Array<{ path: string }>) : [];
-    if (anexos.length > 0) {
-      await supabaseAdmin.storage.from("demandas-anexos").remove(anexos.map((a) => a.path));
+    const audio = dem?.audio as { path: string } | null;
+    const paths = [...anexos.map((a) => a.path), ...(audio ? [audio.path] : [])];
+    if (paths.length > 0) {
+      await supabaseAdmin.storage.from("demandas-anexos").remove(paths);
     }
 
     const { error } = await supabase.from("demandas_externas").delete().eq("id", data.id);

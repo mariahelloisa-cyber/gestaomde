@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import {
   prioridadeCor,
+  prioridadeOrdem,
   complexidadeCor,
   complexidadePillStyle,
   rotuloData,
@@ -47,6 +48,7 @@ import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
+  
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
@@ -100,6 +102,7 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
   // contexto e podem restringir a visão, mesmo sendo o escopo da agência inteira.
   const empresaEfetiva = semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
 
+
   const onDrop = (status: Status) => {
     if (!draggingId) return;
     if (status === "Concluído" && !isAdmin) {
@@ -130,6 +133,7 @@ export function KanbanView({ clienteFilterId, semCliente }: { clienteFilterId?: 
           }
           return true;
         });
+        list.sort((a, b) => prioridadeOrdem[a.prioridade] - prioridadeOrdem[b.prioridade]);
         const cor = statusCor[c.status];
         const Icon = c.icon;
         return (

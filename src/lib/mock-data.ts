@@ -109,6 +109,14 @@ export const prioridadeCor: Record<Prioridade, string> = {
   Nenhuma: "#9CA3AF",
 };
 
+/** Ordem de destaque: prioridades mais altas aparecem primeiro nas listas. */
+export const prioridadeOrdem: Record<Prioridade, number> = {
+  Alta: 0,
+  "Média": 1,
+  Baixa: 2,
+  Nenhuma: 3,
+};
+
 export const statusCor: Record<Status, string> = {
   Pendente: "#F59E0B",
   "Em Progresso": "#3B82F6",

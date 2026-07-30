@@ -34,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Check, X, ArrowRightLeft, Calendar, Mail, Inbox, Copy, ExternalLink } from "lucide-react";
+import { FileText, Check, X, ArrowRightLeft, Calendar, Mail, Inbox, Copy, ExternalLink, Mic } from "lucide-react";
 
 type Demanda = Awaited<ReturnType<typeof listDemandas>>[number];
 
@@ -292,6 +292,13 @@ function DemandaCard({
       </div>
 
       <p className="mt-3 whitespace-pre-wrap text-sm text-black">{d.descricao}</p>
+
+      {d.audio && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-gray-50 px-3 py-2">
+          <Mic className="h-4 w-4 shrink-0 text-gray-500" />
+          <audio controls src={d.audio.url ?? undefined} className="h-9 min-w-0 flex-1" />
+        </div>
+      )}
 
       {d.anexos.length > 0 && (
         <div className="mt-4 space-y-1">

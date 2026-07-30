@@ -327,6 +327,7 @@ export type Database = {
         Row: {
           anexos: Json
           atualizado_em: string
+          audio: Json | null
           criado_em: string
           descricao: string
           id: string
@@ -341,6 +342,7 @@ export type Database = {
         Insert: {
           anexos?: Json
           atualizado_em?: string
+          audio?: Json | null
           criado_em?: string
           descricao: string
           id?: string
@@ -355,6 +357,7 @@ export type Database = {
         Update: {
           anexos?: Json
           atualizado_em?: string
+          audio?: Json | null
           criado_em?: string
           descricao?: string
           id?: string

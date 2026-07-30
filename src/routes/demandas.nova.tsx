@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createDemandaExterna } from "@/lib/demandas.functions";
@@ -8,7 +8,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, X, FileText, CheckCircle2 } from "lucide-react";
+import { Loader2, Upload, X, FileText, CheckCircle2, Mic, Square, Trash2 } from "lucide-react";
+
+const AUDIO_MIME_CANDIDATOS = ["audio/webm", "audio/mp4", "audio/ogg"];
+const AUDIO_DURACAO_MAX_SEG = 180;
+
+function mimeSuportado(): string {
+  for (const mime of AUDIO_MIME_CANDIDATOS) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(mime)) return mime;
+  }
+  return "";
+}
+
+function extensaoParaMime(mime: string): string {
+  if (mime.includes("mp4")) return "m4a";
+  if (mime.includes("ogg")) return "ogg";
+  return "webm";
+}
+
+function formatarDuracao(seg: number): string {
+  const m = Math.floor(seg / 60);
+  const s = seg % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 export const Route = createFileRoute("/demandas/nova")({
   head: () => ({
@@ -30,6 +52,70 @@ function NovaDemandaPage() {
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+
+  const [gravando, setGravando] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [duracaoSeg, setDuracaoSeg] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      timerRef.current && clearInterval(timerRef.current);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      audioUrl && URL.revokeObjectURL(audioUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pararGravacao = () => {
+    mediaRecorderRef.current?.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+    setGravando(false);
+  };
+
+  const iniciarGravacao = async () => {
+    const mime = mimeSuportado();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mime || "audio/webm" });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      };
+      mediaRecorderRef.current = recorder;
+      setDuracaoSeg(0);
+      recorder.start();
+      setGravando(true);
+      timerRef.current = setInterval(() => {
+        setDuracaoSeg((s) => {
+          const next = s + 1;
+          if (next >= AUDIO_DURACAO_MAX_SEG) pararGravacao();
+          return next;
+        });
+      }, 1000);
+    } catch {
+      toast.error("Não foi possível acessar o microfone. Verifique a permissão do navegador.");
+    }
+  };
+
+  const removerAudio = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    setAudioBlob(null);
+    setAudioUrl(null);
+    setDuracaoSeg(0);
+  };
 
   const onFiles = (files: FileList | null) => {
     if (!files) return;
@@ -69,6 +155,17 @@ function NovaDemandaPage() {
         anexos.push({ path, nome_arquivo: file.name });
       }
 
+      let audio: { path: string; nome_arquivo: string; duracao_seg: number } | undefined;
+      if (audioBlob) {
+        const ext = extensaoParaMime(audioBlob.type);
+        const path = `${crypto.randomUUID()}/${Date.now()}-audio.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("demandas-anexos")
+          .upload(path, audioBlob, { contentType: audioBlob.type || "audio/webm", upsert: false });
+        if (upErr) throw new Error(`Falha no upload do áudio: ${upErr.message}`);
+        audio = { path, nome_arquivo: `audio.${ext}`, duracao_seg: duracaoSeg };
+      }
+
       await createFn({
         data: {
           solicitante_nome: nome.trim(),
@@ -76,6 +173,7 @@ function NovaDemandaPage() {
           descricao: descricao.trim(),
           prazo_sugerido: prazo || undefined,
           anexos,
+          audio,
         },
       });
       setEnviado(true);
@@ -103,6 +201,7 @@ function NovaDemandaPage() {
               setDescricao("");
               setPrazo("");
               setArquivos([]);
+              removerAudio();
               setEnviado(false);
             }}
           >
@@ -178,6 +277,39 @@ function NovaDemandaPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Áudio (opcional — até {formatarDuracao(AUDIO_DURACAO_MAX_SEG)})</Label>
+            {!audioUrl && !gravando && (
+              <button
+                type="button"
+                onClick={iniciarGravacao}
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-4 py-6 text-sm text-muted-foreground hover:bg-muted"
+              >
+                <Mic className="h-4 w-4" />
+                Gravar um áudio
+              </button>
+            )}
+            {gravando && (
+              <div className="flex items-center justify-between rounded-md border border-border bg-background px-4 py-3">
+                <span className="flex items-center gap-2 text-sm text-destructive">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                  Gravando… {formatarDuracao(duracaoSeg)}
+                </span>
+                <Button size="sm" variant="destructive" onClick={pararGravacao}>
+                  <Square className="mr-1 h-3.5 w-3.5" /> Parar
+                </Button>
+              </div>
+            )}
+            {audioUrl && !gravando && (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
+                <audio controls src={audioUrl} className="h-9 flex-1" />
+                <button onClick={removerAudio} className="text-muted-foreground hover:text-destructive" title="Remover áudio">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             )}
           </div>
 
