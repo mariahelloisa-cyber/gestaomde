@@ -37,6 +37,7 @@ export interface Tarefa {
   // storage (e zerados aqui) assim que a tarefa é marcada como "Concluído".
   audio?: { path: string; nome_arquivo: string; duracao_seg?: number; url: string | null } | null;
   anexos?: { path: string; nome_arquivo: string; url: string | null }[];
+  video?: { path: string; nome_arquivo: string; url: string | null } | null;
 }
 
 export interface Comentario {
