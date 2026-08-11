@@ -334,6 +334,7 @@ export type Database = {
           justificativa_recusa: string | null
           prazo_sugerido: string | null
           responsavel_id: string | null
+          setor: string | null
           solicitante_email: string | null
           solicitante_nome: string
           status: Database["public"]["Enums"]["status_demanda"]
@@ -350,6 +351,7 @@ export type Database = {
           justificativa_recusa?: string | null
           prazo_sugerido?: string | null
           responsavel_id?: string | null
+          setor?: string | null
           solicitante_email?: string | null
           solicitante_nome: string
           status?: Database["public"]["Enums"]["status_demanda"]
@@ -366,6 +368,7 @@ export type Database = {
           justificativa_recusa?: string | null
           prazo_sugerido?: string | null
           responsavel_id?: string | null
+          setor?: string | null
           solicitante_email?: string | null
           solicitante_nome?: string
           status?: Database["public"]["Enums"]["status_demanda"]

@@ -48,6 +48,7 @@ import {
   Video,
   Link2,
   Globe,
+  Building2,
 } from "lucide-react";
 
 type Demanda = Awaited<ReturnType<typeof listDemandas>>[number];
@@ -326,6 +327,12 @@ function DemandaCard({
               <span className="flex items-center gap-1">
                 <Mail className="h-3 w-3" />
                 {d.solicitante_email}
+              </span>
+            )}
+            {d.setor && (
+              <span className="flex items-center gap-1">
+                <Building2 className="h-3 w-3" />
+                Setor: {d.setor}
               </span>
             )}
             {d.prazo_sugerido && (

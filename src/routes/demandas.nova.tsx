@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  Building2,
   Calendar,
   CheckCircle2,
   FileText,
@@ -85,6 +86,7 @@ function NovaDemandaPage() {
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [setor, setSetor] = useState("");
   const [descricao, setDescricao] = useState("");
   const [prazo, setPrazo] = useState("");
   const [arquivos, setArquivos] = useState<File[]>([]);
@@ -249,6 +251,7 @@ function NovaDemandaPage() {
         data: {
           solicitante_nome: nome.trim(),
           solicitante_email: email.trim() || undefined,
+          setor: setor.trim() || undefined,
           descricao: descricao.trim(),
           prazo_sugerido: prazo || undefined,
           anexos,
@@ -266,8 +269,8 @@ function NovaDemandaPage() {
 
   if (enviado) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--surface-1)] px-4 py-16">
-        <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-10 text-center shadow-sm">
+      <div className="flex min-h-screen items-center justify-center bg-white px-4 py-16">
+        <div className="w-full max-w-lg rounded-2xl border border-border bg-white p-10 text-center shadow-sm">
           <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
           <h1 className="mt-4 text-xl font-semibold">Demanda enviada!</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -278,6 +281,7 @@ function NovaDemandaPage() {
             onClick={() => {
               setNome("");
               setEmail("");
+              setSetor("");
               setDescricao("");
               setPrazo("");
               setArquivos([]);
@@ -294,7 +298,7 @@ function NovaDemandaPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--surface-1)] py-10">
+    <div className="min-h-screen bg-white py-10">
       <div className="mx-auto max-w-2xl px-4">
         <header className="mb-6 flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
@@ -308,7 +312,7 @@ function NovaDemandaPage() {
           </div>
         </header>
 
-        <div className="space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <div className="space-y-6 rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
           <div className="grid gap-5 sm:grid-cols-2">
             <FieldRow icon={User}>
               <Label htmlFor="nome" className="font-semibold">
@@ -337,6 +341,19 @@ function NovaDemandaPage() {
               />
             </FieldRow>
           </div>
+
+          <FieldRow icon={Building2}>
+            <Label htmlFor="setor" className="font-semibold">
+              Qual é o seu setor?
+            </Label>
+            <Input
+              id="setor"
+              value={setor}
+              onChange={(e) => setSetor(e.target.value)}
+              maxLength={100}
+              placeholder="Ex: secretaria, comercial"
+            />
+          </FieldRow>
 
           <FieldRow icon={FileText}>
             <Label htmlFor="descricao" className="font-semibold">

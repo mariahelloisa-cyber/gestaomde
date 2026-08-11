@@ -23,6 +23,7 @@ const videoSchema = z.object({
 const createDemandaSchema = z.object({
   solicitante_nome: z.string().trim().min(1).max(200),
   solicitante_email: z.string().trim().toLowerCase().email().max(255).optional().or(z.literal("")),
+  setor: z.string().trim().max(100).optional(),
   descricao: z.string().trim().min(1).max(5000),
   prazo_sugerido: z.string().optional(),
   anexos: z.array(anexoSchema).max(10).default([]),
@@ -39,6 +40,7 @@ export const createDemandaExterna = createServerFn({ method: "POST" })
       .insert({
         solicitante_nome: data.solicitante_nome,
         solicitante_email: data.solicitante_email || null,
+        setor: data.setor || null,
         responsavel_id: null,
         descricao: data.descricao,
         prazo_sugerido: data.prazo_sugerido || null,
@@ -66,7 +68,7 @@ export const listDemandas = createServerFn({ method: "GET" })
     // na aba Tarefas) e recusadas são excluídas na hora — nunca aparecem aqui.
     const { data, error } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, solicitante_email, responsavel_id, descricao, prazo_sugerido, anexos, audio, video, status, tarefa_id, criado_em")
+      .select("id, solicitante_nome, solicitante_email, setor, responsavel_id, descricao, prazo_sugerido, anexos, audio, video, status, tarefa_id, criado_em")
       .eq("status", "pendente")
       .order("criado_em", { ascending: false });
     if (error) throw new Error(error.message);
