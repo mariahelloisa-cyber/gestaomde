@@ -269,7 +269,7 @@ function NovaDemandaPage() {
 
   if (enviado) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white px-4 py-16">
+      <div className="light flex min-h-screen items-center justify-center bg-white px-4 py-16">
         <div className="w-full max-w-lg rounded-2xl border border-border bg-white p-10 text-center shadow-sm">
           <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
           <h1 className="mt-4 text-xl font-semibold">Demanda enviada!</h1>
@@ -298,7 +298,7 @@ function NovaDemandaPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white py-10">
+    <div className="light min-h-screen bg-white py-10">
       <div className="mx-auto max-w-2xl px-4">
         <header className="mb-6 flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
