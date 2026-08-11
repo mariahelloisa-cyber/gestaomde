@@ -45,6 +45,7 @@ import {
   Copy,
   ExternalLink,
   Mic,
+  Video,
   Link2,
   Globe,
 } from "lucide-react";
@@ -107,8 +108,7 @@ export function DemandasView() {
   const nomePor = (id: string | null) =>
     id ? (membros.find((m) => m.id === id)?.nome ?? "—") : "—";
 
-  const publicUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/demandas/nova` : "/demandas/nova";
+  const publicUrl = "https://demandasmde.com/demandas/nova";
 
   const copiarLink = async () => {
     try {
@@ -347,6 +347,13 @@ function DemandaCard({
         <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-gray-50 px-3 py-2">
           <Mic className="h-4 w-4 shrink-0 text-gray-500" />
           <audio controls src={d.audio.url ?? undefined} className="h-9 min-w-0 flex-1" />
+        </div>
+      )}
+
+      {d.video && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-gray-50 px-3 py-2">
+          <Video className="h-4 w-4 shrink-0 text-gray-500" />
+          <video controls src={d.video.url ?? undefined} className="max-h-64 min-w-0 flex-1 rounded" />
         </div>
       )}
 

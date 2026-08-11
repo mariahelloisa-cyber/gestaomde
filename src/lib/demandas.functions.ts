@@ -15,6 +15,11 @@ const audioSchema = z.object({
   duracao_seg: z.number().int().min(0).max(600).optional(),
 });
 
+const videoSchema = z.object({
+  path: z.string().min(1).max(500),
+  nome_arquivo: z.string().min(1).max(255),
+});
+
 const createDemandaSchema = z.object({
   solicitante_nome: z.string().trim().min(1).max(200),
   solicitante_email: z.string().trim().toLowerCase().email().max(255).optional().or(z.literal("")),
@@ -22,6 +27,7 @@ const createDemandaSchema = z.object({
   prazo_sugerido: z.string().optional(),
   anexos: z.array(anexoSchema).max(10).default([]),
   audio: audioSchema.nullable().optional(),
+  video: videoSchema.nullable().optional(),
 });
 
 export const createDemandaExterna = createServerFn({ method: "POST" })
@@ -38,6 +44,7 @@ export const createDemandaExterna = createServerFn({ method: "POST" })
         prazo_sugerido: data.prazo_sugerido || null,
         anexos: data.anexos,
         audio: data.audio ?? null,
+        video: data.video ?? null,
         status: "pendente",
       })
       .select("id")
@@ -59,7 +66,7 @@ export const listDemandas = createServerFn({ method: "GET" })
     // na aba Tarefas) e recusadas são excluídas na hora — nunca aparecem aqui.
     const { data, error } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, solicitante_email, responsavel_id, descricao, prazo_sugerido, anexos, audio, status, tarefa_id, criado_em")
+      .select("id, solicitante_nome, solicitante_email, responsavel_id, descricao, prazo_sugerido, anexos, audio, video, status, tarefa_id, criado_em")
       .eq("status", "pendente")
       .order("criado_em", { ascending: false });
     if (error) throw new Error(error.message);
@@ -84,7 +91,15 @@ export const listDemandas = createServerFn({ method: "GET" })
             .createSignedUrl(audio.path, 60 * 60);
           audioComUrl = { ...audio, url: signed?.signedUrl ?? null };
         }
-        return { ...d, anexos: anexosComUrl, audio: audioComUrl };
+        const video = d.video as { path: string; nome_arquivo: string } | null;
+        let videoComUrl: (typeof video & { url: string | null }) | null = null;
+        if (video) {
+          const { data: signed } = await supabaseAdmin.storage
+            .from("demandas-anexos")
+            .createSignedUrl(video.path, 60 * 60);
+          videoComUrl = { ...video, url: signed?.signedUrl ?? null };
+        }
+        return { ...d, anexos: anexosComUrl, audio: audioComUrl, video: videoComUrl };
       }),
     );
     return enriched;
@@ -105,7 +120,7 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
 
     const { data: dem, error: errDem } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id, audio, anexos")
+      .select("id, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id, audio, anexos, video")
       .eq("id", data.id)
       .single();
     if (errDem || !dem) throw new Error(errDem?.message ?? "Demanda não encontrada");
@@ -142,6 +157,7 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
         // duplicados, só passam a acompanhar a tarefa também.
         audio: dem.audio ?? null,
         anexos: dem.anexos ?? [],
+        video: dem.video ?? null,
       })
       .select("id")
       .single();
@@ -176,13 +192,18 @@ export const recusarDemanda = createServerFn({ method: "POST" })
 
     const { data: dem } = await supabase
       .from("demandas_externas")
-      .select("anexos, audio")
+      .select("anexos, audio, video")
       .eq("id", data.id)
       .single();
 
     const anexos = Array.isArray(dem?.anexos) ? (dem.anexos as Array<{ path: string }>) : [];
     const audio = dem?.audio as { path: string } | null;
-    const paths = [...anexos.map((a) => a.path), ...(audio ? [audio.path] : [])];
+    const video = dem?.video as { path: string } | null;
+    const paths = [
+      ...anexos.map((a) => a.path),
+      ...(audio ? [audio.path] : []),
+      ...(video ? [video.path] : []),
+    ];
     if (paths.length > 0) {
       await supabaseAdmin.storage.from("demandas-anexos").remove(paths);
     }

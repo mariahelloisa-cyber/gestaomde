@@ -338,6 +338,7 @@ export type Database = {
           solicitante_nome: string
           status: Database["public"]["Enums"]["status_demanda"]
           tarefa_id: string | null
+          video: Json | null
         }
         Insert: {
           anexos?: Json
@@ -353,6 +354,7 @@ export type Database = {
           solicitante_nome: string
           status?: Database["public"]["Enums"]["status_demanda"]
           tarefa_id?: string | null
+          video?: Json | null
         }
         Update: {
           anexos?: Json
@@ -368,6 +370,7 @@ export type Database = {
           solicitante_nome?: string
           status?: Database["public"]["Enums"]["status_demanda"]
           tarefa_id?: string | null
+          video?: Json | null
         }
         Relationships: []
       }
@@ -569,6 +572,7 @@ export type Database = {
           status: Database["public"]["Enums"]["status_tarefa"]
           tipo: Database["public"]["Enums"]["tipo_item"]
           titulo: string
+          video: Json | null
         }
         Insert: {
           anexos?: Json
@@ -589,6 +593,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_tarefa"]
           tipo?: Database["public"]["Enums"]["tipo_item"]
           titulo: string
+          video?: Json | null
         }
         Update: {
           anexos?: Json
@@ -609,6 +614,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_tarefa"]
           tipo?: Database["public"]["Enums"]["tipo_item"]
           titulo?: string
+          video?: Json | null
         }
         Relationships: [
           {
