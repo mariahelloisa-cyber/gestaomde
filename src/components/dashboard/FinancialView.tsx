@@ -148,6 +148,7 @@ function NovoAvulso({
     reset();
     setOpen(false);
   };
+  
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
