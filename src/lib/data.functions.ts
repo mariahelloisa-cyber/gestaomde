@@ -83,7 +83,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
       supabase
         .from("tarefas")
         .select(
-          "id, cliente_id, projeto_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em, audio, anexos",
+          "id, cliente_id, projeto_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, tipo, escopo, criado_por, concluido_em, audio, anexos, video",
         )
         .order("data_criacao", { ascending: false }),
       supabase.from("tarefa_responsaveis").select("tarefa_id, usuario_id, criado_em"),
@@ -175,6 +175,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
     // Áudios e anexos de tarefas ficam no mesmo bucket privado das demandas —
     // cada um precisa de uma signed URL própria (válida por 1h) pra ser aberto.
     const audioUrlByTarefaId = new Map<string, string | null>();
+    const videoUrlByTarefaId = new Map<string, string | null>();
     const anexosComUrlByTarefaId = new Map<
       string,
       Array<{ path: string; nome_arquivo: string; url: string | null }>
@@ -189,6 +190,16 @@ export const getDashboardData = createServerFn({ method: "GET" })
             .from("demandas-anexos")
             .createSignedUrl(audio.path, 60 * 60);
           audioUrlByTarefaId.set(t.id, signed?.signedUrl ?? null);
+        }),
+      ...(tarefasRes.data ?? [])
+        .filter((t) => t.video)
+        .map(async (t) => {
+          const video = t.video as { path: string } | null;
+          if (!video?.path) return;
+          const { data: signed } = await supabaseAdmin.storage
+            .from("demandas-anexos")
+            .createSignedUrl(video.path, 60 * 60);
+          videoUrlByTarefaId.set(t.id, signed?.signedUrl ?? null);
         }),
       ...(tarefasRes.data ?? [])
         .filter((t) => Array.isArray(t.anexos) && t.anexos.length > 0)
@@ -257,6 +268,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
           nome_arquivo: string;
           duracao_seg?: number;
         } | null;
+        const videoRaw = t.video as { path: string; nome_arquivo: string } | null;
         return {
           id: t.id,
           cliente_id: t.cliente_id ?? "",
@@ -270,6 +282,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
           concluido_em: t.concluido_em ?? null,
           descricao: t.descricao ?? undefined,
           audio: audioRaw ? { ...audioRaw, url: audioUrlByTarefaId.get(t.id) ?? null } : null,
+          video: videoRaw ? { ...videoRaw, url: videoUrlByTarefaId.get(t.id) ?? null } : null,
           anexos: anexosComUrlByTarefaId.get(t.id) ?? [],
           tipo: t.tipo,
           escopo: t.escopo,
@@ -423,6 +436,7 @@ export const updateTarefa = createServerFn({ method: "POST" })
       data_vencimento: string | null;
       projeto_id: string | null;
       audio: null;
+      video: null;
       anexos: [];
     }> = {};
     if (patch.titulo !== undefined) dbPatch.titulo = patch.titulo;
@@ -439,15 +453,21 @@ export const updateTarefa = createServerFn({ method: "POST" })
     if (patch.status === "Concluído") {
       const { data: atual } = await supabase
         .from("tarefas")
-        .select("audio, anexos")
+        .select("audio, video, anexos")
         .eq("id", id)
         .maybeSingle();
       const audio = atual?.audio as { path: string } | null;
+      const video = atual?.video as { path: string } | null;
       const anexos = Array.isArray(atual?.anexos) ? (atual.anexos as Array<{ path: string }>) : [];
-      const paths = [...(audio?.path ? [audio.path] : []), ...anexos.map((a) => a.path)];
+      const paths = [
+        ...(audio?.path ? [audio.path] : []),
+        ...(video?.path ? [video.path] : []),
+        ...anexos.map((a) => a.path),
+      ];
       if (paths.length > 0) {
         await supabaseAdmin.storage.from("demandas-anexos").remove(paths);
         if (audio?.path) dbPatch.audio = null;
+        if (video?.path) dbPatch.video = null;
         if (anexos.length > 0) dbPatch.anexos = [];
       }
     }

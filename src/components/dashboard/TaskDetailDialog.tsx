@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Check, ChevronDown, Flag, FolderKanban, ListChecks, Mic, Paperclip, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, X } from "lucide-react";
+import { CalendarIcon, Check, ChevronDown, Flag, FolderKanban, ListChecks, Mic, Paperclip, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, Video, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -220,6 +220,17 @@ export function TaskDetailDialog() {
                   Áudio da demanda
                 </div>
                 <audio controls src={tarefa.audio.url} className="w-full" />
+              </div>
+            )}
+
+            {/* Vídeo (trazido de uma demanda externa aceita) */}
+            {tarefa.video?.url && (
+              <div className="mt-4 rounded-md border border-border bg-[var(--surface-1)] p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Video className="h-3.5 w-3.5" />
+                  Vídeo da demanda
+                </div>
+                <video controls src={tarefa.video.url} className="max-h-80 w-full rounded" />
               </div>
             )}
 

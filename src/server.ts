@@ -37,8 +37,21 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+const DEMANDAS_DOMAINS = new Set(["demandasmde.com", "www.demandasmde.com"]);
+
+function redirectDemandasRoot(request: Request): Response | undefined {
+  const url = new URL(request.url);
+  if (DEMANDAS_DOMAINS.has(url.hostname) && url.pathname === "/") {
+    return Response.redirect(new URL("/demandas/nova", url), 302);
+  }
+  return undefined;
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const redirect = redirectDemandasRoot(request);
+    if (redirect) return redirect;
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

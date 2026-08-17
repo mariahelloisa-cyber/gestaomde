@@ -1,1 +1,0 @@
-ALTER TABLE public.treinamentos ADD COLUMN IF NOT EXISTS capa_url text;

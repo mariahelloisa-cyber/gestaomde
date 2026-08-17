@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  Building2,
   Calendar,
   CheckCircle2,
   FileText,
@@ -24,6 +25,7 @@ import {
   Trash2,
   UploadCloud,
   User,
+  Video,
   X,
 } from "lucide-react";
 
@@ -31,6 +33,7 @@ const AUDIO_MIME_CANDIDATOS = ["audio/webm", "audio/mp4", "audio/ogg"];
 const AUDIO_DURACAO_MAX_SEG = 180;
 const DESCRICAO_MAX = 5000;
 const ANEXO_TAMANHO_MAX_MB = 10;
+const VIDEO_TAMANHO_MAX_MB = 50;
 
 function mimeSuportado(): string {
   for (const mime of AUDIO_MIME_CANDIDATOS) {
@@ -83,12 +86,16 @@ function NovaDemandaPage() {
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [setor, setSetor] = useState("");
   const [descricao, setDescricao] = useState("");
   const [prazo, setPrazo] = useState("");
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [arrastandoArquivo, setArrastandoArquivo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const [gravando, setGravando] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -104,6 +111,7 @@ function NovaDemandaPage() {
       timerRef.current && clearInterval(timerRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       audioUrl && URL.revokeObjectURL(audioUrl);
+      videoUrl && URL.revokeObjectURL(videoUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -162,8 +170,8 @@ function NovaDemandaPage() {
     if (!files) return;
     const novos: File[] = [];
     for (const f of Array.from(files)) {
-      if (f.type !== "application/pdf") {
-        toast.error(`"${f.name}" não é PDF.`);
+      if (f.type !== "application/pdf" && !f.type.startsWith("image/")) {
+        toast.error(`"${f.name}" não é PDF nem imagem.`);
         continue;
       }
       if (f.size > ANEXO_TAMANHO_MAX_MB * 1024 * 1024) {
@@ -176,6 +184,28 @@ function NovaDemandaPage() {
   };
 
   const remover = (idx: number) => setArquivos((prev) => prev.filter((_, i) => i !== idx));
+
+  const onVideo = (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    if (!f.type.startsWith("video/")) {
+      toast.error(`"${f.name}" não é um vídeo.`);
+      return;
+    }
+    if (f.size > VIDEO_TAMANHO_MAX_MB * 1024 * 1024) {
+      toast.error(`"${f.name}" passa de ${VIDEO_TAMANHO_MAX_MB} MB.`);
+      return;
+    }
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoFile(f);
+    setVideoUrl(URL.createObjectURL(f));
+  };
+
+  const removerVideo = () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoFile(null);
+    setVideoUrl(null);
+  };
 
   const enviar = async () => {
     if (!nome.trim() || !descricao.trim()) {
@@ -190,7 +220,7 @@ function NovaDemandaPage() {
         const path = `${crypto.randomUUID()}/${Date.now()}-${safeName}`;
         const { error: upErr } = await supabase.storage
           .from("demandas-anexos")
-          .upload(path, file, { contentType: "application/pdf", upsert: false });
+          .upload(path, file, { contentType: file.type, upsert: false });
         if (upErr) throw new Error(`Falha no upload de "${file.name}": ${upErr.message}`);
         anexos.push({ path, nome_arquivo: file.name });
       }
@@ -206,14 +236,27 @@ function NovaDemandaPage() {
         audio = { path, nome_arquivo: `audio.${ext}`, duracao_seg: duracaoSeg };
       }
 
+      let video: { path: string; nome_arquivo: string } | undefined;
+      if (videoFile) {
+        const safeName = videoFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${crypto.randomUUID()}/${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("demandas-anexos")
+          .upload(path, videoFile, { contentType: videoFile.type || "video/mp4", upsert: false });
+        if (upErr) throw new Error(`Falha no upload do vídeo: ${upErr.message}`);
+        video = { path, nome_arquivo: videoFile.name };
+      }
+
       await createFn({
         data: {
           solicitante_nome: nome.trim(),
           solicitante_email: email.trim() || undefined,
+          setor: setor.trim() || undefined,
           descricao: descricao.trim(),
           prazo_sugerido: prazo || undefined,
           anexos,
           audio,
+          video,
         },
       });
       setEnviado(true);
@@ -226,8 +269,8 @@ function NovaDemandaPage() {
 
   if (enviado) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--surface-1)] px-4 py-16">
-        <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-10 text-center shadow-sm">
+      <div className="light relative z-10 flex min-h-screen items-center justify-center bg-white px-4 py-16">
+        <div className="w-full max-w-lg rounded-2xl border border-border bg-white p-10 text-center shadow-sm">
           <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
           <h1 className="mt-4 text-xl font-semibold">Demanda enviada!</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -238,10 +281,12 @@ function NovaDemandaPage() {
             onClick={() => {
               setNome("");
               setEmail("");
+              setSetor("");
               setDescricao("");
               setPrazo("");
               setArquivos([]);
               removerAudio();
+              removerVideo();
               setEnviado(false);
             }}
           >
@@ -253,7 +298,7 @@ function NovaDemandaPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--surface-1)] py-10">
+    <div className="light relative z-10 min-h-screen bg-white py-10">
       <div className="mx-auto max-w-2xl px-4">
         <header className="mb-6 flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
@@ -267,7 +312,7 @@ function NovaDemandaPage() {
           </div>
         </header>
 
-        <div className="space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <div className="space-y-6 rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
           <div className="grid gap-5 sm:grid-cols-2">
             <FieldRow icon={User}>
               <Label htmlFor="nome" className="font-semibold">
@@ -296,6 +341,19 @@ function NovaDemandaPage() {
               />
             </FieldRow>
           </div>
+
+          <FieldRow icon={Building2}>
+            <Label htmlFor="setor" className="font-semibold">
+              Qual é o seu setor?
+            </Label>
+            <Input
+              id="setor"
+              value={setor}
+              onChange={(e) => setSetor(e.target.value)}
+              maxLength={100}
+              placeholder="Ex: secretaria, comercial"
+            />
+          </FieldRow>
 
           <FieldRow icon={FileText}>
             <Label htmlFor="descricao" className="font-semibold">
@@ -327,7 +385,7 @@ function NovaDemandaPage() {
           </FieldRow>
 
           <FieldRow icon={FileText}>
-            <Label className="font-semibold">Anexos (PDF — até 10 arquivos)</Label>
+            <Label className="font-semibold">Anexos (PDF ou imagem — até 10 arquivos)</Label>
             <label
               onDragOver={(e) => {
                 e.preventDefault();
@@ -346,14 +404,14 @@ function NovaDemandaPage() {
             >
               <UploadCloud className="mb-1 h-6 w-6 text-primary" />
               <span className="text-sm font-semibold text-foreground">
-                Clique para selecionar PDFs
+                Clique para selecionar PDFs ou fotos
               </span>
               <span className="text-xs text-muted-foreground">
                 Ou arraste e solte os arquivos aqui
               </span>
               <input
                 type="file"
-                accept="application/pdf"
+                accept="application/pdf,image/*"
                 multiple
                 className="hidden"
                 onChange={(e) => onFiles(e.target.files)}
@@ -361,7 +419,7 @@ function NovaDemandaPage() {
             </label>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Info className="h-3.5 w-3.5 shrink-0" />
-              Máximo de 10 arquivos • Formato: PDF • Tamanho máximo por arquivo:{" "}
+              Máximo de 10 arquivos • Formatos: PDF ou imagem • Tamanho máximo por arquivo:{" "}
               {ANEXO_TAMANHO_MAX_MB}MB
             </p>
             {arquivos.length > 0 && (
@@ -432,6 +490,43 @@ function NovaDemandaPage() {
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Info className="h-3.5 w-3.5 shrink-0" />
               Duração máxima: {formatarDuracao(AUDIO_DURACAO_MAX_SEG)}
+            </p>
+          </FieldRow>
+
+          <FieldRow icon={Video}>
+            <Label className="font-semibold">Vídeo (opcional)</Label>
+            {!videoUrl && (
+              <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border bg-background px-4 py-8 text-center transition-colors hover:bg-muted">
+                <Video className="mb-1 h-6 w-6 text-primary" />
+                <span className="text-sm font-semibold text-foreground">
+                  Clique para selecionar um vídeo
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Até {VIDEO_TAMANHO_MAX_MB}MB
+                </span>
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(e) => onVideo(e.target.files)}
+                />
+              </label>
+            )}
+            {videoUrl && (
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+                <video controls src={videoUrl} className="max-h-64 w-full flex-1 rounded-lg" />
+                <button
+                  onClick={removerVideo}
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  title="Remover vídeo"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              Tamanho máximo: {VIDEO_TAMANHO_MAX_MB}MB
             </p>
           </FieldRow>
 
