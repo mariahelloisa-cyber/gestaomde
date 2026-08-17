@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -61,6 +61,7 @@ export function KanbanView({
 }: { clienteFilterId?: string; semCliente?: boolean } = {}) {
   const {
     tarefas,
+    membros,
     updateTarefa,
     openTask,
     myId,
@@ -73,6 +74,12 @@ export function KanbanView({
   const apenasMinhas = !semCliente && !clienteFilterId;
   const isAdmin = myCargo === "Admin";
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // Tarefas de Admins ficam de fora da aba "Tarefas" geral (compartilhada entre
+  // todo mundo) — só aparecem em "Minhas Tarefas" do próprio Admin responsável.
+  const adminIds = useMemo(
+    () => new Set(membros.filter((m) => m.cargo === "Admin").map((m) => m.id)),
+    [membros],
+  );
   // No escopo "geral" (semCliente) os filtros de empresa e membro vêm do
   const empresaEfetiva =
     semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
@@ -95,6 +102,7 @@ export function KanbanView({
           if ((t.tipo ?? "tarefa") !== "tarefa" || t.status !== c.status) return false;
           if (isFinalizada(t)) return false;
           if (semCliente) {
+            if (t.responsaveis.some((r) => adminIds.has(r.id))) return false;
             if (geralStatusFilter && t.status !== geralStatusFilter) return false;
             if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
             if (

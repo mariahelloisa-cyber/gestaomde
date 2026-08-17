@@ -19,7 +19,22 @@ export function CalendarView({
   clienteFilterId,
   scope = clienteFilterId ? "cliente" : "pessoal",
 }: { clienteFilterId?: string; scope?: CalendarScope } = {}) {
-  const { tarefas: todas, clientes, openTask, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter } = useTasks();
+  const {
+    tarefas: todas,
+    clientes,
+    membros,
+    openTask,
+    myIniciais,
+    myId,
+    meuStatusFilter,
+    geralStatusFilter,
+    geralEmpresaFilter,
+    geralMembroFilter,
+  } = useTasks();
+  const adminIds = useMemo(
+    () => new Set(membros.filter((m) => m.cargo === "Admin").map((m) => m.id)),
+    [membros],
+  );
   const tarefas = useMemo(() => {
     return todas.filter((t) => {
       const isLembrete = t.tipo === "lembrete";
@@ -28,9 +43,14 @@ export function CalendarView({
       }
       if (scope === "sem-cliente") {
         if (isLembrete) return false;
+        if (t.responsaveis.some((r) => adminIds.has(r.id))) return false;
         if (geralStatusFilter && t.status !== geralStatusFilter) return false;
         if (geralEmpresaFilter !== "todas" && t.cliente_id !== geralEmpresaFilter) return false;
-        if (geralMembroFilter !== "todos" && !t.responsaveis.some((r) => r.id === geralMembroFilter)) return false;
+        if (
+          geralMembroFilter !== "todos" &&
+          !t.responsaveis.some((r) => r.id === geralMembroFilter)
+        )
+          return false;
         return true;
       }
       if (scope === "geral") {
@@ -46,7 +66,18 @@ export function CalendarView({
       const esc = t.escopo ?? "geral";
       return esc === "geral" || t.criado_por === (myIniciais || USUARIO_LOGADO_INICIAIS);
     });
-  }, [todas, scope, clienteFilterId, myIniciais, myId, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter]);
+  }, [
+    todas,
+    scope,
+    clienteFilterId,
+    myIniciais,
+    myId,
+    meuStatusFilter,
+    geralStatusFilter,
+    geralEmpresaFilter,
+    geralMembroFilter,
+    adminIds,
+  ]);
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
     d.setDate(1);
@@ -89,7 +120,9 @@ export function CalendarView({
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <h2 className="min-w-[160px] text-center text-sm font-semibold capitalize">{monthLabel}</h2>
+          <h2 className="min-w-[160px] text-center text-sm font-semibold capitalize">
+            {monthLabel}
+          </h2>
           <button
             onClick={() => setCursor((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
             className="rounded p-1 hover:bg-muted"
@@ -110,7 +143,9 @@ export function CalendarView({
 
       <div className="grid grid-cols-7 border-b border-border bg-[var(--surface-2)] text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {WEEKDAYS.map((w) => (
-          <div key={w} className="px-2 py-2">{w}</div>
+          <div key={w} className="px-2 py-2">
+            {w}
+          </div>
         ))}
       </div>
 
@@ -162,11 +197,17 @@ export function CalendarView({
                       title={t.titulo}
                     >
                       {isLembrete ? (
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: cor }} />
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: cor }}
+                        />
                       ) : (
                         <Flag
                           className="h-2.5 w-2.5 shrink-0"
-                          style={{ color: prioridadeCor[t.prioridade], fill: prioridadeCor[t.prioridade] }}
+                          style={{
+                            color: prioridadeCor[t.prioridade],
+                            fill: prioridadeCor[t.prioridade],
+                          }}
                         />
                       )}
                       <span className="truncate font-medium">{t.titulo}</span>
@@ -174,7 +215,9 @@ export function CalendarView({
                   );
                 })}
                 {tasks.length > 3 && (
-                  <span className="px-1 text-[10px] text-muted-foreground">+{tasks.length - 3} mais</span>
+                  <span className="px-1 text-[10px] text-muted-foreground">
+                    +{tasks.length - 3} mais
+                  </span>
                 )}
               </div>
             </button>
@@ -186,7 +229,12 @@ export function CalendarView({
         <AddTaskDialog
           key={quickDate}
           defaultDate={quickDate}
-          lockedClienteId={clienteFilterId ?? (scope === "sem-cliente" && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined)}
+          lockedClienteId={
+            clienteFilterId ??
+            (scope === "sem-cliente" && geralEmpresaFilter !== "todas"
+              ? geralEmpresaFilter
+              : undefined)
+          }
           semCliente={scope === "sem-cliente" && geralEmpresaFilter === "todas"}
           defaultReminderScope={scope === "pessoal" ? "pessoal" : "geral"}
           allowLembrete={scope !== "cliente" && scope !== "sem-cliente"}

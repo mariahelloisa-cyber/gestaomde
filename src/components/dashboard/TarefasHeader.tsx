@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Calendar as CalendarIcon, ChevronDown, ClipboardList, LayoutGrid, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar as CalendarIcon,
+  ChevronDown,
+  ClipboardList,
+  LayoutGrid,
+  Search,
+} from "lucide-react";
 import { useTasks } from "@/lib/tasks-store";
 import { statusCor, type Prioridade, type Status } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -69,21 +76,29 @@ export function TarefasHeader({
     [tarefas, myId],
   );
 
+  const adminIds = useMemo(
+    () => new Set(membros.filter((m) => m.cargo === "Admin").map((m) => m.id)),
+    [membros],
+  );
+
   const totalGerais = useMemo(
     () =>
       tarefas.filter(
         (t) =>
           (t.tipo ?? "tarefa") === "tarefa" &&
+          !t.responsaveis.some((r) => adminIds.has(r.id)) &&
           (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter) &&
           (geralMembroFilter === "todos" || t.responsaveis.some((r) => r.id === geralMembroFilter)),
       ).length,
-    [tarefas, geralEmpresaFilter, geralMembroFilter],
+    [tarefas, adminIds, geralEmpresaFilter, geralMembroFilter],
   );
 
   const empresasComMinhas = useMemo(() => {
     const ids = new Set(
       tarefas
-        .filter((t) => (t.tipo ?? "tarefa") === "tarefa" && t.responsaveis.some((r) => r.id === myId))
+        .filter(
+          (t) => (t.tipo ?? "tarefa") === "tarefa" && t.responsaveis.some((r) => r.id === myId),
+        )
         .map((t) => t.cliente_id)
         .filter(Boolean) as string[],
     );
@@ -193,7 +208,10 @@ export function TarefasHeader({
           </DropdownMenuItem>
           {statusOrdem.map((s) => (
             <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)} className="text-sm">
-              <span className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: statusCor[s] }} />
+              <span
+                className="mr-2 h-2 w-2 rounded-full"
+                style={{ backgroundColor: statusCor[s] }}
+              />
               {s}
             </DropdownMenuItem>
           ))}
@@ -204,14 +222,16 @@ export function TarefasHeader({
             mode === "geral"
               ? geralEmpresaFilter === "todas"
                 ? "Todas Empresas"
-                : clientes.find((c) => c.id === geralEmpresaFilter)?.nome_empresa ?? "Empresa"
+                : (clientes.find((c) => c.id === geralEmpresaFilter)?.nome_empresa ?? "Empresa")
               : empresa === "todas"
                 ? "Todas Empresas"
-                : clientes.find((c) => c.id === empresa)?.nome_empresa ?? "Empresa"
+                : (clientes.find((c) => c.id === empresa)?.nome_empresa ?? "Empresa")
           }
         >
           <DropdownMenuItem
-            onClick={() => (mode === "geral" ? setGeralEmpresaFilter("todas") : setEmpresa("todas"))}
+            onClick={() =>
+              mode === "geral" ? setGeralEmpresaFilter("todas") : setEmpresa("todas")
+            }
             className="text-sm"
           >
             Todas Empresas
@@ -233,14 +253,18 @@ export function TarefasHeader({
             label={
               geralMembroFilter === "todos"
                 ? "Todos os Membros"
-                : membros.find((m) => m.id === geralMembroFilter)?.nome ?? "Membro"
+                : (membros.find((m) => m.id === geralMembroFilter)?.nome ?? "Membro")
             }
           >
             <DropdownMenuItem onClick={() => setGeralMembroFilter("todos")} className="text-sm">
               Todos os Membros
             </DropdownMenuItem>
             {membros.map((m) => (
-              <DropdownMenuItem key={m.id} onClick={() => setGeralMembroFilter(m.id)} className="text-sm">
+              <DropdownMenuItem
+                key={m.id}
+                onClick={() => setGeralMembroFilter(m.id)}
+                className="text-sm"
+              >
                 <span
                   className="mr-2 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold text-white"
                   style={{ backgroundColor: m.cor }}

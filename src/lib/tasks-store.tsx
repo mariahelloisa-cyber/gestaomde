@@ -123,8 +123,17 @@ interface TasksCtx {
       contrato_url?: string | null;
     };
   }) => Promise<void>;
-  updatePlano: (vars: { id: string; valor_mensal?: number; servicos_inclusos?: string[] }) => Promise<void>;
-  addServicoAvulso: (vars: { cliente_id: string; descricao: string; valor: number; data_pagamento?: string }) => Promise<void>;
+  updatePlano: (vars: {
+    id: string;
+    valor_mensal?: number;
+    servicos_inclusos?: string[];
+  }) => Promise<void>;
+  addServicoAvulso: (vars: {
+    cliente_id: string;
+    descricao: string;
+    valor: number;
+    data_pagamento?: string;
+  }) => Promise<void>;
   removerTransacao: (id: string) => void;
   contarPorStatus: (s: Status) => number;
   contarMinhasPorStatus: (s: Status) => number;
@@ -196,7 +205,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const transacoes = (data?.transacoes ?? []) as Transacao[];
   const projetos = (data?.projetos ?? []) as Projeto[];
   const myCargo: "Admin" | "Supervisor" | "Membro" =
-    (membros.find((m) => m.id === data?.me?.id)?.cargo as "Admin" | "Supervisor" | "Membro") ?? "Membro";
+    (membros.find((m) => m.id === data?.me?.id)?.cargo as "Admin" | "Supervisor" | "Membro") ??
+    "Membro";
   if (data?.me?.iniciais) USUARIO_LOGADO_INICIAIS = data.me.iniciais;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -244,8 +254,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   });
 
   const commentMut = useMutation({
-    mutationFn: (vars: { tarefa_id: string; conteudo: string }) =>
-      commentFn({ data: vars }),
+    mutationFn: (vars: { tarefa_id: string; conteudo: string }) => commentFn({ data: vars }),
     onSuccess: invalidate,
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao comentar"),
   });
@@ -329,8 +338,12 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   });
 
   const avulsoMut = useMutation({
-    mutationFn: (vars: { cliente_id: string; descricao: string; valor: number; data_pagamento?: string }) =>
-      addAvulsoFn({ data: vars }),
+    mutationFn: (vars: {
+      cliente_id: string;
+      descricao: string;
+      valor: number;
+      data_pagamento?: string;
+    }) => addAvulsoFn({ data: vars }),
     onSuccess: () => {
       toast.success("Lançamento registrado");
       invalidate();
@@ -371,17 +384,26 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao excluir projeto"),
   });
 
-  const addTarefa = useCallback((t: Omit<Tarefa, "id">) => {
-    createMut.mutate(t);
-  }, [createMut]);
+  const addTarefa = useCallback(
+    (t: Omit<Tarefa, "id">) => {
+      createMut.mutate(t);
+    },
+    [createMut],
+  );
 
-  const updateTarefa = useCallback((id: string, patch: Partial<Tarefa>) => {
-    updateMut.mutate({ id, patch });
-  }, [updateMut]);
+  const updateTarefa = useCallback(
+    (id: string, patch: Partial<Tarefa>) => {
+      updateMut.mutate({ id, patch });
+    },
+    [updateMut],
+  );
 
-  const removerTarefa = useCallback((id: string) => {
-    deleteMut.mutate(id);
-  }, [deleteMut]);
+  const removerTarefa = useCallback(
+    (id: string) => {
+      deleteMut.mutate(id);
+    },
+    [deleteMut],
+  );
 
   const addCliente = useCallback(
     (c: {
@@ -399,13 +421,18 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     (id: string, status: "ativo" | "inativo") => statusMut.mutate({ id, status }),
     [statusMut],
   );
-  const removerCliente = useCallback((id: string) => deleteClienteMut.mutate(id), [deleteClienteMut]);
+  const removerCliente = useCallback(
+    (id: string) => deleteClienteMut.mutate(id),
+    [deleteClienteMut],
+  );
   const updateCliente = useCallback(
-    (vars: Parameters<TasksCtx["updateCliente"]>[0]) => updateClienteMut.mutateAsync(vars).then(() => undefined),
+    (vars: Parameters<TasksCtx["updateCliente"]>[0]) =>
+      updateClienteMut.mutateAsync(vars).then(() => undefined),
     [updateClienteMut],
   );
   const updatePlano = useCallback(
-    (vars: { id: string; valor_mensal?: number; servicos_inclusos?: string[] }) => planoMut.mutateAsync(vars).then(() => undefined),
+    (vars: { id: string; valor_mensal?: number; servicos_inclusos?: string[] }) =>
+      planoMut.mutateAsync(vars).then(() => undefined),
     [planoMut],
   );
   const addServicoAvulso = useCallback(
@@ -415,12 +442,18 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   );
   const removerTransacao = useCallback((id: string) => deleteTransMut.mutate(id), [deleteTransMut]);
 
-  const addProjeto = useCallback((nome: string) => createProjetoMut.mutateAsync(nome), [createProjetoMut]);
+  const addProjeto = useCallback(
+    (nome: string) => createProjetoMut.mutateAsync(nome),
+    [createProjetoMut],
+  );
   const renomearProjeto = useCallback(
     (id: string, nome: string) => updateProjetoMut.mutate({ id, nome }),
     [updateProjetoMut],
   );
-  const removerProjeto = useCallback((id: string) => deleteProjetoMut.mutate(id), [deleteProjetoMut]);
+  const removerProjeto = useCallback(
+    (id: string) => deleteProjetoMut.mutate(id),
+    [deleteProjetoMut],
+  );
 
   const openTask = useCallback((id: string) => setSelectedTaskId(id), []);
   const closeTask = useCallback(() => setSelectedTaskId(null), []);
@@ -440,15 +473,25 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     (id: string, concluido: boolean) => toggleChecklistMut.mutate({ id, concluido }),
     [toggleChecklistMut],
   );
-  const removerChecklistItem = useCallback((id: string) => deleteChecklistMut.mutate(id), [deleteChecklistMut]);
+  const removerChecklistItem = useCallback(
+    (id: string) => deleteChecklistMut.mutate(id),
+    [deleteChecklistMut],
+  );
 
   const contarTarefasCliente = useCallback(
-    (clienteId: string) => tarefas.filter((t) => (t.tipo ?? "tarefa") === "tarefa" && t.cliente_id === clienteId && t.status !== "Concluído").length,
+    (clienteId: string) =>
+      tarefas.filter(
+        (t) =>
+          (t.tipo ?? "tarefa") === "tarefa" &&
+          t.cliente_id === clienteId &&
+          t.status !== "Concluído",
+      ).length,
     [tarefas],
   );
 
   const contarPorStatus = useCallback(
-    (s: Status) => tarefas.filter((t) => (t.tipo ?? "tarefa") === "tarefa" && t.status === s).length,
+    (s: Status) =>
+      tarefas.filter((t) => (t.tipo ?? "tarefa") === "tarefa" && t.status === s).length,
     [tarefas],
   );
 
@@ -459,22 +502,26 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         (t) =>
           (t.tipo ?? "tarefa") === "tarefa" &&
           t.status === s &&
-          (!!meId && t.responsaveis.some((r) => r.id === meId)),
+          !!meId &&
+          t.responsaveis.some((r) => r.id === meId),
       ).length;
     },
     [tarefas, data?.me?.id],
   );
 
   const contarGeraisPorStatus = useCallback(
-    (s: Status) =>
-      tarefas.filter(
+    (s: Status) => {
+      const adminIds = new Set(membros.filter((m) => m.cargo === "Admin").map((m) => m.id));
+      return tarefas.filter(
         (t) =>
           (t.tipo ?? "tarefa") === "tarefa" &&
           t.status === s &&
+          !t.responsaveis.some((r) => adminIds.has(r.id)) &&
           (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter) &&
           (geralMembroFilter === "todos" || t.responsaveis.some((r) => r.id === geralMembroFilter)),
-      ).length,
-    [tarefas, geralEmpresaFilter, geralMembroFilter],
+      ).length;
+    },
+    [tarefas, membros, geralEmpresaFilter, geralMembroFilter],
   );
 
   const clientesAtivos = useCallback(() => {
@@ -487,7 +534,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     if (!meId) return [];
     const ids = new Set(
       tarefas
-        .filter((t) => (t.tipo ?? "tarefa") === "tarefa" && t.responsaveis.some((r) => r.id === meId))
+        .filter(
+          (t) => (t.tipo ?? "tarefa") === "tarefa" && t.responsaveis.some((r) => r.id === meId),
+        )
         .map((t) => t.cliente_id),
     );
     return clientes.filter((c) => ids.has(c.id));
@@ -547,7 +596,50 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       geralMembroFilter,
       setGeralMembroFilter,
     }),
-    [tarefas, clientes, membros, planos, transacoes, projetos, addProjeto, renomearProjeto, removerProjeto, myCargo, data?.me?.iniciais, data?.me?.id, isLoading, addTarefa, updateTarefa, removerTarefa, addCliente, setClienteStatus, removerCliente, updateCliente, updatePlano, addServicoAvulso, removerTransacao, contarPorStatus, contarMinhasPorStatus, contarGeraisPorStatus, clientesAtivos, selectedTaskId, openTask, closeTask, addComentario, addChecklistItem, toggleChecklistItem, removerChecklistItem, workspace, contarTarefasCliente, mainView, clientesComMinhasTarefas, meuStatusFilter, geralStatusFilter, geralEmpresaFilter, geralMembroFilter],
+    [
+      tarefas,
+      clientes,
+      membros,
+      planos,
+      transacoes,
+      projetos,
+      addProjeto,
+      renomearProjeto,
+      removerProjeto,
+      myCargo,
+      data?.me?.iniciais,
+      data?.me?.id,
+      isLoading,
+      addTarefa,
+      updateTarefa,
+      removerTarefa,
+      addCliente,
+      setClienteStatus,
+      removerCliente,
+      updateCliente,
+      updatePlano,
+      addServicoAvulso,
+      removerTransacao,
+      contarPorStatus,
+      contarMinhasPorStatus,
+      contarGeraisPorStatus,
+      clientesAtivos,
+      selectedTaskId,
+      openTask,
+      closeTask,
+      addComentario,
+      addChecklistItem,
+      toggleChecklistItem,
+      removerChecklistItem,
+      workspace,
+      contarTarefasCliente,
+      mainView,
+      clientesComMinhasTarefas,
+      meuStatusFilter,
+      geralStatusFilter,
+      geralEmpresaFilter,
+      geralMembroFilter,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
