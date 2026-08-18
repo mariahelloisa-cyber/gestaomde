@@ -31,15 +31,43 @@ const createDemandaSchema = z.object({
   video: videoSchema.nullable().optional(),
 });
 
+/** Assina (URL temporária) uma lista de anexos armazenados no bucket demandas-anexos. */
+async function assinarAnexos(anexos: unknown) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const lista = Array.isArray(anexos)
+    ? (anexos as Array<{ path: string; nome_arquivo: string }>)
+    : [];
+  return Promise.all(
+    lista.map(async (a) => {
+      const { data: signed } = await supabaseAdmin.storage
+        .from("demandas-anexos")
+        .createSignedUrl(a.path, 60 * 60);
+      return { ...a, url: signed?.signedUrl ?? null };
+    }),
+  );
+}
+
+/** Assina (URL temporária) um único arquivo de mídia (áudio ou vídeo) da demanda. */
+async function assinarMidia<T extends { path: string }>(midia: T | null) {
+  if (!midia) return null;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: signed } = await supabaseAdmin.storage
+    .from("demandas-anexos")
+    .createSignedUrl(midia.path, 60 * 60);
+  return { ...midia, url: signed?.signedUrl ?? null };
+}
+
 export const createDemandaExterna = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input) => createDemandaSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: nova, error } = await supabaseAdmin
       .from("demandas_externas")
       .insert({
         solicitante_nome: data.solicitante_nome,
         solicitante_email: data.solicitante_email || null,
+        solicitante_user_id: context.userId,
         setor: data.setor || null,
         responsavel_id: null,
         descricao: data.descricao,
@@ -56,55 +84,100 @@ export const createDemandaExterna = createServerFn({ method: "POST" })
     return { id: nova.id };
   });
 
+/* ---------------- Auth externa: perfil e demandas da própria pessoa ---------------- */
+
+export const getMeuPerfilExterno = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("demandas_externas_usuarios")
+      .select("nome, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { nome: data?.nome ?? "", email: data?.email ?? "" };
+  });
+
+export const listMinhasDemandas = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data, error } = await supabaseAdmin
+      .from("demandas_externas")
+      .select(
+        "id, descricao, prazo_sugerido, anexos, audio, video, status, justificativa_recusa, tarefa_id, criado_em, atualizado_em",
+      )
+      .eq("solicitante_user_id", context.userId)
+      .order("criado_em", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const rows = data ?? [];
+    const tarefaIds = Array.from(
+      new Set(rows.map((d) => d.tarefa_id).filter((id): id is string => !!id)),
+    );
+
+    const tarefasPorId = new Map<string, { status: string; concluido_em: string | null }>();
+    if (tarefaIds.length > 0) {
+      const { data: tarefas, error: errTarefas } = await supabaseAdmin
+        .from("tarefas")
+        .select("id, status, concluido_em")
+        .in("id", tarefaIds);
+      if (errTarefas) throw new Error(errTarefas.message);
+      for (const t of tarefas ?? [])
+        tarefasPorId.set(t.id, { status: t.status, concluido_em: t.concluido_em });
+    }
+
+    return Promise.all(
+      rows.map(async (d) => {
+        const anexos = await assinarAnexos(d.anexos);
+        const audio = await assinarMidia(
+          d.audio as { path: string; nome_arquivo: string; duracao_seg?: number } | null,
+        );
+        const video = await assinarMidia(d.video as { path: string; nome_arquivo: string } | null);
+        const tarefa = d.tarefa_id ? (tarefasPorId.get(d.tarefa_id) ?? null) : null;
+        return {
+          ...d,
+          anexos,
+          audio,
+          video,
+          tarefa_status: tarefa?.status ?? null,
+          tarefa_concluido_em: tarefa?.concluido_em ?? null,
+        };
+      }),
+    );
+  });
+
 /* ---------------- Auth: listar demandas com URLs assinadas ---------------- */
 
 export const listDemandas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Só demandas ainda pendentes: aceitas viram tarefa (e somem daqui, ficam só
     // na aba Tarefas) e recusadas são excluídas na hora — nunca aparecem aqui.
     const { data, error } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, solicitante_email, setor, responsavel_id, descricao, prazo_sugerido, anexos, audio, video, status, tarefa_id, criado_em")
+      .select(
+        "id, solicitante_nome, solicitante_email, setor, responsavel_id, descricao, prazo_sugerido, anexos, audio, video, status, tarefa_id, criado_em",
+      )
       .eq("status", "pendente")
       .order("criado_em", { ascending: false });
     if (error) throw new Error(error.message);
 
     const rows = data ?? [];
-    const enriched = await Promise.all(
-      rows.map(async (d) => {
-        const anexos = Array.isArray(d.anexos) ? (d.anexos as Array<{ path: string; nome_arquivo: string }>) : [];
-        const anexosComUrl = await Promise.all(
-          anexos.map(async (a) => {
-            const { data: signed } = await supabaseAdmin.storage
-              .from("demandas-anexos")
-              .createSignedUrl(a.path, 60 * 60);
-            return { ...a, url: signed?.signedUrl ?? null };
-          }),
-        );
-        const audio = d.audio as { path: string; nome_arquivo: string; duracao_seg?: number } | null;
-        let audioComUrl: (typeof audio & { url: string | null }) | null = null;
-        if (audio) {
-          const { data: signed } = await supabaseAdmin.storage
-            .from("demandas-anexos")
-            .createSignedUrl(audio.path, 60 * 60);
-          audioComUrl = { ...audio, url: signed?.signedUrl ?? null };
-        }
-        const video = d.video as { path: string; nome_arquivo: string } | null;
-        let videoComUrl: (typeof video & { url: string | null }) | null = null;
-        if (video) {
-          const { data: signed } = await supabaseAdmin.storage
-            .from("demandas-anexos")
-            .createSignedUrl(video.path, 60 * 60);
-          videoComUrl = { ...video, url: signed?.signedUrl ?? null };
-        }
-        return { ...d, anexos: anexosComUrl, audio: audioComUrl, video: videoComUrl };
-      }),
+    return Promise.all(
+      rows.map(async (d) => ({
+        ...d,
+        anexos: await assinarAnexos(d.anexos),
+        audio: await assinarMidia(
+          d.audio as { path: string; nome_arquivo: string; duracao_seg?: number } | null,
+        ),
+        video: await assinarMidia(d.video as { path: string; nome_arquivo: string } | null),
+      })),
     );
-    return enriched;
   });
 
 /* ---------------- Auth: aceitar (clona em tarefa) ---------------- */
@@ -122,7 +195,9 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
 
     const { data: dem, error: errDem } = await supabase
       .from("demandas_externas")
-      .select("id, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id, audio, anexos, video")
+      .select(
+        "id, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id, audio, anexos, video",
+      )
       .eq("id", data.id)
       .single();
     if (errDem || !dem) throw new Error(errDem?.message ?? "Demanda não encontrada");
@@ -172,17 +247,23 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
 
     const { error: errUpd } = await supabase
       .from("demandas_externas")
-      .update({ status: "aceita", tarefa_id: nova.id, responsavel_id: data.responsavel_id, atualizado_em: new Date().toISOString() })
+      .update({
+        status: "aceita",
+        tarefa_id: nova.id,
+        responsavel_id: data.responsavel_id,
+        atualizado_em: new Date().toISOString(),
+      })
       .eq("id", data.id);
     if (errUpd) throw new Error(errUpd.message);
 
     return { tarefa_id: nova.id };
   });
 
-/* ---------------- Auth: recusar (remove a demanda por completo) ---------------- */
+/* ---------------- Auth: recusar (sai da fila, mas continua visível para quem enviou) ---------------- */
 
 const recusarSchema = z.object({
   id: z.string().uuid(),
+  justificativa: z.string().trim().max(1000).optional(),
 });
 
 export const recusarDemanda = createServerFn({ method: "POST" })
@@ -210,7 +291,19 @@ export const recusarDemanda = createServerFn({ method: "POST" })
       await supabaseAdmin.storage.from("demandas-anexos").remove(paths);
     }
 
-    const { error } = await supabase.from("demandas_externas").delete().eq("id", data.id);
+    // Não apaga a linha: a demanda sai da fila interna (deixa de ser "pendente"),
+    // mas continua visível para quem enviou, marcada como recusada.
+    const { error } = await supabase
+      .from("demandas_externas")
+      .update({
+        status: "recusada",
+        justificativa_recusa: data.justificativa || null,
+        anexos: [],
+        audio: null,
+        video: null,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

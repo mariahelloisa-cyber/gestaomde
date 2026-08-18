@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       clientes: {
@@ -56,110 +81,6 @@ export type Database = {
         }
         Relationships: []
       }
-      ideias: {
-        Row: {
-          avaliado_em: string | null
-          avaliado_por: string | null
-          criado_em: string
-          criado_por: string
-          descricao: string | null
-          id: string
-          pontos: number | null
-          status: string
-          titulo: string
-        }
-        Insert: {
-          avaliado_em?: string | null
-          avaliado_por?: string | null
-          criado_em?: string
-          criado_por: string
-          descricao?: string | null
-          id?: string
-          pontos?: number | null
-          status?: string
-          titulo: string
-        }
-        Update: {
-          avaliado_em?: string | null
-          avaliado_por?: string | null
-          criado_em?: string
-          criado_por?: string
-          descricao?: string | null
-          id?: string
-          pontos?: number | null
-          status?: string
-          titulo?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ideias_criado_por_fkey"
-            columns: ["criado_por"]
-            isOneToOne: false
-            referencedRelation: "perfis_usuarios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ideias_avaliado_por_fkey"
-            columns: ["avaliado_por"]
-            isOneToOne: false
-            referencedRelation: "perfis_usuarios"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pastas_links: {
-        Row: {
-          comentario: string | null
-          criado_em: string
-          criado_por: string | null
-          id: string
-          nome: string
-        }
-        Insert: {
-          comentario?: string | null
-          criado_em?: string
-          criado_por?: string | null
-          id?: string
-          nome: string
-        }
-        Update: {
-          comentario?: string | null
-          criado_em?: string
-          criado_por?: string | null
-          id?: string
-          nome?: string
-        }
-        Relationships: []
-      }
-      pastas_links_itens: {
-        Row: {
-          criado_em: string
-          id: string
-          pasta_id: string
-          url: string
-        }
-        Insert: {
-          criado_em?: string
-          id?: string
-          pasta_id: string
-          url: string
-        }
-        Update: {
-          criado_em?: string
-          id?: string
-          pasta_id?: string
-          url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pastas_links_itens_pasta_id_fkey"
-            columns: ["pasta_id"]
-            isOneToOne: false
-            referencedRelation: "pastas_links"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       comentarios_tarefa: {
         Row: {
           conteudo: string
@@ -195,38 +116,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "perfis_usuarios"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tarefa_checklist_itens: {
-        Row: {
-          concluido: boolean
-          criado_em: string
-          id: string
-          tarefa_id: string
-          texto: string
-        }
-        Insert: {
-          concluido?: boolean
-          criado_em?: string
-          id?: string
-          tarefa_id: string
-          texto: string
-        }
-        Update: {
-          concluido?: boolean
-          criado_em?: string
-          id?: string
-          tarefa_id?: string
-          texto?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tarefa_checklist_itens_tarefa_id_fkey"
-            columns: ["tarefa_id"]
-            isOneToOne: false
-            referencedRelation: "tarefas"
             referencedColumns: ["id"]
           },
         ]
@@ -337,6 +226,7 @@ export type Database = {
           setor: string | null
           solicitante_email: string | null
           solicitante_nome: string
+          solicitante_user_id: string | null
           status: Database["public"]["Enums"]["status_demanda"]
           tarefa_id: string | null
           video: Json | null
@@ -354,6 +244,7 @@ export type Database = {
           setor?: string | null
           solicitante_email?: string | null
           solicitante_nome: string
+          solicitante_user_id?: string | null
           status?: Database["public"]["Enums"]["status_demanda"]
           tarefa_id?: string | null
           video?: Json | null
@@ -371,9 +262,31 @@ export type Database = {
           setor?: string | null
           solicitante_email?: string | null
           solicitante_nome?: string
+          solicitante_user_id?: string | null
           status?: Database["public"]["Enums"]["status_demanda"]
           tarefa_id?: string | null
           video?: Json | null
+        }
+        Relationships: []
+      }
+      demandas_externas_usuarios: {
+        Row: {
+          criado_em: string
+          email: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          criado_em?: string
+          email: string
+          id: string
+          nome: string
+        }
+        Update: {
+          criado_em?: string
+          email?: string
+          id?: string
+          nome?: string
         }
         Relationships: []
       }
@@ -457,26 +370,109 @@ export type Database = {
           },
         ]
       }
-      projetos: {
+      ideias: {
         Row: {
+          avaliado_em: string | null
+          avaliado_por: string | null
+          criado_em: string
+          criado_por: string
+          descricao: string | null
+          id: string
+          pontos: number | null
+          status: string
+          titulo: string
+        }
+        Insert: {
+          avaliado_em?: string | null
+          avaliado_por?: string | null
+          criado_em?: string
+          criado_por: string
+          descricao?: string | null
+          id?: string
+          pontos?: number | null
+          status?: string
+          titulo: string
+        }
+        Update: {
+          avaliado_em?: string | null
+          avaliado_por?: string | null
+          criado_em?: string
+          criado_por?: string
+          descricao?: string | null
+          id?: string
+          pontos?: number | null
+          status?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ideias_avaliado_por_fkey"
+            columns: ["avaliado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideias_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pastas_links: {
+        Row: {
+          comentario: string | null
           criado_em: string
           criado_por: string | null
           id: string
           nome: string
         }
         Insert: {
+          comentario?: string | null
           criado_em?: string
           criado_por?: string | null
           id?: string
           nome: string
         }
         Update: {
+          comentario?: string | null
           criado_em?: string
           criado_por?: string | null
           id?: string
           nome?: string
         }
         Relationships: []
+      }
+      pastas_links_itens: {
+        Row: {
+          criado_em: string
+          id: string
+          pasta_id: string
+          url: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          pasta_id: string
+          url: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          pasta_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pastas_links_itens_pasta_id_fkey"
+            columns: ["pasta_id"]
+            isOneToOne: false
+            referencedRelation: "pastas_links"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       perfis_usuarios: {
         Row: {
@@ -515,6 +511,59 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projetos: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
+      tarefa_checklist_itens: {
+        Row: {
+          concluido: boolean
+          criado_em: string
+          id: string
+          tarefa_id: string
+          texto: string
+        }
+        Insert: {
+          concluido?: boolean
+          criado_em?: string
+          id?: string
+          tarefa_id: string
+          texto: string
+        }
+        Update: {
+          concluido?: boolean
+          criado_em?: string
+          id?: string
+          tarefa_id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_checklist_itens_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "tarefas"
             referencedColumns: ["id"]
           },
         ]
@@ -636,53 +685,13 @@ export type Database = {
           },
         ]
       }
-      treinamentos: {
-        Row: {
-          atualizado_em: string
-          capa_url: string | null
-          criado_em: string
-          criado_por: string | null
-          descricao: string | null
-          id: string
-          plano_destino: string[]
-          tipo: string
-          titulo: string
-          url_video: string
-        }
-        Insert: {
-          atualizado_em?: string
-          capa_url?: string | null
-          criado_em?: string
-          criado_por?: string | null
-          descricao?: string | null
-          id?: string
-          plano_destino?: string[]
-          tipo?: string
-          titulo: string
-          url_video: string
-        }
-        Update: {
-          atualizado_em?: string
-          capa_url?: string | null
-          criado_em?: string
-          criado_por?: string | null
-          descricao?: string | null
-          id?: string
-          plano_destino?: string[]
-          tipo?: string
-          titulo?: string
-          url_video?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      get_meu_plano: { Args: never; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_cliente: { Args: { _user_id: string }; Returns: boolean }
+      tem_perfil: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       cargo_usuario: "Admin" | "Membro" | "Cliente" | "Supervisor"
@@ -818,6 +827,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       cargo_usuario: ["Admin", "Membro", "Cliente", "Supervisor"],

@@ -240,7 +240,8 @@ export function DemandasView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Recusar demanda?</AlertDialogTitle>
             <AlertDialogDescription>
-              A demanda será removida definitivamente e não poderá ser recuperada.
+              A demanda sai da fila e os anexos são apagados. Quem enviou continua vendo a
+              solicitação, marcada como recusada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -360,7 +361,11 @@ function DemandaCard({
       {d.video && (
         <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-gray-50 px-3 py-2">
           <Video className="h-4 w-4 shrink-0 text-gray-500" />
-          <video controls src={d.video.url ?? undefined} className="max-h-64 min-w-0 flex-1 rounded" />
+          <video
+            controls
+            src={d.video.url ?? undefined}
+            className="max-h-64 min-w-0 flex-1 rounded"
+          />
         </div>
       )}
 
