@@ -2,9 +2,26 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Calendar, FileText, Inbox, Mic, Video } from "lucide-react";
 import { listMinhasDemandas } from "@/lib/demandas.functions";
-import { statusPillStyle, rotuloData, type Status } from "@/lib/mock-data";
+import { statusPillStyle, type Status } from "@/lib/mock-data";
 
 type MinhaDemanda = Awaited<ReturnType<typeof listMinhasDemandas>>[number];
+
+/**
+ * Rótulo de "quando foi enviada" com base no dia-calendário (não na fração do
+ * dia já passada) — evita marcar um envio de hoje à noite como "Amanhã".
+ */
+function rotuloEnviada(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const hoje = new Date();
+  const dMeiaNoite = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const hojeMeiaNoite = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const diffDias = Math.round((dMeiaNoite.getTime() - hojeMeiaNoite.getTime()) / 86400000);
+  if (diffDias === 0) return "hoje";
+  if (diffDias === -1) return "ontem";
+  if (diffDias > -7 && diffDias < 0) return `há ${-diffDias} dias`;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "");
+}
 
 function badgeFor(d: MinhaDemanda): {
   label: string;
@@ -65,7 +82,7 @@ export function MinhasDemandasView() {
               >
                 {badge.label}
               </span>
-              <span className="text-xs text-gray-500">Enviada {rotuloData(d.criado_em)}</span>
+              <span className="text-xs text-gray-500">Enviada {rotuloEnviada(d.criado_em)}</span>
             </div>
 
             {d.prazo_sugerido && (
