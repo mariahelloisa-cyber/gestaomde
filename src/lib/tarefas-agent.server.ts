@@ -217,35 +217,80 @@ function removerMarkdown(texto: string): string {
 
 export type HistoricoMensagem = { role: "user" | "assistant"; content: string };
 
+function montarSystemPrompt(): string {
+  const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  return [
+    "Você é um assistente que gerencia tarefas de uma agência via Telegram.",
+    `Hoje é ${hoje} (use como referência para prazos relativos como "amanhã" ou "sexta").`,
+    "Sempre responda em português, de forma curta e direta — é uma mensagem de chat, não um e-mail.",
+    "Não use formatação markdown (nada de **negrito**, listas com *, ou #títulos) — o Telegram não renderiza isso, escreva em texto simples. Para listas, use um traço \"-\" no início da linha.",
+    "Se uma ferramenta retornar erro dizendo que há mais de um resultado (responsável, cliente ou tarefa ambíguos), pergunte ao usuário qual ele quis dizer em vez de adivinhar.",
+    "As mensagens anteriores desta conversa estão incluídas como histórico — use-as para entender respostas curtas de esclarecimento (ex: se você perguntou qual tarefa e o usuário respondeu só o nome dela, una o nome com o pedido original).",
+    "Regra crítica: sempre que o usuário pedir para criar, consultar ou atualizar o status de uma tarefa e você já tiver os dados necessários (mesmo que reunidos ao longo de várias mensagens), você DEVE chamar a ferramenta correspondente NESTA resposta antes de confirmar qualquer coisa. Nunca diga que uma tarefa foi criada, atualizada ou encontrada sem ter de fato chamado a ferramenta — isso engana o usuário.",
+    "Nunca invente dados que não vieram das ferramentas.",
+  ].join(" ");
+}
+
+type ResultadoLoop = { texto: string; usouFerramenta: boolean };
+
+async function rodarLoop(
+  client: Anthropic,
+  messages: Anthropic.Beta.BetaMessageParam[],
+): Promise<ResultadoLoop> {
+  const runner = client.beta.messages.toolRunner({
+    model: "claude-haiku-4-5",
+    max_tokens: 2048,
+    system: montarSystemPrompt(),
+    messages,
+    tools: [criarTarefaTool, consultarTarefasTool, atualizarStatusTarefaTool],
+  });
+
+  let usouFerramenta = false;
+  let ultimaMensagem: Anthropic.Beta.BetaMessage | undefined;
+  for await (const message of runner) {
+    ultimaMensagem = message;
+    if (message.content.some((b) => b.type === "tool_use")) usouFerramenta = true;
+  }
+
+  const textBlocks = (ultimaMensagem?.content ?? []).filter(
+    (b): b is Anthropic.Beta.BetaTextBlock => b.type === "text",
+  );
+  const texto = textBlocks.map((b) => b.text).join("\n").trim();
+  return { texto, usouFerramenta };
+}
+
 /**
  * Roda o agente de tarefas dado o histórico da conversa (mensagens anteriores +
  * a nova mensagem do usuário como último item) e devolve a resposta final em texto.
  * O histórico é necessário porque cada chamada roda numa function serverless sem
  * estado — sem ele, o bot não lembra de perguntas de esclarecimento que ele mesmo fez.
+ *
+ * Modelos menores às vezes "alucinam" uma confirmação de sucesso sem de fato chamar
+ * a ferramenta (efeito observado em produção: o bot dizia "tarefa criada" sem nada
+ * ser gravado). Por isso, se nenhuma ferramenta foi chamada nesta resposta, tentamos
+ * mais uma vez com um lembrete explícito antes de aceitar o resultado.
  */
 export async function runTarefasAgent(historico: HistoricoMensagem[]): Promise<string> {
   const client = getClient();
-  const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const messages: Anthropic.Beta.BetaMessageParam[] = historico.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
 
-  const finalMessage = await client.beta.messages.toolRunner({
-    model: "claude-haiku-4-5",
-    max_tokens: 1024,
-    system: [
-      "Você é um assistente que gerencia tarefas de uma agência via Telegram.",
-      `Hoje é ${hoje} (use como referência para prazos relativos como "amanhã" ou "sexta").`,
-      "Sempre responda em português, de forma curta e direta — é uma mensagem de chat, não um e-mail.",
-      "Não use formatação markdown (nada de **negrito**, listas com *, ou #títulos) — o Telegram não renderiza isso, escreva em texto simples. Para listas, use um traço \"-\" no início da linha.",
-      "Se uma ferramenta retornar erro dizendo que há mais de um resultado (responsável, cliente ou tarefa ambíguos), pergunte ao usuário qual ele quis dizer em vez de adivinhar.",
-      "As mensagens anteriores desta conversa estão incluídas como histórico — use-as para entender respostas curtas de esclarecimento (ex: se você perguntou qual tarefa e o usuário respondeu só o nome dela, una o nome com o pedido original).",
-      "Nunca invente dados que não vieram das ferramentas.",
-    ].join(" "),
-    messages: historico,
-    tools: [criarTarefaTool, consultarTarefasTool, atualizarStatusTarefaTool],
-  });
+  let resultado = await rodarLoop(client, messages);
 
-  const textBlocks = finalMessage.content.filter(
-    (b): b is Anthropic.Beta.BetaTextBlock => b.type === "text",
-  );
-  const texto = textBlocks.map((b) => b.text).join("\n").trim();
-  return removerMarkdown(texto) || "Não consegui gerar uma resposta.";
+  if (!resultado.usouFerramenta && !resultado.texto.toLowerCase().includes("?")) {
+    const retryMessages: Anthropic.Beta.BetaMessageParam[] = [
+      ...messages,
+      { role: "assistant", content: resultado.texto || "(sem resposta)" },
+      {
+        role: "user",
+        content:
+          "Antes de confirmar qualquer coisa: você chamou de fato a ferramenta necessária (criar_tarefa, consultar_tarefas ou atualizar_status_tarefa)? Se ainda não chamou e já tem os dados, chame agora.",
+      },
+    ];
+    resultado = await rodarLoop(client, retryMessages);
+  }
+
+  return removerMarkdown(resultado.texto) || "Não consegui processar seu pedido, pode tentar de novo?";
 }
