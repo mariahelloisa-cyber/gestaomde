@@ -27,10 +27,7 @@ export const Route = createFileRoute("/api/public/hooks/telegram")({
         }
 
         try {
-          // TODO: remover o "as any" depois de regenerar src/integrations/supabase/types.ts
-          // (a tabela telegram_usuarios só entra no tipo Database após a migration ser
-          // aplicada em produção e os types serem re-gerados).
-          const { data: vinculo } = await (supabaseAdmin as any)
+          const { data: vinculo } = await supabaseAdmin
             .from("telegram_usuarios")
             .select("usuario_id")
             .eq("telegram_chat_id", chatId)
