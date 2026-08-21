@@ -205,6 +205,16 @@ const atualizarStatusTarefaTool = betaTool({
   },
 });
 
+/** Remove resquícios de markdown que o Claude eventualmente escreva, já que o Telegram não os renderiza. */
+function removerMarkdown(texto: string): string {
+  return texto
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/`([^`]*)`/g, "$1");
+}
+
 export type HistoricoMensagem = { role: "user" | "assistant"; content: string };
 
 /**
@@ -224,8 +234,9 @@ export async function runTarefasAgent(historico: HistoricoMensagem[]): Promise<s
       "Você é um assistente que gerencia tarefas de uma agência via Telegram.",
       `Hoje é ${hoje} (use como referência para prazos relativos como "amanhã" ou "sexta").`,
       "Sempre responda em português, de forma curta e direta — é uma mensagem de chat, não um e-mail.",
+      "Não use formatação markdown (nada de **negrito**, listas com *, ou #títulos) — o Telegram não renderiza isso, escreva em texto simples. Para listas, use um traço \"-\" no início da linha.",
       "Se uma ferramenta retornar erro dizendo que há mais de um resultado (responsável, cliente ou tarefa ambíguos), pergunte ao usuário qual ele quis dizer em vez de adivinhar.",
-      "As mensagens anteriores desta conversa estão incluídas como histórico — use-as para entender respostas curtas de esclarecimento (ex: se você perguntou qual tarefa e o usuário respondeu só o nome dela, uma o nome com o pedido original).",
+      "As mensagens anteriores desta conversa estão incluídas como histórico — use-as para entender respostas curtas de esclarecimento (ex: se você perguntou qual tarefa e o usuário respondeu só o nome dela, una o nome com o pedido original).",
       "Nunca invente dados que não vieram das ferramentas.",
     ].join(" "),
     messages: historico,
@@ -236,5 +247,5 @@ export async function runTarefasAgent(historico: HistoricoMensagem[]): Promise<s
     (b): b is Anthropic.Beta.BetaTextBlock => b.type === "text",
   );
   const texto = textBlocks.map((b) => b.text).join("\n").trim();
-  return texto || "Não consegui gerar uma resposta.";
+  return removerMarkdown(texto) || "Não consegui gerar uma resposta.";
 }
