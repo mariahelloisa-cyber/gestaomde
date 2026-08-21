@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaTool } from "@anthropic-ai/sdk/helpers/beta/json-schema";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const STATUS_VALIDOS = ["Pendente", "Em Progresso", "Concluído"] as const;
+const STATUS_VALIDOS = ["Pendente", "Em Progresso", "Em Análise", "Concluído"] as const;
 const PRIORIDADES_VALIDAS = ["Alta", "Média", "Baixa", "Nenhuma"] as const;
 
 function getClient() {

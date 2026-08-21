@@ -685,6 +685,35 @@ export type Database = {
           },
         ]
       }
+      telegram_usuarios: {
+        Row: {
+          criado_em: string
+          id: string
+          telegram_chat_id: number
+          usuario_id: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          telegram_chat_id: number
+          usuario_id: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          telegram_chat_id?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_usuarios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
