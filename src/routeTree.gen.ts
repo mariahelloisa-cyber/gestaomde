@@ -16,6 +16,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as PainelPublicoTokenRouteImport } from './routes/painel-publico.$token'
 import { Route as DemandasNovaRouteImport } from './routes/demandas.nova'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksEmailIdeiaRouteImport } from './routes/api/public/hooks/email-ideia'
 import { Route as ApiPublicHooksEmailEmAnaliseRouteImport } from './routes/api/public/hooks/email-em-analise'
 import { Route as ApiPublicHooksEmailDailyRouteImport } from './routes/api/public/hooks/email-daily'
@@ -55,6 +56,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
+  id: '/api/public/hooks/telegram',
+  path: '/api/public/hooks/telegram',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksEmailIdeiaRoute =
   ApiPublicHooksEmailIdeiaRouteImport.update({
     id: '/api/public/hooks/email-ideia',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
   '/api/public/hooks/email-ideia': typeof ApiPublicHooksEmailIdeiaRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
   '/api/public/hooks/email-ideia': typeof ApiPublicHooksEmailIdeiaRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
   '/api/public/hooks/email-ideia': typeof ApiPublicHooksEmailIdeiaRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
     | '/api/public/hooks/email-ideia'
+    | '/api/public/hooks/telegram'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
     | '/api/public/hooks/email-ideia'
+    | '/api/public/hooks/telegram'
   id:
     | '__root__'
     | '/_authenticated'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
     | '/api/public/hooks/email-ideia'
+    | '/api/public/hooks/telegram'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -169,6 +181,7 @@ export interface RootRouteChildren {
   ApiPublicHooksEmailDailyRoute: typeof ApiPublicHooksEmailDailyRoute
   ApiPublicHooksEmailEmAnaliseRoute: typeof ApiPublicHooksEmailEmAnaliseRoute
   ApiPublicHooksEmailIdeiaRoute: typeof ApiPublicHooksEmailIdeiaRoute
+  ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/telegram': {
+      id: '/api/public/hooks/telegram'
+      path: '/api/public/hooks/telegram'
+      fullPath: '/api/public/hooks/telegram'
+      preLoaderRoute: typeof ApiPublicHooksTelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/email-ideia': {
@@ -276,6 +296,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksEmailDailyRoute: ApiPublicHooksEmailDailyRoute,
   ApiPublicHooksEmailEmAnaliseRoute: ApiPublicHooksEmailEmAnaliseRoute,
   ApiPublicHooksEmailIdeiaRoute: ApiPublicHooksEmailIdeiaRoute,
+  ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
