@@ -685,6 +685,30 @@ export type Database = {
           },
         ]
       }
+      telegram_conversas: {
+        Row: {
+          conteudo: string
+          criado_em: string
+          id: string
+          role: string
+          telegram_chat_id: number
+        }
+        Insert: {
+          conteudo: string
+          criado_em?: string
+          id?: string
+          role: string
+          telegram_chat_id: number
+        }
+        Update: {
+          conteudo?: string
+          criado_em?: string
+          id?: string
+          role?: string
+          telegram_chat_id?: number
+        }
+        Relationships: []
+      }
       telegram_usuarios: {
         Row: {
           criado_em: string

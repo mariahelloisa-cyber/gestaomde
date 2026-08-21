@@ -205,8 +205,15 @@ const atualizarStatusTarefaTool = betaTool({
   },
 });
 
-/** Roda o agente de tarefas para uma mensagem do usuário e devolve a resposta final em texto. */
-export async function runTarefasAgent(mensagemUsuario: string): Promise<string> {
+export type HistoricoMensagem = { role: "user" | "assistant"; content: string };
+
+/**
+ * Roda o agente de tarefas dado o histórico da conversa (mensagens anteriores +
+ * a nova mensagem do usuário como último item) e devolve a resposta final em texto.
+ * O histórico é necessário porque cada chamada roda numa function serverless sem
+ * estado — sem ele, o bot não lembra de perguntas de esclarecimento que ele mesmo fez.
+ */
+export async function runTarefasAgent(historico: HistoricoMensagem[]): Promise<string> {
   const client = getClient();
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
@@ -218,9 +225,10 @@ export async function runTarefasAgent(mensagemUsuario: string): Promise<string> 
       `Hoje é ${hoje} (use como referência para prazos relativos como "amanhã" ou "sexta").`,
       "Sempre responda em português, de forma curta e direta — é uma mensagem de chat, não um e-mail.",
       "Se uma ferramenta retornar erro dizendo que há mais de um resultado (responsável, cliente ou tarefa ambíguos), pergunte ao usuário qual ele quis dizer em vez de adivinhar.",
+      "As mensagens anteriores desta conversa estão incluídas como histórico — use-as para entender respostas curtas de esclarecimento (ex: se você perguntou qual tarefa e o usuário respondeu só o nome dela, uma o nome com o pedido original).",
       "Nunca invente dados que não vieram das ferramentas.",
     ].join(" "),
-    messages: [{ role: "user", content: mensagemUsuario }],
+    messages: historico,
     tools: [criarTarefaTool, consultarTarefasTool, atualizarStatusTarefaTool],
   });
 

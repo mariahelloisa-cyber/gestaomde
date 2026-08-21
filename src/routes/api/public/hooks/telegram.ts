@@ -38,8 +38,29 @@ export const Route = createFileRoute("/api/public/hooks/telegram")({
             return Response.json({ ok: true, skipped: "not_linked" });
           }
 
-          const resposta = await runTarefasAgent(text);
+          // Contexto de conversa: últimas mensagens desse chat na última meia hora
+          // (janela curta o bastante pra não misturar assuntos de horas atrás).
+          const meiaHoraAtras = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+          const { data: anteriores } = await supabaseAdmin
+            .from("telegram_conversas")
+            .select("role, conteudo")
+            .eq("telegram_chat_id", chatId)
+            .gte("criado_em", meiaHoraAtras)
+            .order("criado_em", { ascending: true })
+            .limit(20);
+
+          const historico = [
+            ...(anteriores ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.conteudo })),
+            { role: "user" as const, content: text },
+          ];
+
+          const resposta = await runTarefasAgent(historico);
           await sendTelegramMessage(chatId, resposta);
+
+          await supabaseAdmin.from("telegram_conversas").insert([
+            { telegram_chat_id: chatId, role: "user", conteudo: text },
+            { telegram_chat_id: chatId, role: "assistant", conteudo: resposta },
+          ]);
         } catch (e) {
           console.error("[telegram webhook]", e);
           await sendTelegramMessage(chatId, "Ocorreu um erro interno ao processar sua mensagem. Tente de novo em instantes.").catch(() => {});
