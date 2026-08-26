@@ -423,6 +423,9 @@ export type Database = {
       }
       organograma_nos: {
         Row: {
+          auditoria_aviso_expirado_em: string | null
+          auditoria_aviso_lembrete_em: string | null
+          auditoria_marcada_em: string | null
           criado_em: string
           criado_por: string | null
           id: string
@@ -431,6 +434,9 @@ export type Database = {
           parent_id: string | null
         }
         Insert: {
+          auditoria_aviso_expirado_em?: string | null
+          auditoria_aviso_lembrete_em?: string | null
+          auditoria_marcada_em?: string | null
           criado_em?: string
           criado_por?: string | null
           id?: string
@@ -439,6 +445,9 @@ export type Database = {
           parent_id?: string | null
         }
         Update: {
+          auditoria_aviso_expirado_em?: string | null
+          auditoria_aviso_lembrete_em?: string | null
+          auditoria_marcada_em?: string | null
           criado_em?: string
           criado_por?: string | null
           id?: string

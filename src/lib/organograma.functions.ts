@@ -28,7 +28,7 @@ export const listOrganogramaNos = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("organograma_nos")
-      .select("id, nome, parent_id, link, criado_em")
+      .select("id, nome, parent_id, link, criado_em, auditoria_marcada_em")
       .order("criado_em", { ascending: true });
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -75,6 +75,22 @@ export const renomearNoOrganograma = createServerFn({ method: "POST" })
     const { error } = await supabase
       .from("organograma_nos")
       .update({ nome: data.nome, link: normalizarLink(data.link) })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const marcarAuditoriaSchema = z.object({ id: z.string().uuid(), marcada: z.boolean() });
+
+export const marcarAuditoriaOrganograma = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => marcarAuditoriaSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await ensureAdminOuSupervisor(supabase, userId);
+    const { error } = await supabase
+      .from("organograma_nos")
+      .update({ auditoria_marcada_em: data.marcada ? new Date().toISOString() : null })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

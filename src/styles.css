@@ -202,6 +202,16 @@
   background-color: oklch(0.99 0.003 285);
 }
 
+/* Card de tarefa atrasada: fundo vermelho claro por cima da superfície normal,
+   com texto escuro pra continuar legível (funciona em claro e escuro). Precisa
+   vir depois de .task-surface e .light .task-surface pra vencer o empate de
+   especificidade contra elas. */
+.task-surface.task-atrasada {
+  --foreground: #7f1d1d;
+  --muted-foreground: #9f1239;
+  background-color: #fecaca;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

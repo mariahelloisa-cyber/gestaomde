@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
+  CheckCircle2,
+  Circle,
   ExternalLink,
   Facebook,
   Globe,
@@ -47,7 +49,9 @@ import {
   criarNoOrganograma,
   renomearNoOrganograma,
   excluirNoOrganograma,
+  marcarAuditoriaOrganograma,
 } from "@/lib/organograma.functions";
+import { auditoriaEmDia } from "@/lib/organograma-auditoria";
 
 type No = Awaited<ReturnType<typeof listOrganogramaNos>>[number];
 
@@ -181,6 +185,7 @@ export function OrganogramaView() {
   const criarFn = useServerFn(criarNoOrganograma);
   const renomearFn = useServerFn(renomearNoOrganograma);
   const excluirFn = useServerFn(excluirNoOrganograma);
+  const marcarAuditoriaFn = useServerFn(marcarAuditoriaOrganograma);
 
   const { data: nos = [], isLoading } = useQuery({
     queryKey: ["organograma"],
@@ -216,6 +221,15 @@ export function OrganogramaView() {
       invalidate();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao renomear.");
+    }
+  };
+
+  const alternarAuditoria = async (id: string, marcada: boolean) => {
+    try {
+      await marcarAuditoriaFn({ data: { id, marcada } });
+      invalidate();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao marcar auditoria.");
     }
   };
 
@@ -449,6 +463,7 @@ export function OrganogramaView() {
               filhosPorPai={filhosPorPai}
               podeEditar={podeEditar}
               onRenomear={renomear}
+              onAuditoria={alternarAuditoria}
               selecionadoId={selecionadoId}
               onSelecionar={alternarSelecao}
               editandoId={editandoId}
@@ -551,6 +566,7 @@ function OrgNode({
   filhosPorPai,
   podeEditar,
   onRenomear,
+  onAuditoria,
   selecionadoId,
   onSelecionar,
   editandoId,
@@ -561,6 +577,7 @@ function OrgNode({
   filhosPorPai: Map<string | null, No[]>;
   podeEditar: boolean;
   onRenomear: (id: string, nome: string, link: string | null) => Promise<void>;
+  onAuditoria: (id: string, marcada: boolean) => Promise<void>;
   selecionadoId: string | null;
   onSelecionar: (id: string) => void;
   editandoId: string | null;
@@ -602,6 +619,7 @@ function OrgNode({
   };
 
   const redeConfig = temLink ? configRedeSocial(node.nome) : null;
+  const auditada = auditoriaEmDia(node.auditoria_marcada_em);
 
   // Raiz e o primeiro nível (as ramificações logo abaixo dela) usam cor de
   // fundo sólida da marca em vez da caixa branca padrão.
@@ -683,6 +701,30 @@ function OrgNode({
         >
           <IconeRede nome={node.nome} config={redeConfig!} className="h-8 w-8" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">{node.nome}</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (podeEditar) onAuditoria(node.id, !auditada);
+            }}
+            disabled={!podeEditar}
+            className="shrink-0 disabled:cursor-default"
+            title={
+              !podeEditar
+                ? auditada
+                  ? "Auditoria em dia"
+                  : "Auditoria atrasada"
+                : auditada
+                  ? "Auditoria em dia — clique para desmarcar"
+                  : "Auditoria atrasada — clique para marcar como feita (dias 1, 10, 20 e 30 de cada mês)"
+            }
+          >
+            {auditada ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <Circle className="h-4 w-4 text-red-400 hover:text-red-500" />
+            )}
+          </button>
           <a
             href={node.link!}
             target="_blank"
@@ -729,6 +771,7 @@ function OrgNode({
               filhosPorPai={filhosPorPai}
               podeEditar={podeEditar}
               onRenomear={onRenomear}
+              onAuditoria={onAuditoria}
               selecionadoId={selecionadoId}
               onSelecionar={onSelecionar}
               editandoId={editandoId}

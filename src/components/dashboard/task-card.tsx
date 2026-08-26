@@ -134,6 +134,7 @@ export function TaskCard({
       onClick={onClick}
       className={cn(
         "task-surface group shrink-0 overflow-hidden rounded-md border border-border p-3 shadow-sm transition-shadow hover:shadow-md",
+        atrasada && "task-atrasada",
         draggable && "cursor-grab active:cursor-grabbing",
         onClick && "cursor-pointer",
       )}
