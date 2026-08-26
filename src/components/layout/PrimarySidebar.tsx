@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Mail, Inbox, Link2, CheckCheck, Lightbulb, Sun, Moon, FolderKanban } from "lucide-react";
+import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Inbox, Link2, CheckCheck, Lightbulb, Sun, Moon, FolderKanban, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/tasks-store";
 import { InviteDialog } from "./InviteDialog";
@@ -24,15 +24,15 @@ export function PrimarySidebar() {
           ? "Calendário"
           : workspace.tipo === "membros"
             ? "Membros"
-            : workspace.tipo === "financeiro"
+            : workspace.tipo === "organograma"
+              ? "Organograma"
+              : workspace.tipo === "financeiro"
               ? "Financeiro"
               : workspace.tipo === "planos"
                 ? "Planos"
                 : workspace.tipo === "clientes-inativos"
                   ? "Clientes inativos"
-                  : workspace.tipo === "configuracoes"
-                    ? "Configurações"
-                    : workspace.tipo === "dashboard"
+                  : workspace.tipo === "dashboard"
                   ? "Início"
                   : workspace.tipo === "tarefas-gerais"
                     ? "Tarefas"
@@ -56,6 +56,7 @@ export function PrimarySidebar() {
       : []),
     { icon: Calendar, label: "Calendário", onClick: () => setWorkspace({ tipo: "calendario-geral" }) },
     { icon: UserCircle, label: "Membros", onClick: () => setWorkspace({ tipo: "membros" }) },
+    { icon: Network, label: "Organograma", onClick: () => setWorkspace({ tipo: "organograma" }) },
   ];
 
   return (
@@ -180,16 +181,6 @@ export function PrimarySidebar() {
             active={active === "Ideias"}
             onClick={() => setWorkspace({ tipo: "ideias" })}
           />
-
-          {isAdminLike && (
-            <NavButton
-              icon={Mail}
-              label="Configurações"
-              expanded={expanded}
-              active={active === "Configurações"}
-              onClick={() => setWorkspace({ tipo: "configuracoes" })}
-            />
-          )}
 
           {isAdminLike && (
             <NavButton

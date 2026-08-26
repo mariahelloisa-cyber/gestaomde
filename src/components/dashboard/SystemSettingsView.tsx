@@ -309,7 +309,7 @@ export function SystemSettingsView() {
         ) : painelUrl ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Input readOnly value={painelUrl} className="font-mono text-xs" />
+              <Input readOnly value={painelUrl} className="font-mono text-xs text-black" />
               <Button type="button" variant="secondary" onClick={copiarPainelLink}>
                 <Copy className="h-4 w-4" />
                 Copiar

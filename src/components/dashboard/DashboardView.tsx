@@ -1,7 +1,23 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Link2, Copy, RefreshCw, Ban, Loader2 } from "lucide-react";
 import { useTasks } from "@/lib/tasks-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { PeriodFilter } from "./PeriodFilter";
 import { ReportDialog } from "./ReportDialog";
 import {
@@ -15,6 +31,162 @@ import {
   MemberProductivityBlock,
 } from "./dashboard-charts";
 import { calcPrazos, resolverPeriodo, type PeriodoPreset } from "@/lib/productivity";
+import {
+  getPainelPublicoLink,
+  gerarPainelPublicoLink,
+  revogarPainelPublicoLink,
+} from "@/lib/system-settings.functions";
+
+function PainelPublicoWidget() {
+  const getLinkFn = useServerFn(getPainelPublicoLink);
+  const gerarLinkFn = useServerFn(gerarPainelPublicoLink);
+  const revogarLinkFn = useServerFn(revogarPainelPublicoLink);
+
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await getLinkFn();
+        setToken(r.token);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao carregar o painel público.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [getLinkFn]);
+
+  const url =
+    token && typeof window !== "undefined" ? `${window.location.origin}/painel-publico/${token}` : "";
+
+  const copiarLink = async () => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copiado!");
+    } catch {
+      toast.error("Não foi possível copiar. Copie manualmente.");
+    }
+  };
+
+  const gerarNovoLink = async () => {
+    setBusy(true);
+    try {
+      const r = await gerarLinkFn();
+      setToken(r.token);
+      toast.success("Novo link gerado. O link anterior parou de funcionar.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar o link.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const desativarLink = async () => {
+    setBusy(true);
+    try {
+      await revogarLinkFn();
+      setToken(null);
+      toast.success("Painel público desativado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao desativar o link.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="space-y-4 rounded-lg border border-border bg-white p-6 text-black shadow-sm">
+      <div className="flex items-center gap-2">
+        <Link2 className="h-5 w-5 text-primary" />
+        <h2 className="text-base font-medium">Painel público</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Link sem login para gestores acompanharem o dashboard (visão geral, tarefas por projeto e
+        produtividade) em tempo quase real. Quem tiver o link não precisa de conta e não vê mais
+        nenhuma outra página do sistema.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+        </div>
+      ) : url ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Input readOnly value={url} className="font-mono text-xs text-black" />
+            <Button type="button" variant="secondary" onClick={copiarLink}>
+              <Copy className="h-4 w-4" />
+              Copiar
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="secondary" disabled={busy}>
+                  <RefreshCw className="h-4 w-4" />
+                  Gerar novo link
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Gerar um novo link?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O link atual para de funcionar imediatamente. Quem já tiver o link antigo perde
+                    o acesso ao painel.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={gerarNovoLink}>Gerar novo link</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  disabled={busy}
+                >
+                  <Ban className="h-4 w-4" />
+                  Desativar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Desativar o painel público?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O link atual para de funcionar. Você pode gerar um novo depois, quando quiser.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={desativarLink}
+                  >
+                    Desativar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      ) : (
+        <Button type="button" onClick={gerarNovoLink} disabled={busy}>
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
+          Gerar link do painel público
+        </Button>
+      )}
+    </section>
+  );
+}
 
 export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean } = {}) {
   const { tarefas, myId, loading, membros, projetos } = useTasks();
@@ -87,6 +259,8 @@ export function DashboardView({ apenasMinhas = false }: { apenasMinhas?: boolean
       <div className="flex justify-end">
         <ReportDialog apenasMinhas={apenasMinhas} />
       </div>
+
+      {!apenasMinhas && <PainelPublicoWidget />}
 
       {!apenasMinhas && (
         <Section title="Visão Geral da Agência" subtitle="Todas as tarefas de todos os clientes">

@@ -271,3 +271,77 @@
   position: relative;
   z-index: 1;
 }
+
+/* Organograma: árvore CSS pura (sem lib de diagrama) — listas aninhadas com
+   linhas conectoras desenhadas via pseudo-elementos, usando a cor de borda
+   do tema (funciona em claro e escuro). */
+.org-chart,
+.org-chart ul {
+  display: flex;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.org-chart ul {
+  padding-top: 28px;
+  position: relative;
+}
+
+.org-chart ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 28px;
+  border-left: 1.5px solid var(--color-border);
+}
+
+.org-chart li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 0 14px;
+}
+
+.org-chart li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1.5px solid var(--color-border);
+}
+
+.org-chart li:first-child::after {
+  left: 50%;
+}
+
+.org-chart li:last-child::after {
+  right: 50%;
+}
+
+.org-chart li:only-child::after {
+  display: none;
+}
+
+/* Variante vertical: usada quando os filhos de um nó são todos "folhas"
+   (sem filhos próprios, ex: os links de redes sociais) — em vez de espalhar
+   os irmãos lado a lado, empilha-os um abaixo do outro sob o mesmo nó pai. */
+.org-chart ul.org-chart-vertical {
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.org-chart ul.org-chart-vertical li {
+  padding: 0;
+}
+
+.org-chart ul.org-chart-vertical li::after {
+  display: none;
+}

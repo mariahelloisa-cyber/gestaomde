@@ -54,6 +54,7 @@ export type WorkspaceView =
   | { tipo: "finalizados" }
   | { tipo: "ideias" }
   | { tipo: "projetos" }
+  | { tipo: "organograma" }
   | { tipo: "cliente"; clienteId: string };
 
 export type MainView = "Quadro" | "Calendário";

@@ -14,12 +14,12 @@ import { MembersView } from "@/components/dashboard/MembersView";
 import { FinancialView } from "@/components/dashboard/FinancialView";
 import { PlansView } from "@/components/dashboard/PlansView";
 import { DashboardView } from "@/components/dashboard/DashboardView";
-import { SystemSettingsView } from "@/components/dashboard/SystemSettingsView";
 import { DemandasView } from "@/components/dashboard/DemandasView";
 import { LinksView } from "@/components/dashboard/LinksView";
 import { FinalizadosView } from "@/components/dashboard/FinalizadosView";
 import { IdeiasView } from "@/components/dashboard/IdeiasView";
 import { ProjectsView } from "@/components/dashboard/ProjectsView";
+import { OrganogramaView } from "@/components/dashboard/OrganogramaView";
 import { ClientPortal } from "@/components/portal/ClientPortal";
 import { getMyPortalContext } from "@/lib/data.functions";
 import { Plus } from "lucide-react";
@@ -72,7 +72,6 @@ function WorkspaceContent() {
   const blockedForMembro =
     !isAdminLike &&
     (workspace.tipo === "financeiro" ||
-      workspace.tipo === "configuracoes" ||
       workspace.tipo === "demandas" ||
       workspace.tipo === "finalizados");
 
@@ -159,18 +158,18 @@ function WorkspaceContent() {
     );
   }
 
-  if (workspace.tipo === "calendario-geral") {
+  if (workspace.tipo === "organograma") {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
-        <CalendarView scope="geral" />
+        <OrganogramaView />
       </div>
     );
   }
 
-  if (workspace.tipo === "configuracoes") {
+  if (workspace.tipo === "calendario-geral") {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
-        <SystemSettingsView />
+        <CalendarView scope="geral" />
       </div>
     );
   }

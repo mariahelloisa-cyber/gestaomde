@@ -421,6 +421,48 @@ export type Database = {
           },
         ]
       }
+      organograma_nos: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          id: string
+          link: string | null
+          nome: string
+          parent_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          link?: string | null
+          nome: string
+          parent_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          link?: string | null
+          nome?: string
+          parent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organograma_nos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organograma_nos_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "organograma_nos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pastas_links: {
         Row: {
           comentario: string | null

@@ -35,6 +35,7 @@ export const getEmailConfig = createServerFn({ method: "GET" })
       atualizado_em: map.get("resend_api_key")?.atualizado_em ?? null,
     };
   });
+  
 
 const saveSchema = z.object({
   apiKey: z.string().trim().min(1).max(500),
