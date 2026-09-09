@@ -9,6 +9,7 @@ import {
   transferirDemanda,
 } from "@/lib/demandas.functions";
 import { useTasks } from "@/lib/tasks-store";
+import { dataCurta } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -339,7 +340,7 @@ function DemandaCard({
             {d.prazo_sugerido && (
               <span className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                Prazo: {new Date(d.prazo_sugerido).toLocaleDateString("pt-BR")}
+                Prazo: {dataCurta(d.prazo_sugerido)}
               </span>
             )}
             <span>

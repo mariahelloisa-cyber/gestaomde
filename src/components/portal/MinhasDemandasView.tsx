@@ -2,13 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Calendar, FileText, Inbox, Mic, Video } from "lucide-react";
 import { listMinhasDemandas } from "@/lib/demandas.functions";
-import { statusPillStyle, type Status } from "@/lib/mock-data";
+import { dataCurta, statusPillStyle, type Status } from "@/lib/mock-data";
 
 type MinhaDemanda = Awaited<ReturnType<typeof listMinhasDemandas>>[number];
 
 /**
  * Rótulo de "quando foi enviada" com base no dia-calendário (não na fração do
  * dia já passada) — evita marcar um envio de hoje à noite como "Amanhã".
+ *
+ * Acima de uma semana usamos a data cheia ("em 27/08/2026") em vez de "27 de
+ * ago": o formato abreviado foi lido por solicitantes como "há 27 anos".
  */
 function rotuloEnviada(iso: string): string {
   const d = new Date(iso);
@@ -20,7 +23,7 @@ function rotuloEnviada(iso: string): string {
   if (diffDias === 0) return "hoje";
   if (diffDias === -1) return "ontem";
   if (diffDias > -7 && diffDias < 0) return `há ${-diffDias} dias`;
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "");
+  return `em ${d.toLocaleDateString("pt-BR")}`;
 }
 
 function badgeFor(d: MinhaDemanda): {
@@ -88,7 +91,7 @@ export function MinhasDemandasView() {
             {d.prazo_sugerido && (
               <div className="mt-2 flex items-center gap-1 text-xs text-gray-600">
                 <Calendar className="h-3 w-3" />
-                Prazo sugerido: {new Date(d.prazo_sugerido).toLocaleDateString("pt-BR")}
+                Prazo sugerido: {dataCurta(d.prazo_sugerido)}
               </div>
             )}
 

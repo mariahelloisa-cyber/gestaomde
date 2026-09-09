@@ -89,6 +89,18 @@ export const tarefasIniciais: Tarefa[] = [
   { id: "t6", cliente_id: "c4", titulo: "Trabalhar mais inteligente com IA", status: "Pendente", prioridade: "Nenhuma", complexidade: "Difícil", responsaveis: [{ id: "m1", nome: "Helloisa", iniciais: "HK" }], data_vencimento: isoOffset(6) },
 ];
 
+/**
+ * Formata uma data em dd/mm/aaaa sem deslocar o dia por fuso horário.
+ * Colunas `date` do Postgres chegam como "AAAA-MM-DD", e `new Date("2026-08-28")`
+ * é lido como meia-noite UTC — em UTC-3 isso volta um dia e vira 27/08.
+ */
+export function dataCurta(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso.length === 10 ? iso + "T00:00:00" : iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR");
+}
+
 export function rotuloData(iso: string): string {
   if (!iso) return "—";
   const hoje = new Date();
