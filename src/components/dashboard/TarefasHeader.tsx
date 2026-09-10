@@ -56,6 +56,7 @@ export function TarefasHeader({
     setGeralEmpresaFilter,
     geralMembroFilter,
     setGeralMembroFilter,
+    myCargo,
   } = useTasks();
 
   const [busca, setBusca] = useState("");
@@ -76,6 +77,8 @@ export function TarefasHeader({
     [tarefas, myId],
   );
 
+  // Tarefas de Admins entram na contagem da aba geral só para outros Admins.
+  const isAdmin = myCargo === "Admin";
   const adminIds = useMemo(
     () => new Set(membros.filter((m) => m.cargo === "Admin").map((m) => m.id)),
     [membros],
@@ -86,11 +89,11 @@ export function TarefasHeader({
       tarefas.filter(
         (t) =>
           (t.tipo ?? "tarefa") === "tarefa" &&
-          !t.responsaveis.some((r) => adminIds.has(r.id)) &&
+          (isAdmin || !t.responsaveis.some((r) => adminIds.has(r.id))) &&
           (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter) &&
           (geralMembroFilter === "todos" || t.responsaveis.some((r) => r.id === geralMembroFilter)),
       ).length,
-    [tarefas, adminIds, geralEmpresaFilter, geralMembroFilter],
+    [tarefas, adminIds, isAdmin, geralEmpresaFilter, geralMembroFilter],
   );
 
   const empresasComMinhas = useMemo(() => {

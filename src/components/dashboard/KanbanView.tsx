@@ -74,8 +74,9 @@ export function KanbanView({
   const apenasMinhas = !semCliente && !clienteFilterId;
   const isAdmin = myCargo === "Admin";
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  // Tarefas de Admins ficam de fora da aba "Tarefas" geral (compartilhada entre
-  // todo mundo) — só aparecem em "Minhas Tarefas" do próprio Admin responsável.
+  // Tarefas de Admins ficam na aba "Tarefas" junto com as demais, mas só são
+  // visíveis para quem também é Admin. Para Supervisores e Membros elas somem
+  // da aba geral (continuam em "Minhas Tarefas" de quem for responsável).
   const adminIds = useMemo(
     () => new Set(membros.filter((m) => m.cargo === "Admin").map((m) => m.id)),
     [membros],
@@ -102,7 +103,7 @@ export function KanbanView({
           if ((t.tipo ?? "tarefa") !== "tarefa" || t.status !== c.status) return false;
           if (isFinalizada(t)) return false;
           if (semCliente) {
-            if (t.responsaveis.some((r) => adminIds.has(r.id))) return false;
+            if (!isAdmin && t.responsaveis.some((r) => adminIds.has(r.id))) return false;
             if (geralStatusFilter && t.status !== geralStatusFilter) return false;
             if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
             if (

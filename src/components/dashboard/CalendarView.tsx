@@ -26,11 +26,13 @@ export function CalendarView({
     openTask,
     myIniciais,
     myId,
+    myCargo,
     meuStatusFilter,
     geralStatusFilter,
     geralEmpresaFilter,
     geralMembroFilter,
   } = useTasks();
+  const isAdmin = myCargo === "Admin";
   const adminIds = useMemo(
     () => new Set(membros.filter((m) => m.cargo === "Admin").map((m) => m.id)),
     [membros],
@@ -43,7 +45,7 @@ export function CalendarView({
       }
       if (scope === "sem-cliente") {
         if (isLembrete) return false;
-        if (t.responsaveis.some((r) => adminIds.has(r.id))) return false;
+        if (!isAdmin && t.responsaveis.some((r) => adminIds.has(r.id))) return false;
         if (geralStatusFilter && t.status !== geralStatusFilter) return false;
         if (geralEmpresaFilter !== "todas" && t.cliente_id !== geralEmpresaFilter) return false;
         if (
@@ -77,6 +79,7 @@ export function CalendarView({
     geralEmpresaFilter,
     geralMembroFilter,
     adminIds,
+    isAdmin,
   ]);
   const [cursor, setCursor] = useState(() => {
     const d = new Date();

@@ -517,12 +517,12 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         (t) =>
           (t.tipo ?? "tarefa") === "tarefa" &&
           t.status === s &&
-          !t.responsaveis.some((r) => adminIds.has(r.id)) &&
+          (myCargo === "Admin" || !t.responsaveis.some((r) => adminIds.has(r.id))) &&
           (geralEmpresaFilter === "todas" || t.cliente_id === geralEmpresaFilter) &&
           (geralMembroFilter === "todos" || t.responsaveis.some((r) => r.id === geralMembroFilter)),
       ).length;
     },
-    [tarefas, membros, geralEmpresaFilter, geralMembroFilter],
+    [tarefas, membros, myCargo, geralEmpresaFilter, geralMembroFilter],
   );
 
   const clientesAtivos = useCallback(() => {
