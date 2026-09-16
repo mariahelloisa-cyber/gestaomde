@@ -1,6 +1,7 @@
+import { boolean } from "zod";
+
 export type SendResult = { ok: boolean; status: number; response: string };
 
-/** Envia mensagem de texto via Telegram Bot API (POST .../sendMessage). */
 export async function sendTelegramMessage(chatId: number, text: string): Promise<SendResult> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {

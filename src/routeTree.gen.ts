@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as PainelPublicoTokenRouteImport } from './routes/painel-publico.$token'
 import { Route as DemandasNovaRouteImport } from './routes/demandas.nova'
+import { Route as CompartilhadoTokenRouteImport } from './routes/compartilhado.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksOrganogramaAuditoriaRouteImport } from './routes/api/public/hooks/organograma-auditoria'
@@ -50,6 +51,11 @@ const PainelPublicoTokenRoute = PainelPublicoTokenRouteImport.update({
 const DemandasNovaRoute = DemandasNovaRouteImport.update({
   id: '/demandas/nova',
   path: '/demandas/nova',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompartilhadoTokenRoute = CompartilhadoTokenRouteImport.update({
+  id: '/compartilhado/$token',
+  path: '/compartilhado/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/compartilhado/$token': typeof CompartilhadoTokenRoute
   '/demandas/nova': typeof DemandasNovaRoute
   '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/compartilhado/$token': typeof CompartilhadoTokenRoute
   '/demandas/nova': typeof DemandasNovaRoute
   '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/': typeof AuthenticatedIndexRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/compartilhado/$token': typeof CompartilhadoTokenRoute
   '/demandas/nova': typeof DemandasNovaRoute
   '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/auth/callback'
+    | '/compartilhado/$token'
     | '/demandas/nova'
     | '/painel-publico/$token'
     | '/api/public/hooks/email-assignment'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/auth/callback'
+    | '/compartilhado/$token'
     | '/demandas/nova'
     | '/painel-publico/$token'
     | '/'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/auth/callback'
+    | '/compartilhado/$token'
     | '/demandas/nova'
     | '/painel-publico/$token'
     | '/_authenticated/'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  CompartilhadoTokenRoute: typeof CompartilhadoTokenRoute
   DemandasNovaRoute: typeof DemandasNovaRoute
   PainelPublicoTokenRoute: typeof PainelPublicoTokenRoute
   ApiPublicHooksEmailAssignmentRoute: typeof ApiPublicHooksEmailAssignmentRoute
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       path: '/demandas/nova'
       fullPath: '/demandas/nova'
       preLoaderRoute: typeof DemandasNovaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compartilhado/$token': {
+      id: '/compartilhado/$token'
+      path: '/compartilhado/$token'
+      fullPath: '/compartilhado/$token'
+      preLoaderRoute: typeof CompartilhadoTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/callback': {
@@ -311,6 +331,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  CompartilhadoTokenRoute: CompartilhadoTokenRoute,
   DemandasNovaRoute: DemandasNovaRoute,
   PainelPublicoTokenRoute: PainelPublicoTokenRoute,
   ApiPublicHooksEmailAssignmentRoute: ApiPublicHooksEmailAssignmentRoute,

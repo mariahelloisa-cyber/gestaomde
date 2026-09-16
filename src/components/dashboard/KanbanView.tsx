@@ -16,6 +16,7 @@ import {
   Lock,
   Paperclip,
   Plus,
+  Share2,
   User,
   X,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/mock-data";
 import { useTasks, USUARIO_LOGADO_INICIAIS } from "@/lib/tasks-store";
 import { TaskCard, complexidadeIcon } from "./task-card";
+import { ShareDialog, type ShareAlvo } from "./ShareDialog";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -61,6 +63,7 @@ export function KanbanView({
 }: { clienteFilterId?: string; semCliente?: boolean } = {}) {
   const {
     tarefas,
+    clientes,
     membros,
     updateTarefa,
     openTask,
@@ -74,6 +77,7 @@ export function KanbanView({
   const apenasMinhas = !semCliente && !clienteFilterId;
   const isAdmin = myCargo === "Admin";
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [colunaCompartilhada, setColunaCompartilhada] = useState<ShareAlvo | null>(null);
   // Tarefas de Admins ficam na aba "Tarefas" junto com as demais, mas só são
   // visíveis para quem também é Admin. Para Supervisores e Membros elas somem
   // da aba geral (continuam em "Minhas Tarefas" de quem for responsável).
@@ -84,6 +88,21 @@ export function KanbanView({
   // No escopo "geral" (semCliente) os filtros de empresa e membro vêm do
   const empresaEfetiva =
     semCliente && geralEmpresaFilter !== "todas" ? geralEmpresaFilter : undefined;
+
+  // Texto que descreve, no link compartilhado, a que recorte a coluna se refere.
+  const membroDoRecorte = apenasMinhas
+    ? myId
+    : semCliente && geralMembroFilter !== "todos"
+      ? geralMembroFilter
+      : null;
+  const clienteDoRecorte = clienteFilterId ?? empresaEfetiva ?? null;
+  const contextoDaColuna =
+    [
+      clienteDoRecorte ? clientes.find((c) => c.id === clienteDoRecorte)?.nome_empresa : null,
+      membroDoRecorte ? membros.find((m) => m.id === membroDoRecorte)?.nome : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
 
   const onDrop = (status: Status) => {
     if (!draggingId) return;
@@ -97,100 +116,126 @@ export function KanbanView({
   };
 
   return (
-    <div className="flex h-full gap-4 overflow-x-auto p-5">
-      {colunas.map((c) => {
-        const list = tarefas.filter((t) => {
-          if ((t.tipo ?? "tarefa") !== "tarefa" || t.status !== c.status) return false;
-          if (isFinalizada(t)) return false;
-          if (semCliente) {
-            if (!isAdmin && t.responsaveis.some((r) => adminIds.has(r.id))) return false;
-            if (geralStatusFilter && t.status !== geralStatusFilter) return false;
-            if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
-            if (
-              geralMembroFilter !== "todos" &&
-              !t.responsaveis.some((r) => r.id === geralMembroFilter)
-            )
-              return false;
+    <>
+      <div className="flex h-full gap-4 overflow-x-auto p-5">
+        {colunas.map((c) => {
+          const list = tarefas.filter((t) => {
+            if ((t.tipo ?? "tarefa") !== "tarefa" || t.status !== c.status) return false;
+            if (isFinalizada(t)) return false;
+            if (semCliente) {
+              if (!isAdmin && t.responsaveis.some((r) => adminIds.has(r.id))) return false;
+              if (geralStatusFilter && t.status !== geralStatusFilter) return false;
+              if (empresaEfetiva && t.cliente_id !== empresaEfetiva) return false;
+              if (
+                geralMembroFilter !== "todos" &&
+                !t.responsaveis.some((r) => r.id === geralMembroFilter)
+              )
+                return false;
+              return true;
+            }
+            if (clienteFilterId) return t.cliente_id === clienteFilterId;
+            if (apenasMinhas) {
+              if (!t.responsaveis.some((r) => r.id === myId)) return false;
+              if (meuStatusFilter && t.status !== meuStatusFilter) return false;
+            }
             return true;
-          }
-          if (clienteFilterId) return t.cliente_id === clienteFilterId;
-          if (apenasMinhas) {
-            if (!t.responsaveis.some((r) => r.id === myId)) return false;
-            if (meuStatusFilter && t.status !== meuStatusFilter) return false;
-          }
-          return true;
-        });
-        list.sort((a, b) => prioridadeOrdem[a.prioridade] - prioridadeOrdem[b.prioridade]);
-        const cor = statusCor[c.status];
-        const Icon = c.icon;
-        return (
-          <div
-            key={c.status}
-            onDragOver={(e) => {
-              if (c.status !== "Concluído" || isAdmin) e.preventDefault();
-            }}
-            onDrop={() => onDrop(c.status)}
-            className="flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-[var(--surface-2)]"
-          >
+          });
+          list.sort((a, b) => prioridadeOrdem[a.prioridade] - prioridadeOrdem[b.prioridade]);
+          const cor = statusCor[c.status];
+          const Icon = c.icon;
+          return (
             <div
-              className="flex items-center justify-between px-3.5 py-2.5"
-              style={{
-                backgroundColor: `color-mix(in oklab, ${cor} 14%, transparent)`,
-                borderBottom: `1px solid color-mix(in oklab, ${cor} 30%, transparent)`,
+              key={c.status}
+              onDragOver={(e) => {
+                if (c.status !== "Concluído" || isAdmin) e.preventDefault();
               }}
+              onDrop={() => onDrop(c.status)}
+              className="flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-[var(--surface-2)]"
             >
-              <div className="flex items-center gap-2">
-                <span
-                  className="flex h-5 w-5 items-center justify-center rounded-full"
-                  style={{ backgroundColor: cor, color: "#fff" }}
-                >
-                  <Icon className="h-3 w-3" strokeWidth={2.5} />
-                </span>
-                <span className="text-sm font-semibold" style={{ color: cor }}>
-                  {c.label}
-                </span>
+              <div
+                className="flex items-center justify-between px-3.5 py-2.5"
+                style={{
+                  backgroundColor: `color-mix(in oklab, ${cor} 14%, transparent)`,
+                  borderBottom: `1px solid color-mix(in oklab, ${cor} 30%, transparent)`,
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="flex h-5 w-5 items-center justify-center rounded-full"
+                    style={{ backgroundColor: cor, color: "#fff" }}
+                  >
+                    <Icon className="h-3 w-3" strokeWidth={2.5} />
+                  </span>
+                  <span className="text-sm font-semibold" style={{ color: cor }}>
+                    {c.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">{list.length}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setColunaCompartilhada({
+                        tipo: "coluna",
+                        status: c.status,
+                        titulo: c.label,
+                        clienteId: clienteDoRecorte,
+                        membroId: membroDoRecorte,
+                        contexto: contextoDaColuna,
+                      })
+                    }
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    title="Compartilhar este bloco por link"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                  </button>
+                  {(c.status !== "Concluído" || isAdmin) && (
+                    <AddTaskDialog
+                      defaultStatus={c.status}
+                      compact
+                      lockedClienteId={clienteFilterId ?? empresaEfetiva}
+                      semCliente={semCliente && !empresaEfetiva}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-medium text-muted-foreground">{list.length}</span>
+
+              <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
+                {list.map((t) => (
+                  <CardTarefa
+                    key={t.id}
+                    tarefa={t}
+                    onDragStart={() => setDraggingId(t.id)}
+                    onDragEnd={() => setDraggingId(null)}
+                    onOpen={() => openTask(t.id)}
+                  />
+                ))}
+                {list.length === 0 && (
+                  <div className="flex shrink-0 flex-col items-center gap-2 rounded-lg border border-dashed border-border/60 py-8 text-xs text-muted-foreground">
+                    <Icon className="h-5 w-5 opacity-40" />
+                    Arraste tarefas aqui
+                  </div>
+                )}
                 {(c.status !== "Concluído" || isAdmin) && (
                   <AddTaskDialog
                     defaultStatus={c.status}
-                    compact
                     lockedClienteId={clienteFilterId ?? empresaEfetiva}
                     semCliente={semCliente && !empresaEfetiva}
                   />
                 )}
               </div>
             </div>
-
-            <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
-              {list.map((t) => (
-                <CardTarefa
-                  key={t.id}
-                  tarefa={t}
-                  onDragStart={() => setDraggingId(t.id)}
-                  onDragEnd={() => setDraggingId(null)}
-                  onOpen={() => openTask(t.id)}
-                />
-              ))}
-              {list.length === 0 && (
-                <div className="flex shrink-0 flex-col items-center gap-2 rounded-lg border border-dashed border-border/60 py-8 text-xs text-muted-foreground">
-                  <Icon className="h-5 w-5 opacity-40" />
-                  Arraste tarefas aqui
-                </div>
-              )}
-              {(c.status !== "Concluído" || isAdmin) && (
-                <AddTaskDialog
-                  defaultStatus={c.status}
-                  lockedClienteId={clienteFilterId ?? empresaEfetiva}
-                  semCliente={semCliente && !empresaEfetiva}
-                />
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+      {colunaCompartilhada && (
+        <ShareDialog
+          alvo={colunaCompartilhada}
+          open
+          onOpenChange={(o) => !o && setColunaCompartilhada(null)}
+        />
+      )}
+    </>
   );
 }
 

@@ -120,6 +120,83 @@ export type Database = {
           },
         ]
       }
+      compartilhamentos: {
+        Row: {
+          acessos: number
+          cliente_id: string | null
+          criado_em: string
+          criado_por: string | null
+          expira_em: string | null
+          id: string
+          membro_id: string | null
+          revogado_em: string | null
+          status: string | null
+          tarefa_id: string | null
+          tipo: string
+          token: string
+          ultimo_acesso_em: string | null
+        }
+        Insert: {
+          acessos?: number
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          expira_em?: string | null
+          id?: string
+          membro_id?: string | null
+          revogado_em?: string | null
+          status?: string | null
+          tarefa_id?: string | null
+          tipo: string
+          token?: string
+          ultimo_acesso_em?: string | null
+        }
+        Update: {
+          acessos?: number
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          expira_em?: string | null
+          id?: string
+          membro_id?: string | null
+          revogado_em?: string | null
+          status?: string | null
+          tarefa_id?: string | null
+          tipo?: string
+          token?: string
+          ultimo_acesso_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compartilhamentos_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "tarefas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compartilhamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compartilhamentos_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compartilhamentos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_planos: {
         Row: {
           atualizado_em: string

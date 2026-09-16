@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Check, ChevronDown, Flag, FolderKanban, ListChecks, Mic, Paperclip, Plus, Send, SignalHigh, SignalLow, SignalMedium, Trash2, Video, X } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  CalendarIcon,
+  Check,
+  ChevronDown,
+  Flag,
+  FolderKanban,
+  ListChecks,
+  Mic,
+  Paperclip,
+  Plus,
+  Send,
+  Share2,
+  SignalHigh,
+  SignalLow,
+  SignalMedium,
+  Trash2,
+  Video,
+  X,
+} from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,11 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,15 +53,16 @@ import {
   type Status,
 } from "@/lib/mock-data";
 import { useTasks } from "@/lib/tasks-store";
+import { ShareDialog } from "./ShareDialog";
 import { cn } from "@/lib/utils";
 
 const STATUSES: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
 const PRIORIDADES: Prioridade[] = ["Alta", "Média", "Baixa", "Nenhuma"];
 const COMPLEXIDADES: Complexidade[] = ["Fácil", "Média", "Difícil"];
 const complexidadeIcon: Record<Complexidade, typeof SignalLow> = {
-  "Fácil": SignalLow,
-  "Média": SignalMedium,
-  "Difícil": SignalHigh,
+  Fácil: SignalLow,
+  Média: SignalMedium,
+  Difícil: SignalHigh,
 };
 
 function relativo(iso: string): string {
@@ -89,12 +100,14 @@ export function TaskDetailDialog() {
   const [descricao, setDescricao] = useState("");
   const [comentario, setComentario] = useState("");
   const [novoItem, setNovoItem] = useState("");
+  const [compartilhando, setCompartilhando] = useState(false);
 
   useEffect(() => {
     if (tarefa) {
       setTitulo(tarefa.titulo);
       setDescricao(tarefa.descricao ?? "");
       setComentario("");
+      setCompartilhando(false);
     }
   }, [tarefa?.id]);
 
@@ -155,6 +168,15 @@ export function TaskDetailDialog() {
               isAdmin={isAdmin}
             />
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-primary"
+            title="Compartilhar por link (somente leitura)"
+            onClick={() => setCompartilhando(true)}
+          >
+            <Share2 className="h-4 w-4" />
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -172,7 +194,9 @@ export function TaskDetailDialog() {
                   Excluir {tarefa.tipo === "lembrete" ? "lembrete" : "tarefa"}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta ação não pode ser desfeita. {tarefa.tipo === "lembrete" ? "O lembrete" : "A tarefa"} e seus comentários serão removidos permanentemente.
+                  Esta ação não pode ser desfeita.{" "}
+                  {tarefa.tipo === "lembrete" ? "O lembrete" : "A tarefa"} e seus comentários serão
+                  removidos permanentemente.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -334,7 +358,12 @@ export function TaskDetailDialog() {
                   placeholder="Adicionar item ao checklist..."
                   className="h-9 flex-1 rounded-md border border-border bg-[var(--surface-1)] px-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
                 />
-                <Button size="icon" className="h-9 w-9 shrink-0" onClick={adicionarItem} disabled={!novoItem.trim()}>
+                <Button
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={adicionarItem}
+                  disabled={!novoItem.trim()}
+                >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -360,9 +389,13 @@ export function TaskDetailDialog() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{c.autor.nome}</span>
-                        <span className="text-[11px] text-muted-foreground">{relativo(c.criado_em)}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {relativo(c.criado_em)}
+                        </span>
                       </div>
-                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground/90">{c.conteudo}</p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground/90">
+                        {c.conteudo}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -441,6 +474,14 @@ export function TaskDetailDialog() {
             )}
           </aside>
         </div>
+
+        {compartilhando && (
+          <ShareDialog
+            alvo={{ tipo: "tarefa", tarefaId: tarefa.id, titulo: tarefa.titulo }}
+            open
+            onOpenChange={(o) => !o && setCompartilhando(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -457,7 +498,15 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function StatusDropdown({ status, onChange, isAdmin }: { status: Status; onChange: (s: Status) => void; isAdmin: boolean }) {
+function StatusDropdown({
+  status,
+  onChange,
+  isAdmin,
+}: {
+  status: Status;
+  onChange: (s: Status) => void;
+  isAdmin: boolean;
+}) {
   const opcoes = isAdmin ? STATUSES : STATUSES.filter((s) => s !== "Concluído");
   return (
     <DropdownMenu>
@@ -573,7 +622,9 @@ function ProjetoDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
         {projetos.length === 0 && (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum projeto cadastrado ainda.</div>
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+            Nenhum projeto cadastrado ainda.
+          </div>
         )}
         {projetos.map((p) => (
           <DropdownMenuItem key={p.id} onClick={() => onChange(p.id)} className="gap-2">
@@ -629,9 +680,7 @@ function ResponsavelPicker({
                   );
                 })}
               </div>
-              <span>
-                {atuais.length === 1 ? atuais[0].nome : `${atuais.length} responsáveis`}
-              </span>
+              <span>{atuais.length === 1 ? atuais[0].nome : `${atuais.length} responsáveis`}</span>
             </>
           )}
         </button>
@@ -673,7 +722,9 @@ function DatePickerField({ value, onChange }: { value: string; onChange: (iso: s
           )}
         >
           <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-          {date ? format(date, "dd 'de' MMM, yyyy", { locale: ptBR }) : (
+          {date ? (
+            format(date, "dd 'de' MMM, yyyy", { locale: ptBR })
+          ) : (
             <span className="text-muted-foreground">Sem data</span>
           )}
         </button>
