@@ -7,10 +7,16 @@ export const listProjetos = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase } = context;
     const [projetosRes, tarefasRes] = await Promise.all([
-      supabase.from("projetos").select("id, nome, criado_em").order("criado_em", { ascending: false }),
+      supabase
+        .from("projetos")
+        .select("id, nome, criado_em")
+        .order("criado_em", { ascending: false }),
       supabase
         .from("tarefas")
         .select("id, projeto_id, titulo, status, cliente_id")
+        // Lembretes podem ter projeto (para filtrar na Agenda/Mural), mas a
+        // página de Projetos lista só tarefas.
+        .eq("tipo", "tarefa")
         .not("projeto_id", "is", null),
     ]);
     if (projetosRes.error) throw new Error(projetosRes.error.message);

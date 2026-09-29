@@ -37,6 +37,7 @@ import {
   type EscopoItem,
 } from "@/lib/mock-data";
 import { useTasks, USUARIO_LOGADO_INICIAIS } from "@/lib/tasks-store";
+import { passaFiltros } from "@/lib/filtros";
 import { TaskCard, complexidadeIcon } from "./task-card";
 import { ShareDialog, type ShareAlvo } from "./ShareDialog";
 import { cn } from "@/lib/utils";
@@ -73,6 +74,8 @@ export function KanbanView({
     geralStatusFilter,
     geralEmpresaFilter,
     geralMembroFilter,
+    meusFiltros,
+    geraisFiltros,
   } = useTasks();
   const apenasMinhas = !semCliente && !clienteFilterId;
   const isAdmin = myCargo === "Admin";
@@ -131,12 +134,14 @@ export function KanbanView({
                 !t.responsaveis.some((r) => r.id === geralMembroFilter)
               )
                 return false;
-              return true;
+              // Empresa já foi aplicada acima (empresaEfetiva).
+              return passaFiltros(t, geraisFiltros, "todas");
             }
             if (clienteFilterId) return t.cliente_id === clienteFilterId;
             if (apenasMinhas) {
               if (!t.responsaveis.some((r) => r.id === myId)) return false;
               if (meuStatusFilter && t.status !== meuStatusFilter) return false;
+              return passaFiltros(t, meusFiltros);
             }
             return true;
           });
@@ -281,6 +286,7 @@ export function AddTaskDialog({
   onOpenChange,
   allowLembrete = false,
   semCliente = false,
+  muralQuadroId,
 }: {
   defaultStatus?: Status;
   defaultDate?: string;
@@ -292,16 +298,20 @@ export function AddTaskDialog({
   onOpenChange?: (o: boolean) => void;
   allowLembrete?: boolean;
   semCliente?: boolean;
+  /** Criando dentro de um quadro do Mural: só lembrete, sempre pessoal, e já
+   * entra no quadro. */
+  muralQuadroId?: string;
 }) {
   const { addTarefa, clientes, projetos } = useTasks();
+  const doMural = !!muralQuadroId;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = (o: boolean) => {
     onOpenChange?.(o);
     if (controlledOpen === undefined) setInternalOpen(o);
   };
-  const [tipo, setTipo] = useState<TipoItem>("tarefa");
-  const [escopo, setEscopo] = useState<EscopoItem>(defaultReminderScope);
+  const [tipo, setTipo] = useState<TipoItem>(doMural ? "lembrete" : "tarefa");
+  const [escopo, setEscopo] = useState<EscopoItem>(doMural ? "pessoal" : defaultReminderScope);
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [clienteId, setClienteId] = useState(
@@ -337,22 +347,26 @@ export function AddTaskDialog({
 
   const submit = () => {
     if (!titulo.trim()) return;
-    addTarefa({
-      cliente_id: isLembrete || semCliente ? "" : clienteId,
-      projeto_id: isLembrete ? null : projetoId || null,
-      titulo: titulo.trim(),
-      status: isLembrete ? "Pendente" : status,
-      prioridade: isLembrete ? "Nenhuma" : prioridade,
-      complexidade: isLembrete ? "Média" : complexidade,
-      responsaveis: isLembrete ? [] : responsaveis,
-      data_vencimento: data || "",
-      descricao: descricao.trim() || undefined,
-      tipo,
-      escopo: isLembrete ? escopo : undefined,
-      criado_por: USUARIO_LOGADO_INICIAIS,
-    });
+    addTarefa(
+      {
+        cliente_id: isLembrete || semCliente ? "" : clienteId,
+        projeto_id: projetoId || null,
+        titulo: titulo.trim(),
+        status: isLembrete ? "Pendente" : status,
+        prioridade: isLembrete ? "Nenhuma" : prioridade,
+        complexidade: isLembrete ? "Média" : complexidade,
+        responsaveis: isLembrete ? [] : responsaveis,
+        data_vencimento: data || "",
+        descricao: descricao.trim() || undefined,
+        tipo,
+        escopo: isLembrete ? escopo : undefined,
+        criado_por: USUARIO_LOGADO_INICIAIS,
+      },
+      { muralQuadroId },
+    );
     setTitulo("");
     setDescricao("");
+    setProjetoId("");
     setAnexos([]);
     setOpen(false);
   };
@@ -383,9 +397,11 @@ export function AddTaskDialog({
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 pt-5">
           <div className="flex items-end gap-4">
-            {(allowLembrete
-              ? (["tarefa", "lembrete"] as TipoItem[])
-              : (["tarefa"] as TipoItem[])
+            {(doMural
+              ? (["lembrete"] as TipoItem[])
+              : allowLembrete
+                ? (["tarefa", "lembrete"] as TipoItem[])
+                : (["tarefa"] as TipoItem[])
             ).map((t) => (
               <button key={t} onClick={() => setTipo(t)} className="relative pb-1">
                 <span
@@ -433,76 +449,72 @@ export function AddTaskDialog({
           )}
 
           {/* Contexto: cliente / projeto / escopo */}
-          {!isLembrete && (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {!semCliente && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      disabled={!!lockedClienteId}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-xs text-foreground/80 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                      {clienteAtual?.nome_empresa ?? "Cliente"}
-                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    {clientes.map((c) => (
-                      <DropdownMenuItem
-                        key={c.id}
-                        onClick={() => setClienteId(c.id)}
-                        className="gap-2"
-                      >
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.cor }} />
-                        <span className="flex-1">{c.nome_empresa}</span>
-                        {c.id === clienteId && <Check className="h-3.5 w-3.5" />}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {!isLembrete && !semCliente && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-xs text-foreground/80 hover:bg-muted">
-                    <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
-                    {projetos.find((p) => p.id === projetoId)?.nome ?? "Projeto"}
+                  <button
+                    disabled={!!lockedClienteId}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-xs text-foreground/80 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                    {clienteAtual?.nome_empresa ?? "Cliente"}
                     <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
-                  {projetos.length === 0 && (
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                      Nenhum projeto cadastrado ainda.
-                    </div>
-                  )}
-                  {projetos.map((p) => (
+                  {clientes.map((c) => (
                     <DropdownMenuItem
-                      key={p.id}
-                      onClick={() => setProjetoId(p.id)}
+                      key={c.id}
+                      onClick={() => setClienteId(c.id)}
                       className="gap-2"
                     >
-                      <span className="flex-1">{p.nome}</span>
-                      {p.id === projetoId && <Check className="h-3.5 w-3.5" />}
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.cor }} />
+                      <span className="flex-1">{c.nome_empresa}</span>
+                      {c.id === clienteId && <Check className="h-3.5 w-3.5" />}
                     </DropdownMenuItem>
                   ))}
-                  {projetoId && (
-                    <DropdownMenuItem
-                      onClick={() => setProjetoId("")}
-                      className="text-muted-foreground"
-                    >
-                      Nenhum projeto
-                    </DropdownMenuItem>
-                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
-          )}
-          {isLembrete && (
-            <div className="mt-4">
-              <EscopoPill value={escopo} onChange={setEscopo} />
-            </div>
-          )}
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-xs text-foreground/80 hover:bg-muted">
+                  <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                  {projetos.find((p) => p.id === projetoId)?.nome ?? "Projeto"}
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {projetos.length === 0 && (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                    Nenhum projeto cadastrado ainda.
+                  </div>
+                )}
+                {projetos.map((p) => (
+                  <DropdownMenuItem key={p.id} onClick={() => setProjetoId(p.id)} className="gap-2">
+                    <span className="flex-1">{p.nome}</span>
+                    {p.id === projetoId && <Check className="h-3.5 w-3.5" />}
+                  </DropdownMenuItem>
+                ))}
+                {projetoId && (
+                  <DropdownMenuItem
+                    onClick={() => setProjetoId("")}
+                    className="text-muted-foreground"
+                  >
+                    Nenhum projeto
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {isLembrete && !doMural && <EscopoPill value={escopo} onChange={setEscopo} />}
+            {doMural && (
+              <span className={pillBase()}>
+                <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                Pessoal
+              </span>
+            )}
+          </div>
 
           {/* Cards de metadados — 2 colunas */}
           <div className="mt-6 grid grid-cols-2 gap-3">

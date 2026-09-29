@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import { prioridadeCor } from "@/lib/mock-data";
 import { useTasks, USUARIO_LOGADO_INICIAIS } from "@/lib/tasks-store";
 import { cn } from "@/lib/utils";
+import { passaFiltros } from "@/lib/filtros";
 import { AddTaskDialog } from "./KanbanView";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -31,6 +32,8 @@ export function CalendarView({
     geralStatusFilter,
     geralEmpresaFilter,
     geralMembroFilter,
+    meusFiltros,
+    geraisFiltros,
   } = useTasks();
   const isAdmin = myCargo === "Admin";
   const adminIds = useMemo(
@@ -53,7 +56,8 @@ export function CalendarView({
           !t.responsaveis.some((r) => r.id === geralMembroFilter)
         )
           return false;
-        return true;
+        // Empresa já foi aplicada acima (geralEmpresaFilter).
+        return passaFiltros(t, geraisFiltros, "todas");
       }
       if (scope === "geral") {
         // Tarefas + lembretes gerais (sem pessoais de ninguém)
@@ -63,10 +67,11 @@ export function CalendarView({
       if (!isLembrete) {
         if (!t.responsaveis.some((r) => r.id === myId)) return false;
         if (meuStatusFilter && t.status !== meuStatusFilter) return false;
-        return true;
+        return passaFiltros(t, meusFiltros);
       }
       const esc = t.escopo ?? "geral";
-      return esc === "geral" || t.criado_por === (myIniciais || USUARIO_LOGADO_INICIAIS);
+      if (esc !== "geral" && t.criado_por !== (myIniciais || USUARIO_LOGADO_INICIAIS)) return false;
+      return passaFiltros(t, meusFiltros);
     });
   }, [
     todas,
@@ -80,6 +85,8 @@ export function CalendarView({
     geralMembroFilter,
     adminIds,
     isAdmin,
+    meusFiltros,
+    geraisFiltros,
   ]);
   const [cursor, setCursor] = useState(() => {
     const d = new Date();

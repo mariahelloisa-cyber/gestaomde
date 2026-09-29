@@ -12,6 +12,7 @@ import {
 import {
   prioridadeCor,
   complexidadeCor,
+  statusCor,
   rotuloData,
   type Complexidade,
   type Prioridade,
@@ -111,6 +112,8 @@ export function TaskCard({
   onDragStart,
   onDragEnd,
   onClick,
+  mostrarStatus,
+  acoes,
 }: {
   tarefa: TaskCardTarefa;
   cliente?: TaskCardCliente | null;
@@ -119,6 +122,10 @@ export function TaskCard({
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onClick?: () => void;
+  /** No Mural o quadro não é o status, então o status aparece no card. */
+  mostrarStatus?: boolean;
+  /** Botões extras no canto (ex: menu do Mural). */
+  acoes?: React.ReactNode;
 }) {
   const atrasada = isAtrasada(tarefa);
   const PrioIcon = prioridadeIcon[tarefa.prioridade];
@@ -140,6 +147,14 @@ export function TaskCard({
       )}
     >
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+        {mostrarStatus && (
+          <span
+            className="inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white"
+            style={{ backgroundColor: statusCor[tarefa.status] }}
+          >
+            {tarefa.status}
+          </span>
+        )}
         <span
           className="inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
           style={{
@@ -167,6 +182,7 @@ export function TaskCard({
             Atrasada
           </span>
         )}
+        {acoes && <div className="ml-auto flex shrink-0 items-center">{acoes}</div>}
       </div>
       <p className="mb-1 break-words text-sm font-medium leading-snug">{tarefa.titulo}</p>
       {cliente && (

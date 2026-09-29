@@ -6,6 +6,7 @@ import { SecondarySidebar } from "@/components/layout/SecondarySidebar";
 import { TarefasHeader } from "@/components/dashboard/TarefasHeader";
 import { KanbanView, AddTaskDialog } from "@/components/dashboard/KanbanView";
 import { CalendarView } from "@/components/dashboard/CalendarView";
+import { MuralView } from "@/components/dashboard/MuralView";
 import { TasksProvider, useTasks } from "@/lib/tasks-store";
 import { TaskDetailDialog } from "@/components/dashboard/TaskDetailDialog";
 import { ClientsView } from "@/components/dashboard/ClientsView";
@@ -90,6 +91,7 @@ function WorkspaceContent() {
         <div key={mainView} className="flex-1 animate-in fade-in-50 overflow-y-auto bg-[var(--surface-1)] duration-200">
           {mainView === "Quadro" && <KanbanView />}
           {mainView === "Calendário" && <CalendarView scope="pessoal" />}
+          {mainView === "Mural" && <MuralView />}
         </div>
       </>
     );
@@ -107,12 +109,14 @@ function WorkspaceContent() {
         }
       />
     );
+    // Mural é só de Minhas Tarefas: aqui cai para o Kanban.
+    const viewGeral = mainView === "Mural" ? "Quadro" : mainView;
     return (
       <>
-        <TarefasHeader view={mainView} onViewChange={setMainView} extraActions={criarTarefaButton} mode="geral" />
-        <div key={mainView} className="flex-1 animate-in fade-in-50 overflow-y-auto bg-[var(--surface-1)] duration-200">
-          {mainView === "Quadro" && <KanbanView semCliente />}
-          {mainView === "Calendário" && <CalendarView scope="sem-cliente" />}
+        <TarefasHeader view={viewGeral} onViewChange={setMainView} extraActions={criarTarefaButton} mode="geral" />
+        <div key={viewGeral} className="flex-1 animate-in fade-in-50 overflow-y-auto bg-[var(--surface-1)] duration-200">
+          {viewGeral === "Quadro" && <KanbanView semCliente />}
+          {viewGeral === "Calendário" && <CalendarView scope="sem-cliente" />}
         </div>
       </>
     );
@@ -228,6 +232,7 @@ function WorkspaceContent() {
       <div key={mainView} className="flex-1 animate-in fade-in-50 overflow-y-auto bg-[var(--surface-1)] duration-200">
         {mainView === "Quadro" && <KanbanView />}
         {mainView === "Calendário" && <CalendarView scope="pessoal" />}
+        {mainView === "Mural" && <MuralView />}
       </div>
     </>
   );

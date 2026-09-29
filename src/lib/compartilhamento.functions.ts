@@ -26,6 +26,8 @@ export interface CompartilhamentoResumo {
 
 export interface CompartilhadoTarefa {
   id: string;
+  /** Lembretes (inclusive os pessoais do Mural) também podem ser compartilhados. */
+  tipo: "tarefa" | "lembrete";
   titulo: string;
   descricao?: string;
   status: "Pendente" | "Em Progresso" | "Em Análise" | "Concluído";
@@ -208,7 +210,7 @@ function jaFinalizada(status: string, concluido_em: string | null): boolean {
 }
 
 const COLUNAS_TAREFA =
-  "id, cliente_id, projeto_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, concluido_em, audio, anexos, video";
+  "id, tipo, cliente_id, projeto_id, titulo, status, prioridade, complexidade, data_vencimento, descricao, concluido_em, audio, anexos, video";
 
 /** Sem autenticação — validado só pelo token opaco. Somente leitura: devolve o
  * conteúdo da tarefa como ela aparece no app (descrição, checklist, comentários
@@ -243,6 +245,7 @@ export const getCompartilhamento = createServerFn({ method: "GET" })
 
     let brutas: Array<{
       id: string;
+      tipo: "tarefa" | "lembrete";
       cliente_id: string | null;
       projeto_id: string | null;
       titulo: string;
@@ -375,6 +378,7 @@ export const getCompartilhamento = createServerFn({ method: "GET" })
         ]);
         return {
           id: t.id,
+          tipo: t.tipo,
           titulo: t.titulo,
           descricao: t.descricao ?? undefined,
           status: normalizeStatus(t.status),

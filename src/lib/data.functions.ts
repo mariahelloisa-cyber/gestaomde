@@ -345,6 +345,8 @@ const createSchema = z.object({
   tipo: z.enum(["tarefa", "lembrete"]).default("tarefa"),
   escopo: z.enum(["geral", "pessoal"]).default("geral"),
   responsavel_ids: z.array(z.string().uuid()).default([]),
+  // Lembrete criado dentro de um quadro do Mural: já entra no quadro.
+  mural_quadro_id: z.string().uuid().optional(),
 });
 
 export const createTarefa = createServerFn({ method: "POST" })
@@ -367,7 +369,7 @@ export const createTarefa = createServerFn({ method: "POST" })
     const isLembrete = data.tipo === "lembrete";
     const insertPayload = {
       cliente_id: isLembrete ? null : (data.cliente_id ?? null),
-      projeto_id: isLembrete ? null : (data.projeto_id ?? null),
+      projeto_id: data.projeto_id ?? null,
       titulo: data.titulo,
       status: data.status,
       prioridade: data.prioridade,
@@ -390,6 +392,23 @@ export const createTarefa = createServerFn({ method: "POST" })
       const rows = data.responsavel_ids.map((uid) => ({ tarefa_id: nova.id, usuario_id: uid }));
       const { error: respErr } = await supabase.from("tarefa_responsaveis").insert(rows);
       if (respErr) throw new Error(respErr.message);
+    }
+
+    if (data.mural_quadro_id) {
+      const { data: ultimo } = await supabase
+        .from("mural_itens")
+        .select("posicao")
+        .eq("quadro_id", data.mural_quadro_id)
+        .order("posicao", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const { error: muralErr } = await supabase.from("mural_itens").insert({
+        quadro_id: data.mural_quadro_id,
+        tarefa_id: nova.id,
+        usuario_id: userId,
+        posicao: (ultimo?.posicao ?? 0) + 1,
+      });
+      if (muralErr) throw new Error(muralErr.message);
     }
 
     return { id: nova.id };

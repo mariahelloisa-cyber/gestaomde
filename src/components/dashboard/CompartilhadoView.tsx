@@ -2,6 +2,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  Bell,
   Calendar as CalendarIcon,
   Check,
   Clock,
@@ -139,25 +140,37 @@ function DetalheTarefa({ tarefa }: { tarefa: CompartilhadoTarefa }) {
       <div>
         <h2 className="pr-6 text-xl font-semibold leading-snug text-foreground">{tarefa.titulo}</h2>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span
-            className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
-            style={statusPillStyle(tarefa.status)}
-          >
-            {tarefa.status}
-          </span>
-          <span
-            className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
-            style={prioridadePillStyle(tarefa.prioridade)}
-          >
-            {tarefa.prioridade}
-          </span>
-          <span
-            className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
-            style={complexidadePillStyle(tarefa.complexidade)}
-          >
-            {tarefa.complexidade}
-          </span>
-          {atrasada && (
+          {tarefa.tipo === "lembrete" ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+              style={{ color: "#8B5CF6", backgroundColor: "#8B5CF61F" }}
+            >
+              <Bell className="h-3 w-3" />
+              Lembrete
+            </span>
+          ) : (
+            <>
+              <span
+                className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                style={statusPillStyle(tarefa.status)}
+              >
+                {tarefa.status}
+              </span>
+              <span
+                className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                style={prioridadePillStyle(tarefa.prioridade)}
+              >
+                {tarefa.prioridade}
+              </span>
+              <span
+                className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                style={complexidadePillStyle(tarefa.complexidade)}
+              >
+                {tarefa.complexidade}
+              </span>
+            </>
+          )}
+          {atrasada && tarefa.tipo !== "lembrete" && (
             <span className="inline-flex items-center rounded-full bg-destructive/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-destructive">
               Atrasada
             </span>
@@ -183,7 +196,7 @@ function DetalheTarefa({ tarefa }: { tarefa: CompartilhadoTarefa }) {
         )}
         <span className="flex items-center gap-1.5">
           <CalendarIcon className="h-3.5 w-3.5" />
-          {rotuloData(tarefa.data_vencimento)}
+          {tarefa.data_vencimento ? rotuloData(tarefa.data_vencimento) : "Sem data"}
         </span>
       </div>
 
@@ -193,28 +206,30 @@ function DetalheTarefa({ tarefa }: { tarefa: CompartilhadoTarefa }) {
         </p>
       )}
 
-      <Bloco titulo="Responsáveis">
-        {tarefa.responsaveis.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum responsável atribuído.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {tarefa.responsaveis.map((r) => (
-              <span
-                key={r.id}
-                className="flex items-center gap-1.5 rounded-full border border-border bg-background px-2 py-1 text-xs"
-              >
+      {tarefa.tipo !== "lembrete" && (
+        <Bloco titulo="Responsáveis">
+          {tarefa.responsaveis.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum responsável atribuído.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {tarefa.responsaveis.map((r) => (
                 <span
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold text-white"
-                  style={{ backgroundColor: r.cor }}
+                  key={r.id}
+                  className="flex items-center gap-1.5 rounded-full border border-border bg-background px-2 py-1 text-xs"
                 >
-                  {r.iniciais}
+                  <span
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+                    style={{ backgroundColor: r.cor }}
+                  >
+                    {r.iniciais}
+                  </span>
+                  {r.nome}
                 </span>
-                {r.nome}
-              </span>
-            ))}
-          </div>
-        )}
-      </Bloco>
+              ))}
+            </div>
+          )}
+        </Bloco>
+      )}
 
       {tarefa.checklist.length > 0 && (
         <Bloco titulo="Checklist" icone={ListChecks} extra={`${feitos}/${tarefa.checklist.length}`}>

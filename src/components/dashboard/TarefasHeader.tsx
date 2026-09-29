@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
   ChevronDown,
   ClipboardList,
+  FolderKanban,
   LayoutGrid,
   Search,
+  StickyNote,
 } from "lucide-react";
-import { useTasks } from "@/lib/tasks-store";
+import { useTasks, type MainView } from "@/lib/tasks-store";
 import { statusCor, type Prioridade, type Status } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import {
@@ -17,11 +19,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type View = "Quadro" | "Calendário";
+type View = MainView;
 
-const tabs: { key: View; label: string; icon: typeof LayoutGrid }[] = [
+const tabs: { key: View; label: string; icon: typeof LayoutGrid; soMinhas?: boolean }[] = [
   { key: "Quadro", label: "Kanban", icon: LayoutGrid },
   { key: "Calendário", label: "Agenda", icon: CalendarIcon },
+  // Mural é pessoal: só existe em Minhas Tarefas.
+  { key: "Mural", label: "Mural", icon: StickyNote, soMinhas: true },
 ];
 
 const statusOrdem: Status[] = ["Pendente", "Em Progresso", "Em Análise", "Concluído"];
@@ -57,13 +61,26 @@ export function TarefasHeader({
     geralMembroFilter,
     setGeralMembroFilter,
     myCargo,
+    projetos,
+    meusFiltros,
+    setMeusFiltros,
+    geraisFiltros,
+    setGeraisFiltros,
   } = useTasks();
 
-  const [busca, setBusca] = useState("");
-  const [prioridade, setPrioridade] = useState<Prioridade | "todas">("todas");
-  const [empresa, setEmpresa] = useState<string | "todas">("todas");
-  const [dataDe, setDataDe] = useState("");
-  const [dataAte, setDataAte] = useState("");
+  const filtros = mode === "geral" ? geraisFiltros : meusFiltros;
+  const setFiltros = mode === "geral" ? setGeraisFiltros : setMeusFiltros;
+  const { busca, prioridade, empresa, projeto, dataDe, dataAte } = filtros;
+  const setBusca = (v: string) => setFiltros({ busca: v });
+  const setPrioridade = (v: Prioridade | "todas") => setFiltros({ prioridade: v });
+  const setEmpresa = (v: string | "todas") => setFiltros({ empresa: v });
+  const setProjeto = (v: string) => setFiltros({ projeto: v });
+  const setDataDe = (v: string) => setFiltros({ dataDe: v });
+  const setDataAte = (v: string) => setFiltros({ dataAte: v });
+  const projetosOrdenados = useMemo(
+    () => [...projetos].sort((a, b) => a.nome.localeCompare(b.nome)),
+    [projetos],
+  );
 
   const statusFilter = mode === "geral" ? geralStatusFilter : meuStatusFilter;
   const setStatusFilter = mode === "geral" ? setGeralStatusFilter : setMeuStatusFilter;
@@ -251,6 +268,32 @@ export function TarefasHeader({
           ))}
         </FiltroPill>
 
+        <FiltroPill
+          label={
+            projeto === "todos"
+              ? "Todos Projetos"
+              : projeto === "sem"
+                ? "Sem projeto"
+                : (projetos.find((p) => p.id === projeto)?.nome ?? "Projeto")
+          }
+        >
+          <DropdownMenuItem onClick={() => setProjeto("todos")} className="text-sm">
+            Todos Projetos
+          </DropdownMenuItem>
+          {projetosOrdenados.map((p) => (
+            <DropdownMenuItem key={p.id} onClick={() => setProjeto(p.id)} className="text-sm">
+              <FolderKanban className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+              {p.nome}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuItem
+            onClick={() => setProjeto("sem")}
+            className="text-sm text-muted-foreground"
+          >
+            Sem projeto
+          </DropdownMenuItem>
+        </FiltroPill>
+
         {mode === "geral" && (
           <FiltroPill
             label={
@@ -305,24 +348,26 @@ export function TarefasHeader({
 
       {/* Tabs */}
       <div className="flex flex-wrap items-center gap-1 border-t border-border px-4 py-2">
-        {tabs.map((t) => {
-          const active = view === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => onViewChange(t.key)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <t.icon className="h-4 w-4" />
-              {t.label}
-            </button>
-          );
-        })}
+        {tabs
+          .filter((t) => !t.soMinhas || mode === "minhas")
+          .map((t) => {
+            const active = view === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => onViewChange(t.key)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <t.icon className="h-4 w-4" />
+                {t.label}
+              </button>
+            );
+          })}
         {extraActions && <div className="ml-auto">{extraActions}</div>}
       </div>
     </header>

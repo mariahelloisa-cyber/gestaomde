@@ -463,15 +463,13 @@ export function TaskDetailDialog() {
               </MetaRow>
             )}
 
-            {tarefa.tipo !== "lembrete" && (
-              <MetaRow label="Projeto">
-                <ProjetoDropdown
-                  value={tarefa.projeto_id ?? null}
-                  projetos={projetos}
-                  onChange={(id) => updateTarefa(tarefa.id, { projeto_id: id })}
-                />
-              </MetaRow>
-            )}
+            <MetaRow label="Projeto">
+              <ProjetoDropdown
+                value={tarefa.projeto_id ?? null}
+                projetos={projetos}
+                onChange={(id) => updateTarefa(tarefa.id, { projeto_id: id })}
+              />
+            </MetaRow>
           </aside>
         </div>
 

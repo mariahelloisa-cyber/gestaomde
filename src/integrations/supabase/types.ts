@@ -498,6 +498,90 @@ export type Database = {
           },
         ]
       }
+      mural_itens: {
+        Row: {
+          criado_em: string
+          id: string
+          posicao: number
+          quadro_id: string
+          tarefa_id: string
+          usuario_id: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          posicao?: number
+          quadro_id: string
+          tarefa_id: string
+          usuario_id?: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          posicao?: number
+          quadro_id?: string
+          tarefa_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mural_itens_quadro_id_fkey"
+            columns: ["quadro_id"]
+            isOneToOne: false
+            referencedRelation: "mural_quadros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mural_itens_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "tarefas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mural_itens_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mural_quadros: {
+        Row: {
+          cor: string
+          criado_em: string
+          id: string
+          nome: string
+          posicao: number
+          usuario_id: string
+        }
+        Insert: {
+          cor: string
+          criado_em?: string
+          id?: string
+          nome: string
+          posicao?: number
+          usuario_id?: string
+        }
+        Update: {
+          cor?: string
+          criado_em?: string
+          id?: string
+          nome?: string
+          posicao?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mural_quadros_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organograma_nos: {
         Row: {
           auditoria_aviso_expirado_em: string | null
@@ -871,7 +955,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      excluir_mural_quadro: { Args: { _quadro_id: string }; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      mural_tarefa_permitida: { Args: { _tarefa_id: string }; Returns: boolean }
       tem_perfil: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {

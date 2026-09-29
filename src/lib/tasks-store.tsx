@@ -25,6 +25,7 @@ import {
   updateProjeto as updateProjetoFn,
   deleteProjeto as deleteProjetoFn,
 } from "./projetos.functions";
+import { FILTROS_VAZIOS, type FiltrosBarra } from "./filtros";
 
 export interface Membro {
   id: string;
@@ -57,7 +58,7 @@ export type WorkspaceView =
   | { tipo: "organograma" }
   | { tipo: "cliente"; clienteId: string };
 
-export type MainView = "Quadro" | "Calendário";
+export type MainView = "Quadro" | "Calendário" | "Mural";
 // Backwards-compat: components still import this constant; it is overwritten
 // from the live profile at runtime by TasksProvider.
 export let USUARIO_LOGADO_INICIAIS = "EU";
@@ -100,7 +101,11 @@ interface TasksCtx {
   myEmail: string;
   myAvatar: string | null;
   loading: boolean;
-  addTarefa: (t: Omit<Tarefa, "id">) => void;
+  /** Resolve com o id criado, ou null se falhou (o erro já vira toast). */
+  addTarefa: (
+    t: Omit<Tarefa, "id">,
+    opts?: { muralQuadroId?: string },
+  ) => Promise<{ id: string } | null>;
   updateTarefa: (id: string, patch: Partial<Tarefa>) => void;
   removerTarefa: (id: string) => void;
   addCliente: (c: {
@@ -161,6 +166,10 @@ interface TasksCtx {
   setGeralEmpresaFilter: (id: string | "todas") => void;
   geralMembroFilter: string | "todos";
   setGeralMembroFilter: (id: string | "todos") => void;
+  meusFiltros: FiltrosBarra;
+  setMeusFiltros: (patch: Partial<FiltrosBarra>) => void;
+  geraisFiltros: FiltrosBarra;
+  setGeraisFiltros: (patch: Partial<FiltrosBarra>) => void;
 }
 
 const Ctx = createContext<TasksCtx | null>(null);
@@ -173,6 +182,16 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [geralStatusFilter, setGeralStatusFilter] = useState<Status | null>(null);
   const [geralEmpresaFilter, setGeralEmpresaFilter] = useState<string | "todas">("todas");
   const [geralMembroFilter, setGeralMembroFilter] = useState<string | "todos">("todos");
+  const [meusFiltros, setMeusFiltrosState] = useState<FiltrosBarra>(FILTROS_VAZIOS);
+  const [geraisFiltros, setGeraisFiltrosState] = useState<FiltrosBarra>(FILTROS_VAZIOS);
+  const setMeusFiltros = useCallback(
+    (patch: Partial<FiltrosBarra>) => setMeusFiltrosState((f) => ({ ...f, ...patch })),
+    [],
+  );
+  const setGeraisFiltros = useCallback(
+    (patch: Partial<FiltrosBarra>) => setGeraisFiltrosState((f) => ({ ...f, ...patch })),
+    [],
+  );
 
   const queryClient = useQueryClient();
   const fetchDashboard = useServerFn(getDashboardData);
@@ -213,7 +232,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["dashboard"] });
 
   const createMut = useMutation({
-    mutationFn: (vars: Omit<Tarefa, "id">) =>
+    mutationFn: ({ muralQuadroId, ...vars }: Omit<Tarefa, "id"> & { muralQuadroId?: string }) =>
       createFn({
         data: {
           cliente_id: vars.cliente_id || null,
@@ -227,9 +246,13 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           tipo: (vars.tipo ?? "tarefa") as "tarefa" | "lembrete",
           escopo: (vars.escopo ?? "geral") as "geral" | "pessoal",
           responsavel_ids: vars.responsaveis.map((r) => r.id),
+          mural_quadro_id: muralQuadroId,
         },
       }),
-    onSuccess: invalidate,
+    onSuccess: (_res, vars) => {
+      invalidate();
+      if (vars.muralQuadroId) queryClient.invalidateQueries({ queryKey: ["mural"] });
+    },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao criar"),
   });
 
@@ -283,6 +306,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       toast.success("Excluído com sucesso");
       invalidate();
+      // O item do Mural some junto (ON DELETE CASCADE).
+      queryClient.invalidateQueries({ queryKey: ["mural"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao excluir"),
   });
@@ -386,9 +411,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   });
 
   const addTarefa = useCallback(
-    (t: Omit<Tarefa, "id">) => {
-      createMut.mutate(t);
-    },
+    (t: Omit<Tarefa, "id">, opts?: { muralQuadroId?: string }) =>
+      createMut.mutateAsync({ ...t, muralQuadroId: opts?.muralQuadroId }).catch(() => null),
     [createMut],
   );
 
@@ -596,6 +620,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       setGeralEmpresaFilter,
       geralMembroFilter,
       setGeralMembroFilter,
+      meusFiltros,
+      setMeusFiltros,
+      geraisFiltros,
+      setGeraisFiltros,
     }),
     [
       tarefas,
@@ -640,6 +668,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       geralStatusFilter,
       geralEmpresaFilter,
       geralMembroFilter,
+      meusFiltros,
+      setMeusFiltros,
+      geraisFiltros,
+      setGeraisFiltros,
     ],
   );
 
