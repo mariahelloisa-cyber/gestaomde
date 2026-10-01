@@ -446,12 +446,7 @@ export function AniversariantesView() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <p className="text-xs text-muted-foreground">
-        Dica: ao abrir o material há dois envios. "Arte + colar legenda" sempre resulta numa
-        mensagem só, ao custo de colar a legenda; "Arte + mensagem juntas" dispensa a colagem quando
-        o aparelho usa o texto como legenda, mas pode separar a mensagem da foto. Em navegador que
-        não anexa imagem (Firefox no computador), use "Baixar imagem" e "Copiar mensagem".
-      </p>
+      
     </div>
   );
 }
