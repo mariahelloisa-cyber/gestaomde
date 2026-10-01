@@ -21,6 +21,8 @@ import { FinalizadosView } from "@/components/dashboard/FinalizadosView";
 import { IdeiasView } from "@/components/dashboard/IdeiasView";
 import { ProjectsView } from "@/components/dashboard/ProjectsView";
 import { OrganogramaView } from "@/components/dashboard/OrganogramaView";
+import { AniversariantesView } from "@/components/dashboard/AniversariantesView";
+import { AniversariantesPopupAutomatico } from "@/components/dashboard/AniversariantesPopup";
 import { ClientPortal } from "@/components/portal/ClientPortal";
 import { getMyPortalContext } from "@/lib/data.functions";
 import { Plus } from "lucide-react";
@@ -62,8 +64,20 @@ function Index() {
           <WorkspaceContent />
         </main>
         <TaskDetailDialog />
+        {/* Lembrete das publicações do dia: abre sozinho no primeiro acesso de
+            cada membro e some quando não há aniversariante hoje. */}
+        <AniversariantesDoDia />
       </div>
     </TasksProvider>
+  );
+}
+
+function AniversariantesDoDia() {
+  const { setWorkspace } = useTasks();
+  return (
+    <AniversariantesPopupAutomatico
+      onVerTodos={() => setWorkspace({ tipo: "aniversariantes" })}
+    />
   );
 }
 
@@ -214,6 +228,14 @@ function WorkspaceContent() {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
         <ProjectsView />
+      </div>
+    );
+  }
+
+  if (workspace.tipo === "aniversariantes") {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
+        <AniversariantesView />
       </div>
     );
   }

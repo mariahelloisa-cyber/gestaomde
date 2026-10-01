@@ -12,7 +12,7 @@ import {
 
 /* ---------------- Tipos compartilhados com o front ---------------- */
 
-export type CompartilhamentoTipo = "tarefa" | "coluna";
+export type CompartilhamentoTipo = "tarefa" | "coluna" | "aniversariante";
 
 export interface CompartilhamentoResumo {
   id: string;
@@ -63,26 +63,32 @@ export interface CompartilhadoPayload {
 
 /* ---------------- Criação / gestão (autenticado) ---------------- */
 
-const alvoSchema = z
-  .object({
-    tipo: z.enum(["tarefa", "coluna"]),
-    tarefaId: z.string().uuid().optional(),
-    status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).optional(),
-    clienteId: z.string().uuid().nullish(),
-    membroId: z.string().uuid().nullish(),
-  })
-  .refine((v) => (v.tipo === "tarefa" ? !!v.tarefaId : !!v.status), {
-    message: "Informe a tarefa (tipo=tarefa) ou o status da coluna (tipo=coluna).",
-  });
-
-const criarSchema = z.object({
-  tipo: z.enum(["tarefa", "coluna"]),
+const camposAlvo = {
+  tipo: z.enum(["tarefa", "coluna", "aniversariante"]),
   tarefaId: z.string().uuid().optional(),
   status: z.enum(["Pendente", "Em Progresso", "Em Análise", "Concluído"]).optional(),
   clienteId: z.string().uuid().nullish(),
   membroId: z.string().uuid().nullish(),
-  expiraEmDias: z.union([z.literal(7), z.literal(30), z.null()]).default(30),
-});
+  aniversarianteId: z.string().uuid().optional(),
+};
+
+function alvoPreenchido(v: { tipo: string; tarefaId?: string; status?: string; aniversarianteId?: string }) {
+  if (v.tipo === "tarefa") return !!v.tarefaId;
+  if (v.tipo === "aniversariante") return !!v.aniversarianteId;
+  return !!v.status;
+}
+
+const MSG_ALVO =
+  "Informe a tarefa (tipo=tarefa), o status da coluna (tipo=coluna) ou o aniversariante (tipo=aniversariante).";
+
+const alvoSchema = z.object(camposAlvo).refine(alvoPreenchido, { message: MSG_ALVO });
+
+const criarSchema = z
+  .object({
+    ...camposAlvo,
+    expiraEmDias: z.union([z.literal(7), z.literal(30), z.null()]).default(30),
+  })
+  .refine(alvoPreenchido, { message: MSG_ALVO });
 
 type Alvo = z.infer<typeof alvoSchema>;
 
@@ -104,6 +110,16 @@ export const criarCompartilhamento = createServerFn({ method: "POST" })
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!t) throw new Error("Tarefa não encontrada ou sem permissão para compartilhar.");
+    } else if (data.tipo === "aniversariante") {
+      if (!data.aniversarianteId) throw new Error("Informe o aniversariante a compartilhar.");
+      // Mesma ideia: o RLS de aniversariantes decide se esta pessoa enxerga o registro.
+      const { data: a, error } = await supabase
+        .from("aniversariantes")
+        .select("id")
+        .eq("id", data.aniversarianteId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!a) throw new Error("Aniversariante não encontrado ou sem permissão para compartilhar.");
     } else if (!data.status) {
       throw new Error("Informe o status da coluna a compartilhar.");
     }
@@ -121,6 +137,7 @@ export const criarCompartilhamento = createServerFn({ method: "POST" })
         status: data.tipo === "coluna" ? data.status! : null,
         cliente_id: data.tipo === "coluna" ? (data.clienteId ?? null) : null,
         membro_id: data.tipo === "coluna" ? (data.membroId ?? null) : null,
+        aniversariante_id: data.tipo === "aniversariante" ? data.aniversarianteId! : null,
         criado_por: userId,
         expira_em,
       })
@@ -151,6 +168,8 @@ export const listarCompartilhamentos = createServerFn({ method: "GET" })
 
     if (alvo.tipo === "tarefa") {
       query = query.eq("tarefa_id", alvo.tarefaId!);
+    } else if (alvo.tipo === "aniversariante") {
+      query = query.eq("aniversariante_id", alvo.aniversarianteId!);
     } else {
       query = query.eq("status", alvo.status!);
       query = alvo.clienteId
@@ -229,6 +248,10 @@ export const getCompartilhamento = createServerFn({ method: "GET" })
     if (!link || link.revogado_em) throw new Error("Link inválido ou revogado.");
     if (link.expira_em && new Date(link.expira_em).getTime() <= Date.now()) {
       throw new Error("Este link expirou.");
+    }
+    // Link de aniversariante tem página e leitor próprios (/aniversariante/$token).
+    if (link.tipo !== "tarefa" && link.tipo !== "coluna") {
+      throw new Error("Link inválido ou revogado.");
     }
 
     const [perfisRes, clientesRes, projetosRes] = await Promise.all([

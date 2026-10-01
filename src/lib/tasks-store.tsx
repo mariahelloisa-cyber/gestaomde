@@ -56,6 +56,7 @@ export type WorkspaceView =
   | { tipo: "ideias" }
   | { tipo: "projetos" }
   | { tipo: "organograma" }
+  | { tipo: "aniversariantes" }
   | { tipo: "cliente"; clienteId: string };
 
 export type MainView = "Quadro" | "Calendário" | "Mural";

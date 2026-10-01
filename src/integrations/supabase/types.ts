@@ -39,6 +39,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      aniversariante_visualizacoes: {
+        Row: {
+          aniversariante_id: string
+          usuario_id: string
+          visto_em: string
+        }
+        Insert: {
+          aniversariante_id: string
+          usuario_id?: string
+          visto_em?: string
+        }
+        Update: {
+          aniversariante_id?: string
+          usuario_id?: string
+          visto_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aniversariante_visualizacoes_aniversariante_id_fkey"
+            columns: ["aniversariante_id"]
+            isOneToOne: false
+            referencedRelation: "aniversariantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aniversariante_visualizacoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aniversariantes: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          criado_por: string | null
+          data_comemoracao: string
+          id: string
+          imagens: Json
+          mensagem: string
+          nome: string
+          publicado_em: string | null
+          publicado_por: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          data_comemoracao: string
+          id?: string
+          imagens: Json
+          mensagem: string
+          nome: string
+          publicado_em?: string | null
+          publicado_por?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          data_comemoracao?: string
+          id?: string
+          imagens?: Json
+          mensagem?: string
+          nome?: string
+          publicado_em?: string | null
+          publicado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aniversariantes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aniversariantes_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           contrato_url: string | null
@@ -123,6 +210,7 @@ export type Database = {
       compartilhamentos: {
         Row: {
           acessos: number
+          aniversariante_id: string | null
           cliente_id: string | null
           criado_em: string
           criado_por: string | null
@@ -138,6 +226,7 @@ export type Database = {
         }
         Insert: {
           acessos?: number
+          aniversariante_id?: string | null
           cliente_id?: string | null
           criado_em?: string
           criado_por?: string | null
@@ -153,6 +242,7 @@ export type Database = {
         }
         Update: {
           acessos?: number
+          aniversariante_id?: string | null
           cliente_id?: string | null
           criado_em?: string
           criado_por?: string | null
@@ -167,6 +257,13 @@ export type Database = {
           ultimo_acesso_em?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "compartilhamentos_aniversariante_id_fkey"
+            columns: ["aniversariante_id"]
+            isOneToOne: false
+            referencedRelation: "aniversariantes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "compartilhamentos_tarefa_id_fkey"
             columns: ["tarefa_id"]
@@ -956,7 +1053,12 @@ export type Database = {
     }
     Functions: {
       excluir_mural_quadro: { Args: { _quadro_id: string }; Returns: undefined }
+      aniversariante_imagens_validas: { Args: { _imagens: Json }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      marcar_aniversariante_publicado: {
+        Args: { _id: string; _publicado: boolean }
+        Returns: undefined
+      }
       mural_tarefa_permitida: { Args: { _tarefa_id: string }; Returns: boolean }
       tem_perfil: { Args: { _user_id: string }; Returns: boolean }
     }

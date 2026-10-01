@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Inbox, Link2, CheckCheck, Lightbulb, Sun, Moon, FolderKanban, Network } from "lucide-react";
+import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Inbox, Link2, CheckCheck, Lightbulb, Sun, Moon, FolderKanban, Network, Cake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/tasks-store";
 import { InviteDialog } from "./InviteDialog";
@@ -46,6 +46,8 @@ export function PrimarySidebar() {
                             ? "Ideias"
                         : workspace.tipo === "projetos"
                           ? "Projetos"
+                      : workspace.tipo === "aniversariantes"
+                        ? "Aniversariantes"
                     : "Minhas tarefas";
 
   const items: { icon: typeof Home; label: string; onClick: () => void }[] = [
@@ -173,6 +175,14 @@ export function PrimarySidebar() {
               onClick={() => setWorkspace({ tipo: "finalizados" })}
             />
           )}
+
+          <NavButton
+            icon={Cake}
+            label="Aniversariantes"
+            expanded={expanded}
+            active={active === "Aniversariantes"}
+            onClick={() => setWorkspace({ tipo: "aniversariantes" })}
+          />
 
           <NavButton
             icon={Lightbulb}

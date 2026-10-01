@@ -33,7 +33,15 @@ export type ShareAlvo =
       membroId?: string | null;
       /** Contexto mostrado no dialog: empresa e/ou responsável do filtro atual. */
       contexto?: string | null;
-    };
+    }
+  | { tipo: "aniversariante"; aniversarianteId: string; titulo: string };
+
+/** Cada tipo de alvo tem a sua página pública. */
+const ROTA_PUBLICA: Record<ShareAlvo["tipo"], string> = {
+  tarefa: "compartilhado",
+  coluna: "compartilhado",
+  aniversariante: "aniversariante",
+};
 
 const VALIDADES: { label: string; dias: 7 | 30 | null }[] = [
   { label: "7 dias", dias: 7 },
@@ -65,12 +73,14 @@ export function ShareDialog({
   const payloadAlvo =
     alvo.tipo === "tarefa"
       ? { tipo: "tarefa" as const, tarefaId: alvo.tarefaId }
-      : {
-          tipo: "coluna" as const,
-          status: alvo.status,
-          clienteId: alvo.clienteId ?? null,
-          membroId: alvo.membroId ?? null,
-        };
+      : alvo.tipo === "aniversariante"
+        ? { tipo: "aniversariante" as const, aniversarianteId: alvo.aniversarianteId }
+        : {
+            tipo: "coluna" as const,
+            status: alvo.status,
+            clienteId: alvo.clienteId ?? null,
+            membroId: alvo.membroId ?? null,
+          };
   const chaveAlvo = JSON.stringify(payloadAlvo);
 
   useEffect(() => {
@@ -96,13 +106,15 @@ export function ShareDialog({
 
   const url =
     link && typeof window !== "undefined"
-      ? `${window.location.origin}/compartilhado/${link.token}`
+      ? `${window.location.origin}/${ROTA_PUBLICA[alvo.tipo]}/${link.token}`
       : "";
 
   const mensagem =
     alvo.tipo === "tarefa"
       ? `Tarefa: ${alvo.titulo}\n${url}`
-      : `Tarefas em "${alvo.titulo}"${alvo.contexto ? ` — ${alvo.contexto}` : ""}\n${url}`;
+      : alvo.tipo === "aniversariante"
+        ? `Material de aniversário de ${alvo.titulo}\n${url}`
+        : `Tarefas em "${alvo.titulo}"${alvo.contexto ? ` — ${alvo.contexto}` : ""}\n${url}`;
 
   const gerar = async () => {
     setOcupado(true);
@@ -160,13 +172,24 @@ export function ShareDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share2 className="h-4 w-4 text-primary" />
-            {alvo.tipo === "tarefa" ? "Compartilhar tarefa" : "Compartilhar bloco"}
+            {alvo.tipo === "tarefa"
+              ? "Compartilhar tarefa"
+              : alvo.tipo === "aniversariante"
+                ? "Compartilhar material"
+                : "Compartilhar bloco"}
           </DialogTitle>
           <DialogDescription>
             {alvo.tipo === "tarefa" ? (
               <>
                 Quem receber o link vê <strong>{alvo.titulo}</strong> em modo somente leitura, sem
                 precisar de conta e sem poder editar nada.
+              </>
+            ) : alvo.tipo === "aniversariante" ? (
+              <>
+                Quem receber o link vê e baixa a arte e a mensagem de{" "}
+                <strong>{alvo.titulo}</strong>, sem acessar o resto do sistema. O link manda só o
+                material — a foto com legenda no WhatsApp sai pelos botões de envio do
+                material.
               </>
             ) : (
               <>

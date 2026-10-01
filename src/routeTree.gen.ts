@@ -17,12 +17,14 @@ import { Route as PainelPublicoTokenRouteImport } from './routes/painel-publico.
 import { Route as DemandasNovaRouteImport } from './routes/demandas.nova'
 import { Route as CompartilhadoTokenRouteImport } from './routes/compartilhado.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as AniversarianteTokenRouteImport } from './routes/aniversariante.$token'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksOrganogramaAuditoriaRouteImport } from './routes/api/public/hooks/organograma-auditoria'
 import { Route as ApiPublicHooksEmailIdeiaRouteImport } from './routes/api/public/hooks/email-ideia'
 import { Route as ApiPublicHooksEmailEmAnaliseRouteImport } from './routes/api/public/hooks/email-em-analise'
 import { Route as ApiPublicHooksEmailDailyRouteImport } from './routes/api/public/hooks/email-daily'
 import { Route as ApiPublicHooksEmailAssignmentRouteImport } from './routes/api/public/hooks/email-assignment'
+import { Route as ApiPublicAniversarianteImagemTokenRouteImport } from './routes/api/public/aniversariante-imagem.$token'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -63,6 +65,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AniversarianteTokenRoute = AniversarianteTokenRouteImport.update({
+  id: '/aniversariante/$token',
+  path: '/aniversariante/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
   id: '/api/public/hooks/telegram',
   path: '/api/public/hooks/telegram',
@@ -98,15 +105,23 @@ const ApiPublicHooksEmailAssignmentRoute =
     path: '/api/public/hooks/email-assignment',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAniversarianteImagemTokenRoute =
+  ApiPublicAniversarianteImagemTokenRouteImport.update({
+    id: '/api/public/aniversariante-imagem/$token',
+    path: '/api/public/aniversariante-imagem/$token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/aniversariante/$token': typeof AniversarianteTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/compartilhado/$token': typeof CompartilhadoTokenRoute
   '/demandas/nova': typeof DemandasNovaRoute
   '/painel-publico/$token': typeof PainelPublicoTokenRoute
+  '/api/public/aniversariante-imagem/$token': typeof ApiPublicAniversarianteImagemTokenRoute
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
@@ -117,11 +132,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/aniversariante/$token': typeof AniversarianteTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/compartilhado/$token': typeof CompartilhadoTokenRoute
   '/demandas/nova': typeof DemandasNovaRoute
   '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/': typeof AuthenticatedIndexRoute
+  '/api/public/aniversariante-imagem/$token': typeof ApiPublicAniversarianteImagemTokenRoute
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
@@ -134,11 +151,13 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/aniversariante/$token': typeof AniversarianteTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/compartilhado/$token': typeof CompartilhadoTokenRoute
   '/demandas/nova': typeof DemandasNovaRoute
   '/painel-publico/$token': typeof PainelPublicoTokenRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/api/public/aniversariante-imagem/$token': typeof ApiPublicAniversarianteImagemTokenRoute
   '/api/public/hooks/email-assignment': typeof ApiPublicHooksEmailAssignmentRoute
   '/api/public/hooks/email-daily': typeof ApiPublicHooksEmailDailyRoute
   '/api/public/hooks/email-em-analise': typeof ApiPublicHooksEmailEmAnaliseRoute
@@ -152,10 +171,12 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/aniversariante/$token'
     | '/auth/callback'
     | '/compartilhado/$token'
     | '/demandas/nova'
     | '/painel-publico/$token'
+    | '/api/public/aniversariante-imagem/$token'
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
@@ -166,11 +187,13 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/signup'
+    | '/aniversariante/$token'
     | '/auth/callback'
     | '/compartilhado/$token'
     | '/demandas/nova'
     | '/painel-publico/$token'
     | '/'
+    | '/api/public/aniversariante-imagem/$token'
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
@@ -182,11 +205,13 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/signup'
+    | '/aniversariante/$token'
     | '/auth/callback'
     | '/compartilhado/$token'
     | '/demandas/nova'
     | '/painel-publico/$token'
     | '/_authenticated/'
+    | '/api/public/aniversariante-imagem/$token'
     | '/api/public/hooks/email-assignment'
     | '/api/public/hooks/email-daily'
     | '/api/public/hooks/email-em-analise'
@@ -199,10 +224,12 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  AniversarianteTokenRoute: typeof AniversarianteTokenRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   CompartilhadoTokenRoute: typeof CompartilhadoTokenRoute
   DemandasNovaRoute: typeof DemandasNovaRoute
   PainelPublicoTokenRoute: typeof PainelPublicoTokenRoute
+  ApiPublicAniversarianteImagemTokenRoute: typeof ApiPublicAniversarianteImagemTokenRoute
   ApiPublicHooksEmailAssignmentRoute: typeof ApiPublicHooksEmailAssignmentRoute
   ApiPublicHooksEmailDailyRoute: typeof ApiPublicHooksEmailDailyRoute
   ApiPublicHooksEmailEmAnaliseRoute: typeof ApiPublicHooksEmailEmAnaliseRoute
@@ -269,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/aniversariante/$token': {
+      id: '/aniversariante/$token'
+      path: '/aniversariante/$token'
+      fullPath: '/aniversariante/$token'
+      preLoaderRoute: typeof AniversarianteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/telegram': {
       id: '/api/public/hooks/telegram'
       path: '/api/public/hooks/telegram'
@@ -311,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksEmailAssignmentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/aniversariante-imagem/$token': {
+      id: '/api/public/aniversariante-imagem/$token'
+      path: '/api/public/aniversariante-imagem/$token'
+      fullPath: '/api/public/aniversariante-imagem/$token'
+      preLoaderRoute: typeof ApiPublicAniversarianteImagemTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -330,10 +371,13 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  AniversarianteTokenRoute: AniversarianteTokenRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   CompartilhadoTokenRoute: CompartilhadoTokenRoute,
   DemandasNovaRoute: DemandasNovaRoute,
   PainelPublicoTokenRoute: PainelPublicoTokenRoute,
+  ApiPublicAniversarianteImagemTokenRoute:
+    ApiPublicAniversarianteImagemTokenRoute,
   ApiPublicHooksEmailAssignmentRoute: ApiPublicHooksEmailAssignmentRoute,
   ApiPublicHooksEmailDailyRoute: ApiPublicHooksEmailDailyRoute,
   ApiPublicHooksEmailEmAnaliseRoute: ApiPublicHooksEmailEmAnaliseRoute,
