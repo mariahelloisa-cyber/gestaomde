@@ -74,7 +74,6 @@ import {
   CHAVE_ANIVERSARIANTES_HOJE,
   useAniversariantesDeHoje,
 } from "./AniversariantesPopup";
-import { ShareDialog } from "./ShareDialog";
 
 const CHAVE_LISTA = "aniversariantes";
 
@@ -111,7 +110,6 @@ export function AniversariantesView() {
   const [emEdicao, setEmEdicao] = useState<Aniversariante | null>(null);
   const [material, setMaterial] = useState<Aniversariante | null>(null);
   const [paraExcluir, setParaExcluir] = useState<Aniversariante | null>(null);
-  const [paraCompartilhar, setParaCompartilhar] = useState<Aniversariante | null>(null);
 
   const publicarFn = useServerFn(marcarPublicado);
   const publicarMut = useMutation({
@@ -348,8 +346,8 @@ export function AniversariantesView() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setParaCompartilhar(a)}
-                      title="Gerar ou revogar o link do material"
+                      onClick={() => setMaterial(a)}
+                      title="Abrir o card para compartilhar"
                     >
                       <Share2 className="h-3.5 w-3.5" />
                     </Button>
@@ -410,18 +408,6 @@ export function AniversariantesView() {
           anoPadrao={ano}
           mesPadrao={mes ?? hojeSP.mes}
           onSalvo={invalidar}
-        />
-      )}
-
-      {paraCompartilhar && (
-        <ShareDialog
-          open
-          onOpenChange={(v) => !v && setParaCompartilhar(null)}
-          alvo={{
-            tipo: "aniversariante",
-            aniversarianteId: paraCompartilhar.id,
-            titulo: paraCompartilhar.nome,
-          }}
         />
       )}
 
