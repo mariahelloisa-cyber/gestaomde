@@ -14,13 +14,15 @@ function getClient() {
 type Resolvido = { ok: true; id: string; nome: string } | { ok: false; erro: string };
 
 async function resolverResponsavel(nomeBusca: string): Promise<Resolvido> {
-  const { data, error } = await supabaseAdmin
+  const { data: perfis, error } = await supabaseAdmin
     .from("perfis_usuarios")
-    .select("id, nome")
+    .select("id, nome, status")
     .ilike("nome", `%${nomeBusca}%`);
   if (error) return { ok: false, erro: `Erro ao buscar responsável: ${error.message}` };
-  if (!data || data.length === 0) {
-    return { ok: false, erro: `Nenhum responsável encontrado com o nome "${nomeBusca}".` };
+  // Quem foi inativado não recebe tarefa nova.
+  const data = (perfis ?? []).filter((p) => (p.status ?? "ativo") !== "inativo");
+  if (data.length === 0) {
+    return { ok: false, erro: `Nenhum responsável ativo encontrado com o nome "${nomeBusca}".` };
   }
   if (data.length > 1) {
     return {

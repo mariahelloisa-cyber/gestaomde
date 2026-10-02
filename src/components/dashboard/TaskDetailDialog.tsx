@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -648,6 +648,12 @@ function ResponsavelPicker({
   onChange: (arr: { id: string; nome: string; iniciais: string }[]) => void;
 }) {
   const { membros } = useTasks();
+  // Um inativo que já é responsável continua listado (para dar para tirar);
+  // os outros inativos saem das opções.
+  const opcoes = useMemo(
+    () => membros.filter((m) => m.status !== "inativo" || atuais.some((r) => r.id === m.id)),
+    [membros, atuais],
+  );
   const toggle = (m: { id: string; nome: string; iniciais: string }) => {
     const exists = atuais.some((r) => r.id === m.id);
     onChange(
@@ -684,7 +690,7 @@ function ResponsavelPicker({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
-        {membros.map((m) => (
+        {opcoes.map((m) => (
           <DropdownMenuItem
             key={m.id}
             onClick={(e) => {
@@ -700,6 +706,9 @@ function ResponsavelPicker({
               {m.iniciais}
             </span>
             <span className="flex-1">{m.nome}</span>
+            {m.status === "inativo" && (
+              <span className="text-[10px] font-medium text-muted-foreground">Inativo</span>
+            )}
             {atuais.some((r) => r.id === m.id) && <Check className="h-3.5 w-3.5" />}
           </DropdownMenuItem>
         ))}

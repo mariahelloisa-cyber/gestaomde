@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { garantirResponsaveisAtivos } from "./responsaveis.server";
 
 /* ---------------- Public: criar demanda externa ---------------- */
 
@@ -240,6 +241,7 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
       .single();
     if (errTar || !nova) throw new Error(errTar?.message ?? "Falha ao criar tarefa");
 
+    await garantirResponsaveisAtivos([data.responsavel_id]);
     const { error: errResp } = await supabase
       .from("tarefa_responsaveis")
       .insert({ tarefa_id: nova.id, usuario_id: data.responsavel_id });
@@ -320,6 +322,7 @@ export const transferirDemanda = createServerFn({ method: "POST" })
   .inputValidator((input) => transferirSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await garantirResponsaveisAtivos([data.novo_responsavel_id]);
     const { error } = await supabase
       .from("demandas_externas")
       .update({

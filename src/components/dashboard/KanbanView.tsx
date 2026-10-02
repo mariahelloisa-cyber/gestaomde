@@ -676,6 +676,12 @@ function ResponsavelPill({
   onChange: (m: { id: string; nome: string; iniciais: string }[]) => void;
 }) {
   const { membros } = useTasks();
+  // Quem já está na tarefa continua na lista (mesmo inativo) para poder ser
+  // removido; quem não está só aparece se estiver ativo.
+  const opcoes = useMemo(
+    () => membros.filter((m) => m.status !== "inativo" || value.some((r) => r.id === m.id)),
+    [membros, value],
+  );
   const toggle = (m: { id: string; nome: string; iniciais: string }) => {
     const exists = value.some((r) => r.id === m.id);
     onChange(exists ? value.filter((r) => r.id !== m.id) : [...value, m]);
@@ -712,7 +718,7 @@ function ResponsavelPill({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
-        {membros.map((m) => (
+        {opcoes.map((m) => (
           <DropdownMenuItem
             key={m.id}
             onClick={(e) => {
@@ -728,6 +734,9 @@ function ResponsavelPill({
               {m.iniciais}
             </span>
             <span className="flex-1">{m.nome}</span>
+            {m.status === "inativo" && (
+              <span className="text-[10px] font-medium text-muted-foreground">Inativo</span>
+            )}
             {value.some((r) => r.id === m.id) && <Check className="h-3.5 w-3.5" />}
           </DropdownMenuItem>
         ))}

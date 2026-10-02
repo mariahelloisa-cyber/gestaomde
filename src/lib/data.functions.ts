@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getEmailSettings, sendEmail, logEmail, msgConvite } from "./email.server";
+import { garantirResponsaveisAtivos } from "./responsaveis.server";
 
 const SITE_URL = "https://xn--gestomde-uza.tec.br";
 
@@ -389,6 +390,7 @@ export const createTarefa = createServerFn({ method: "POST" })
     if (error || !nova) throw new Error(error?.message ?? "Falha ao criar tarefa");
 
     if (!isLembrete && data.responsavel_ids.length > 0) {
+      await garantirResponsaveisAtivos(data.responsavel_ids);
       const rows = data.responsavel_ids.map((uid) => ({ tarefa_id: nova.id, usuario_id: uid }));
       const { error: respErr } = await supabase.from("tarefa_responsaveis").insert(rows);
       if (respErr) throw new Error(respErr.message);
@@ -520,6 +522,9 @@ export const updateTarefa = createServerFn({ method: "POST" })
       }
 
       if (paraAdicionar.length > 0) {
+        // Só quem entra agora precisa estar ativo — quem já era responsável
+        // continua, mesmo tendo sido inativado depois.
+        await garantirResponsaveisAtivos(paraAdicionar);
         const rows = paraAdicionar.map((uid) => ({ tarefa_id: id, usuario_id: uid }));
         const { error: insErr } = await supabase.from("tarefa_responsaveis").insert(rows);
         if (insErr) throw new Error(insErr.message);

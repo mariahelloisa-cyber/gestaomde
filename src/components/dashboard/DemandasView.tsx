@@ -55,7 +55,7 @@ import {
 type Demanda = Awaited<ReturnType<typeof listDemandas>>[number];
 
 export function DemandasView() {
-  const { membros } = useTasks();
+  const { membros, membrosAtivos } = useTasks();
   const qc = useQueryClient();
   const fetchFn = useServerFn(listDemandas);
   const aceitarFn = useServerFn(aceitarDemanda);
@@ -208,7 +208,7 @@ export function DemandasView() {
               <SelectValue placeholder="Escolha o responsável" />
             </SelectTrigger>
             <SelectContent>
-              {membros.map((m) => (
+              {membrosAtivos.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.nome}
                 </SelectItem>
@@ -272,7 +272,7 @@ export function DemandasView() {
               <SelectValue placeholder="Escolha o novo responsável" />
             </SelectTrigger>
             <SelectContent>
-              {membros.map((m) => (
+              {membrosAtivos.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.nome}
                 </SelectItem>

@@ -89,6 +89,8 @@ interface TasksCtx {
   tarefas: Tarefa[];
   clientes: Cliente[];
   membros: Membro[];
+  /** Quem ainda pode receber tarefa — membros inativos ficam de fora. */
+  membrosAtivos: Membro[];
   planos: Plano[];
   transacoes: Transacao[];
   projetos: Projeto[];
@@ -222,6 +224,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const tarefas = (data?.tarefas ?? []) as Tarefa[];
   const clientes = (data?.clientes ?? []) as Cliente[];
   const membros = data?.membros ?? [];
+  // Inativo continua responsável pelo que já é dele (e aparece nas tarefas
+  // antigas), mas não entra mais nas listas de escolher responsável.
+  const membrosAtivos = useMemo(() => membros.filter((m) => m.status !== "inativo"), [membros]);
   const planos = (data?.planos ?? []) as Plano[];
   const transacoes = (data?.transacoes ?? []) as Transacao[];
   const projetos = (data?.projetos ?? []) as Projeto[];
@@ -576,6 +581,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       tarefas,
       clientes,
       membros,
+      membrosAtivos,
       planos,
       transacoes,
       projetos,
@@ -633,6 +639,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       tarefas,
       clientes,
       membros,
+      membrosAtivos,
       planos,
       transacoes,
       projetos,
