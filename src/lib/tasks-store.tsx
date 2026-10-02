@@ -252,7 +252,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       }),
     onSuccess: (_res, vars) => {
       invalidate();
-      if (vars.muralQuadroId) queryClient.invalidateQueries({ queryKey: ["mural"] });
+      if (vars.muralQuadroId) {
+        queryClient.invalidateQueries({ queryKey: ["mural"] });
+        queryClient.invalidateQueries({ queryKey: ["murais"] });
+      }
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao criar"),
   });

@@ -36,6 +36,11 @@ export const Route = createFileRoute("/_authenticated/")({
       { property: "og:description", content: "Sistema de gestão de tarefas e clientes da agência." },
     ],
   }),
+  // Qual mural está aberto na aba Mural. Fica na URL para o voltar do
+  // navegador funcionar e o link de um mural poder ser guardado.
+  validateSearch: (search: Record<string, unknown>): { mural?: string } => ({
+    mural: typeof search.mural === "string" ? search.mural : undefined,
+  }),
   component: Index,
 });
 

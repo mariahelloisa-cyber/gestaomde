@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  ArrowLeft,
   Bell,
   Calendar as CalendarIcon,
   Check,
@@ -53,6 +55,7 @@ import {
   listMural,
   moverItemMural,
   removerItemMural,
+  type Mural,
   type MuralData,
   type MuralItem,
   type MuralQuadro,
@@ -61,6 +64,7 @@ import { useTasks } from "@/lib/tasks-store";
 import { passaFiltros } from "@/lib/filtros";
 import { isFinalizada, rotuloData, statusCor, type Tarefa } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { MuraisView } from "./MuraisView";
 import { TaskCard } from "./task-card";
 import { AddTaskDialog } from "./KanbanView";
 import { ShareDialog, type ShareAlvo } from "./ShareDialog";
@@ -93,9 +97,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-/* Mural: quadros pessoais (só a própria pessoa vê). Cada quadro guarda tarefas
- * em que ela é responsável e lembretes pessoais criados ali. Arrastar move o
- * item entre quadros / reordena — nunca muda o status da tarefa.
+/* Mural: a pessoa tem vários murais (só ela vê) e, dentro de cada um, os
+ * quadros. Cada quadro guarda tarefas em que ela é responsável e lembretes
+ * pessoais criados ali. Arrastar move o item entre quadros / reordena — nunca
+ * muda o status da tarefa.
+ *
+ * Qual mural está aberto vive na URL (?mural=<id>), então o voltar do
+ * navegador funciona e dá para guardar o link de um mural.
  *
  * Ids do drag-and-drop: "q:<quadro>" (quadro, para reordenar quadros),
  * "c:<quadro>" (área de itens do quadro, para soltar em quadro vazio) e
@@ -118,6 +126,18 @@ function quadroDoItem(itemId: string, o: Ordem): string | undefined {
 }
 
 export function MuralView() {
+  const navigate = useNavigate();
+  const { mural: muralId } = useSearch({ strict: false }) as { mural?: string };
+
+  const abrirMural = (id: string) => navigate({ to: "/", search: { mural: id } });
+  const voltar = () => navigate({ to: "/", search: {} });
+
+  if (!muralId) return <MuraisView onAbrir={abrirMural} />;
+  // key: trocar de mural recomeça o estado do quadro (drag, diálogos).
+  return <MuralQuadros key={muralId} muralId={muralId} onVoltar={voltar} />;
+}
+
+function MuralQuadros({ muralId, onVoltar }: { muralId: string; onVoltar: () => void }) {
   const qc = useQueryClient();
   const { tarefas, myId, meuStatusFilter, meusFiltros, openTask, removerTarefa } = useTasks();
 
@@ -129,16 +149,23 @@ export function MuralView() {
   const moverFn = useServerFn(moverItemMural);
   const removerItemFn = useServerFn(removerItemMural);
 
-  const { data, isLoading, error } = useQuery({ queryKey: ["mural"], queryFn: () => listFn() });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["mural", muralId],
+    queryFn: () => listFn({ data: { muralId } }),
+  });
 
-  const invalidar = () => qc.invalidateQueries({ queryKey: ["mural"] });
+  const invalidar = () => {
+    qc.invalidateQueries({ queryKey: ["mural", muralId] });
+    // As contagens dos cards da lista de murais mudam junto.
+    qc.invalidateQueries({ queryKey: ["murais"] });
+  };
   const falhou = (msg: string) => (e: unknown) => {
     toast.error(e instanceof Error ? e.message : msg);
     invalidar();
   };
 
   const criarQuadroMut = useMutation({
-    mutationFn: (v: { nome: string; cor: string }) => criarQuadroFn({ data: v }),
+    mutationFn: (v: { nome: string; cor: string }) => criarQuadroFn({ data: { ...v, muralId } }),
     onSuccess: invalidar,
     onError: falhou("Falha ao criar quadro"),
   });
@@ -285,7 +312,7 @@ export function MuralView() {
       const novos = arrayMove(quadros, de, para);
       const posicao = posicaoEntre(novos[para - 1]?.posicao, novos[para + 1]?.posicao);
       const id = ativoId.slice(2);
-      qc.setQueryData<MuralData>(["mural"], (d) =>
+      qc.setQueryData<MuralData>(["mural", muralId], (d) =>
         d ? { ...d, quadros: d.quadros.map((q) => (q.id === id ? { ...q, posicao } : q)) } : d,
       );
       atualizarQuadroMut.mutate({ id, posicao });
@@ -319,7 +346,7 @@ export function MuralView() {
       itemPorId.get(lista[idx + 1])?.posicao,
     );
     // Otimista: a tela já fica no lugar novo enquanto o servidor salva.
-    qc.setQueryData<MuralData>(["mural"], (d) =>
+    qc.setQueryData<MuralData>(["mural", muralId], (d) =>
       d
         ? {
             ...d,
@@ -364,6 +391,21 @@ export function MuralView() {
     );
   }
 
+  // Link de um mural que não existe mais (ou de outra pessoa).
+  if (!data?.mural) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-10 text-center">
+        <h2 className="text-base font-semibold">Mural não encontrado</h2>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Ele pode ter sido excluído, ou o link é de outra pessoa.
+        </p>
+        <Button variant="outline" onClick={onVoltar}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> Ver meus murais
+        </Button>
+      </div>
+    );
+  }
+
   const itemAtivo = ativo?.startsWith("i:") ? itemPorId.get(ativo.slice(2)) : undefined;
   const tarefaAtiva = itemAtivo ? tarefaPorId.get(itemAtivo.tarefa_id) : undefined;
   const quadroAtivo = ativo?.startsWith("q:")
@@ -372,80 +414,88 @@ export function MuralView() {
 
   return (
     <>
-      {quadros.length === 0 ? (
-        <div className="flex h-full flex-col items-center justify-center gap-3 p-10 text-center">
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
-            <StickyNote className="h-6 w-6" />
+      <div className="flex h-full flex-col">
+        <BarraDoMural
+          mural={data.mural}
+          quadros={quadros.length}
+          onVoltar={onVoltar}
+          onNovoQuadro={() => setQuadroDialog({ modo: "novo" })}
+        />
+        {quadros.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
+            <div className="grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
+              <StickyNote className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold">Este mural está vazio</h2>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Crie quadros para organizar suas tarefas e lembretes do seu jeito. Só você vê o seu
+                Mural.
+              </p>
+            </div>
+            <Button onClick={() => setQuadroDialog({ modo: "novo" })}>
+              <Plus className="mr-1.5 h-4 w-4" /> Novo quadro
+            </Button>
           </div>
-          <div>
-            <h2 className="text-base font-semibold">Seu Mural está vazio</h2>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Crie quadros para organizar suas tarefas e lembretes do seu jeito. Só você vê o seu
-              Mural.
-            </p>
-          </div>
-          <Button onClick={() => setQuadroDialog({ modo: "novo" })}>
-            <Plus className="mr-1.5 h-4 w-4" /> Novo quadro
-          </Button>
-        </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={collision}
-          onDragStart={onDragStart}
-          onDragOver={onDragOver}
-          onDragEnd={onDragEnd}
-          onDragCancel={fimDoDrag}
-        >
-          <div className="flex h-full gap-4 overflow-x-auto p-5">
-            <SortableContext
-              items={quadros.map((q) => `q:${q.id}`)}
-              strategy={horizontalListSortingStrategy}
-            >
-              {quadros.map((q) => (
-                <QuadroColuna
-                  key={q.id}
-                  quadro={q}
-                  itemIds={ordem[q.id] ?? []}
-                  itemPorId={itemPorId}
-                  tarefaPorId={tarefaPorId}
-                  onNovoLembrete={() => setLembreteEm(q.id)}
-                  onAdicionarTarefas={() => setAdicionandoEm(q.id)}
-                  onEditar={() => setQuadroDialog({ modo: "editar", quadro: q })}
-                  onExcluir={() => setExcluindoQuadro(q)}
-                  onAbrir={(t) => openTask(t.id)}
-                  onCompartilhar={(t) =>
-                    setCompartilhando({ tipo: "tarefa", tarefaId: t.id, titulo: t.titulo })
-                  }
-                  onRemover={(i) => removerItemMut.mutate(i.id)}
-                  onExcluirLembrete={(t) => setExcluindoLembrete(t)}
-                />
-              ))}
-            </SortableContext>
-            <button
-              onClick={() => setQuadroDialog({ modo: "novo" })}
-              className="flex h-12 w-72 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-80"
-            >
-              <Plus className="h-4 w-4" /> Novo quadro
-            </button>
-          </div>
-
-          <DragOverlay>
-            {tarefaAtiva ? (
-              <div className="w-72 rotate-2 cursor-grabbing sm:w-[18.5rem]">
-                <MuralCard tarefa={tarefaAtiva} />
-              </div>
-            ) : quadroAtivo ? (
-              <div
-                className="w-72 rotate-1 cursor-grabbing rounded-xl border border-border bg-[var(--surface-2)] px-3.5 py-2.5 text-sm font-semibold shadow-lg sm:w-80"
-                style={{ color: quadroAtivo.cor, borderTop: `3px solid ${quadroAtivo.cor}` }}
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collision}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDragEnd={onDragEnd}
+            onDragCancel={fimDoDrag}
+          >
+            <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto p-5">
+              <SortableContext
+                items={quadros.map((q) => `q:${q.id}`)}
+                strategy={horizontalListSortingStrategy}
               >
-                {quadroAtivo.nome}
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      )}
+                {quadros.map((q) => (
+                  <QuadroColuna
+                    key={q.id}
+                    quadro={q}
+                    itemIds={ordem[q.id] ?? []}
+                    itemPorId={itemPorId}
+                    tarefaPorId={tarefaPorId}
+                    onNovoLembrete={() => setLembreteEm(q.id)}
+                    onAdicionarTarefas={() => setAdicionandoEm(q.id)}
+                    onEditar={() => setQuadroDialog({ modo: "editar", quadro: q })}
+                    onExcluir={() => setExcluindoQuadro(q)}
+                    onAbrir={(t) => openTask(t.id)}
+                    onCompartilhar={(t) =>
+                      setCompartilhando({ tipo: "tarefa", tarefaId: t.id, titulo: t.titulo })
+                    }
+                    onRemover={(i) => removerItemMut.mutate(i.id)}
+                    onExcluirLembrete={(t) => setExcluindoLembrete(t)}
+                  />
+                ))}
+              </SortableContext>
+              <button
+                onClick={() => setQuadroDialog({ modo: "novo" })}
+                className="flex h-12 w-72 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-80"
+              >
+                <Plus className="h-4 w-4" /> Novo quadro
+              </button>
+            </div>
+
+            <DragOverlay>
+              {tarefaAtiva ? (
+                <div className="w-72 rotate-2 cursor-grabbing sm:w-[18.5rem]">
+                  <MuralCard tarefa={tarefaAtiva} />
+                </div>
+              ) : quadroAtivo ? (
+                <div
+                  className="w-72 rotate-1 cursor-grabbing rounded-xl border border-border bg-[var(--surface-2)] px-3.5 py-2.5 text-sm font-semibold shadow-lg sm:w-80"
+                  style={{ color: quadroAtivo.cor, borderTop: `3px solid ${quadroAtivo.cor}` }}
+                >
+                  {quadroAtivo.nome}
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        )}
+      </div>
 
       {quadroDialog && (
         <QuadroDialog
@@ -553,6 +603,50 @@ export function MuralView() {
         />
       )}
     </>
+  );
+}
+
+/* ---------------- Barra do mural aberto ---------------- */
+
+function BarraDoMural({
+  mural,
+  quadros,
+  onVoltar,
+  onNovoQuadro,
+}: {
+  mural: Mural;
+  quadros: number;
+  onVoltar: () => void;
+  onNovoQuadro: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
+      <button
+        onClick={onVoltar}
+        className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+        title="Voltar para os murais"
+        aria-label="Voltar para os murais"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </button>
+      <button
+        onClick={onVoltar}
+        className="text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        Murais
+      </button>
+      <span className="text-xs text-muted-foreground">/</span>
+      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: mural.cor }} />
+      <span className="truncate text-sm font-semibold" style={{ color: mural.cor }}>
+        {mural.nome}
+      </span>
+      <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+        · {quadros === 1 ? "1 quadro" : `${quadros} quadros`}
+      </span>
+      <Button size="sm" variant="outline" className="ml-auto shrink-0" onClick={onNovoQuadro}>
+        <Plus className="mr-1.5 h-4 w-4" /> Novo quadro
+      </Button>
+    </div>
   );
 }
 
@@ -890,7 +984,7 @@ function QuadroDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
-          <DialogDescription>Só você vê os quadros do seu Mural.</DialogDescription>
+          <DialogDescription>Só você vê os quadros deste mural.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <Input
@@ -954,8 +1048,8 @@ function AdicionarTarefasDialog({
   const [busca, setBusca] = useState("");
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
 
-  // Só tarefas da própria pessoa, ainda fora do Mural (uma tarefa fica em um
-  // quadro só) e que não foram para "Finalizados".
+  // Só tarefas da própria pessoa, ainda fora deste mural (uma tarefa fica em um
+  // quadro só dentro de cada mural) e que não foram para "Finalizados".
   const disponiveis = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return tarefas
@@ -984,7 +1078,7 @@ function AdicionarTarefasDialog({
         <DialogHeader>
           <DialogTitle>Adicionar tarefas{quadro ? ` em “${quadro.nome}”` : ""}</DialogTitle>
           <DialogDescription>
-            Suas tarefas que ainda não estão em nenhum quadro do Mural.
+            Suas tarefas que ainda não estão em nenhum quadro deste mural.
           </DialogDescription>
         </DialogHeader>
         <div className="relative">

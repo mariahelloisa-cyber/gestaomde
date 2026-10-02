@@ -13,8 +13,6 @@ CREATE INDEX IF NOT EXISTS idx_tarefas_criado_por ON public.tarefas(criado_por);
 CREATE INDEX IF NOT EXISTS idx_tarefas_tipo_escopo ON public.tarefas(tipo, escopo);
 -- Substituir a policy genérica por regras que respeitem privacidade de lembretes pessoais
 DROP POLICY IF EXISTS "Autenticados gerenciam tarefas" ON public.tarefas;
--- SELECT: tarefas e lembretes gerais são visíveis a todos os autenticados;
--- lembretes pessoais somente para quem os criou
 CREATE POLICY "Ver tarefas e lembretes permitidos"
 ON public.tarefas
 FOR SELECT

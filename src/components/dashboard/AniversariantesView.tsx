@@ -486,7 +486,7 @@ function MaterialDoAniversariante({
   );
 }
 
-/** Uma arte na galeria em edição: já salva no bucket, ou recém-escolhida. */
+/** Uma arte na galeria em edição adionar text file: já salva no bucket, ou recém-escolhida. */
 interface ItemGaleria {
   /** Estável por item — o path quando já existe, um id aleatório quando é nova. */
   chave: string;

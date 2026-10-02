@@ -599,6 +599,7 @@ export type Database = {
         Row: {
           criado_em: string
           id: string
+          mural_id: string
           posicao: number
           quadro_id: string
           tarefa_id: string
@@ -607,6 +608,7 @@ export type Database = {
         Insert: {
           criado_em?: string
           id?: string
+          mural_id?: string
           posicao?: number
           quadro_id: string
           tarefa_id: string
@@ -615,6 +617,7 @@ export type Database = {
         Update: {
           criado_em?: string
           id?: string
+          mural_id?: string
           posicao?: number
           quadro_id?: string
           tarefa_id?: string
@@ -649,6 +652,7 @@ export type Database = {
           cor: string
           criado_em: string
           id: string
+          mural_id: string
           nome: string
           posicao: number
           usuario_id: string
@@ -657,6 +661,7 @@ export type Database = {
           cor: string
           criado_em?: string
           id?: string
+          mural_id: string
           nome: string
           posicao?: number
           usuario_id?: string
@@ -665,13 +670,59 @@ export type Database = {
           cor?: string
           criado_em?: string
           id?: string
+          mural_id?: string
           nome?: string
           posicao?: number
           usuario_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "mural_quadros_mural_id_fkey"
+            columns: ["mural_id"]
+            isOneToOne: false
+            referencedRelation: "murais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "mural_quadros_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      murais: {
+        Row: {
+          cor: string
+          criado_em: string
+          descricao: string | null
+          id: string
+          nome: string
+          posicao: number
+          usuario_id: string
+        }
+        Insert: {
+          cor: string
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          posicao?: number
+          usuario_id?: string
+        }
+        Update: {
+          cor?: string
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          posicao?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "murais_usuario_id_fkey"
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "perfis_usuarios"
@@ -1052,6 +1103,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      excluir_mural: { Args: { _mural_id: string }; Returns: undefined }
       excluir_mural_quadro: { Args: { _quadro_id: string }; Returns: undefined }
       aniversariante_imagens_validas: { Args: { _imagens: Json }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
