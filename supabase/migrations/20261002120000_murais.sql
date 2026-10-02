@@ -24,9 +24,7 @@ CREATE TABLE public.mural_quadros (
     REFERENCES public.perfis_usuarios(id) ON DELETE CASCADE,
   nome text NOT NULL CHECK (char_length(btrim(nome)) BETWEEN 1 AND 80),
   cor text NOT NULL CHECK (cor ~ '^#[0-9A-Fa-f]{6}$'),
-  -- Ordem dos quadros na tela. double precision para reordenar pelo ponto
-  -- médio entre vizinhos sem precisar renumerar os outros.
-  posicao double precision NOT NULL DEFAULT 0,
+    posicao double precision NOT NULL DEFAULT 0,
   criado_em timestamptz NOT NULL DEFAULT now(),
   -- Alvo da FK composta de mural_itens (garante item e quadro no mesmo mural).
   CONSTRAINT mural_quadros_id_mural_key UNIQUE (id, mural_id)

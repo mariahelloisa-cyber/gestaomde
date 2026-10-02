@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gestaomde-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // @supabase/supabase-js precisa disso no Workers (etapa 3).
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  }
+
+  // Etapa 2 (OAuth) adiciona aqui:
+  //   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "<id>" }]
+  // Secrets via `wrangler secret put`, nunca neste arquivo:
+  //   SUPABASE_URL, SUPABASE_ANON_KEY, COOKIE_ENCRYPTION_KEY
+}

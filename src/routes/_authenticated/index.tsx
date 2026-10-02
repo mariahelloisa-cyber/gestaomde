@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { PrimarySidebar } from "@/components/layout/PrimarySidebar";
 import { SecondarySidebar } from "@/components/layout/SecondarySidebar";
 import { TarefasHeader } from "@/components/dashboard/TarefasHeader";
@@ -23,8 +21,6 @@ import { ProjectsView } from "@/components/dashboard/ProjectsView";
 import { OrganogramaView } from "@/components/dashboard/OrganogramaView";
 import { AniversariantesView } from "@/components/dashboard/AniversariantesView";
 import { AniversariantesPopupAutomatico } from "@/components/dashboard/AniversariantesPopup";
-import { ClientPortal } from "@/components/portal/ClientPortal";
-import { getMyPortalContext } from "@/lib/data.functions";
 import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -45,21 +41,9 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 function Index() {
-  const ctxFn = useServerFn(getMyPortalContext);
-  const { data: ctx, isLoading } = useQuery({ queryKey: ["portal-ctx"], queryFn: () => ctxFn() });
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Carregando...
-      </div>
-    );
-  }
-
-  if (ctx?.cargo === "Cliente") {
-    return <ClientPortal />;
-  }
-
+  // O acesso do cargo Cliente foi encerrado, então não há mais bifurcação aqui
+  // nem espera pelo getMyPortalContext: quem chega neste componente já passou
+  // pela checagem de perfil de _authenticated.tsx.
   return (
     <TasksProvider>
       <div className="flex h-screen w-full overflow-hidden bg-background">

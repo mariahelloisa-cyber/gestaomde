@@ -5,27 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, ShieldCheck, User, Building2 } from "lucide-react";
+import { Shield, ShieldCheck, User } from "lucide-react";
 import { toast } from "sonner";
 import { createInvites } from "@/lib/data.functions";
-import { useTasks } from "@/lib/tasks-store";
 
-type Cargo = "Membro" | "Admin" | "Supervisor" | "Cliente";
+type Cargo = "Membro" | "Admin" | "Supervisor";
 
 const DESCRICAO: Record<Cargo, string> = {
   Membro: "Pode acessar todos os itens públicos em seu Espaço de trabalho.",
   Admin: "Pode gerenciar membros, faturamento e configurações do Espaço.",
   Supervisor: "Acesso completo, igual ao Admin — gerencia tudo do Espaço.",
-  Cliente: "Acessa apenas o portal do cliente (boas-vindas).",
 };
 
 export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const [emails, setEmails] = useState("");
   const [cargo, setCargo] = useState<Cargo>("Membro");
-  const [clienteId, setClienteId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const createInvitesFn = useServerFn(createInvites);
-  const { clientes } = useTasks();
 
   const enviar = async () => {
     const lista = emails.split(/[\s,]+/).filter(Boolean);
@@ -33,13 +29,9 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       toast.error("Adicione pelo menos um e-mail.");
       return;
     }
-    if (cargo === "Cliente" && !clienteId) {
-      toast.error("Selecione a empresa cliente.");
-      return;
-    }
     setSubmitting(true);
     try {
-      const res = await createInvitesFn({ data: { emails: lista, cargo, cliente_id: cargo === "Cliente" ? clienteId : null } });
+      const res = await createInvitesFn({ data: { emails: lista, cargo } });
       const pessoas = res.count === 1 ? "pessoa" : "pessoas";
       if (res.emailsEnviados === res.count) {
         toast.success(`Convite enviado por e-mail para ${res.count} ${pessoas} como ${cargo}.`);
@@ -50,7 +42,6 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       }
       setEmails("");
       setCargo("Membro");
-      setClienteId("");
       onOpenChange(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao enviar convites.";
@@ -61,13 +52,7 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   };
 
   const Icon =
-    cargo === "Admin"
-      ? Shield
-      : cargo === "Supervisor"
-        ? ShieldCheck
-        : cargo === "Cliente"
-          ? Building2
-          : User;
+    cargo === "Admin" ? Shield : cargo === "Supervisor" ? ShieldCheck : User;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,29 +110,9 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                     <span>Supervisor</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="Cliente">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-3.5 w-3.5" />
-                    <span>Cliente</span>
-                  </div>
-                </SelectItem>
               </SelectContent>
             </Select>
           </div>
-
-          {cargo === "Cliente" && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Empresa cliente</Label>
-              <Select value={clienteId} onValueChange={setClienteId}>
-                <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
-                <SelectContent>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome_empresa} — {c.plano}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
 
         <DialogFooter>

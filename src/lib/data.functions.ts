@@ -618,10 +618,12 @@ export const deleteTarefa = createServerFn({ method: "POST" })
 
 /* ---------------- Convites (invite-only) ---------------- */
 
+// 'Cliente' saiu do enum junto com o encerramento do acesso desse cargo. O
+// valor continua existindo no enum cargo_usuario do banco, só não é mais
+// convidável.
 const convitesSchema = z.object({
   emails: z.array(z.string().trim().toLowerCase().email()).min(1).max(20),
-  cargo: z.enum(["Membro", "Admin", "Supervisor", "Cliente"]),
-  cliente_id: z.string().uuid().nullable().optional(),
+  cargo: z.enum(["Membro", "Admin", "Supervisor"]),
 });
 
 export const getMyRole = createServerFn({ method: "GET" })
@@ -641,27 +643,10 @@ export const getMyRole = createServerFn({ method: "GET" })
     };
   });
 
-/** Contexto do usuário logado para decidir se ele cai no portal do cliente ou no painel interno. */
-export const getMyPortalContext = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data, error } = await supabase
-      .from("perfis_usuarios")
-      .select("nome, email, cargo, cliente_id, clientes:cliente_id(nome_empresa, plano)")
-      .eq("id", userId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    const cli = data?.clientes as { nome_empresa: string; plano: string } | null;
-    return {
-      nome: data?.nome ?? "",
-      email: data?.email ?? "",
-      cargo: (data?.cargo ?? "Membro") as string,
-      cliente_id: data?.cliente_id ?? null,
-      cliente_nome: cli?.nome_empresa ?? null,
-      plano: cli?.plano ?? null,
-    };
-  });
+// getMyPortalContext foi removida junto com o portal do Cliente: existia só
+// para decidir entre o portal e o painel interno, e seus dois únicos
+// consumidores (ClientPortal.tsx e o branch em _authenticated/index.tsx) saíram
+// na mesma mudança. Para saber o cargo do usuário logado use getMyRole, acima.
 
 export const createInvites = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -674,7 +659,7 @@ export const createInvites = createServerFn({ method: "POST" })
       cargo: data.cargo,
       convidado_por: userId,
       status: "pendente",
-      cliente_id: data.cargo === "Cliente" ? (data.cliente_id ?? null) : null,
+      cliente_id: null,
     }));
 
     const { error } = await supabase.from("convites").upsert(rows, { onConflict: "email" });
