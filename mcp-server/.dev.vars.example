@@ -1,2 +1,15 @@
+# Copie para .dev.vars (gitignored) e preencha. Em produção, estes dois entram
+# por `wrangler secret put`, nunca no wrangler.jsonc.
+
+# Projeto Supabase do CRM.
 SUPABASE_URL="https://SEU-PROJETO.supabase.co"
-SUPABASE_ANON_KEY="sua-chave-anon"
+
+# Chave publishable (anon). A service role NAO entra neste Worker: o ponto e
+# que toda leitura passe pelo RLS com o JWT do usuario.
+SUPABASE_PUBLISHABLE_KEY="sua-chave-publishable"
+
+# SO EM DESENVOLVIMENTO. Libera redirect_uri de loopback (localhost,
+# 127.0.0.0/8, ::1) no /register, que e o que o MCP Inspector precisa para se
+# registrar. Em producao NAO crie este secret: com ele ligado, qualquer processo
+# local pode se registrar como cliente OAuth deste servidor.
+PERMITIR_REDIRECT_LOCAL="1"

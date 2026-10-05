@@ -7,7 +7,11 @@
     "deploy": "wrangler deploy --config wrangler.jsonc",
     "typecheck": "tsc --noEmit",
     "inspector": "npx @modelcontextprotocol/inspector",
-    "dry-run": "wrangler deploy --dry-run --config wrangler.jsonc"
+    "dry-run": "wrangler deploy --dry-run --config wrangler.jsonc",
+    "portabilidade": "esbuild scripts/portabilidade.mjs --bundle --format=esm --platform=node --outfile=.wrangler/tmp/portabilidade.mjs --log-level=error && node .wrangler/tmp/portabilidade.mjs",
+    "teste-formato": "esbuild scripts/formato.test.mjs --bundle --format=esm --platform=node --outfile=.wrangler/tmp/formato.test.mjs --log-level=error && node .wrangler/tmp/formato.test.mjs",
+    "verificar-producao": "node scripts/verificar-producao.mjs",
+    "verificar": "npm run typecheck && npm run teste-formato && npm run portabilidade && npm run dry-run"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^1.2.1",

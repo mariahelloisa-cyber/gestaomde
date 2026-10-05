@@ -53,8 +53,7 @@ BEGIN
   SELECT COUNT(*) INTO v_total FROM public.perfis_usuarios;
 
   IF v_total = 0 THEN
-    -- Bootstrap: primeiro usuário do sistema vira Admin
-    v_cargo := 'Admin';
+        v_cargo := 'Admin';
   ELSE
     SELECT * INTO v_convite
     FROM public.convites

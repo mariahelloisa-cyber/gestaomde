@@ -1,16 +1,65 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gestaomde-mcp",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-10-01",
-  // @supabase/supabase-js precisa disso no Workers (etapa 3).
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": {
-    "enabled": true
-  }
-
-  // Etapa 2 (OAuth) adiciona aqui:
-  //   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "<id>" }]
-  // Secrets via `wrangler secret put`, nunca neste arquivo:
-  //   SUPABASE_URL, SUPABASE_ANON_KEY, COOKIE_ENCRYPTION_KEY
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "gestaomde-mcp",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-01",
+	"workers_dev": true,
+	"preview_urls": false,
+	// @supabase/supabase-js precisa disso no Workers.
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	// Cron diário de coleta de lixo do KV (handler `scheduled` no src/index.ts).
+	//
+	// O CRON DA CLOUDFLARE É EM UTC, SEMPRE. Não existe campo de fuso.
+	//
+	//   06:17 UTC = 03:17 em Brasília (UTC-3).
+	//
+	// O Brasil extinguiu o horário de verão em 2019, então -3 é estável. Se um
+	// dia voltar, este horário vira 02:17 local — o que, para uma limpeza de
+	// madrugada, não muda nada.
+	//
+	// Por que 03:17 e não 03:00: minuto redondo é quando todo mundo agenda, e a
+	// Cloudflare enfileira. 17 pega uma janela vazia.
+	"triggers": {
+		"crons": [
+			"17 6 * * *"
+		]
+	},
+	// Exigido pelo @cloudflare/workers-oauth-provider: guarda clients, grants,
+	// codes e tokens (só hashes; os props vão criptografados). O rate limiting e
+	// o login pendente entre login e consentimento também moram aqui.
+	//
+	// DOIS namespaces, e a diferença importa:
+	//
+	//   "id"         -> o de PRODUÇÃO, usado por `wrangler deploy`.
+	//   "preview_id" -> o de dev/preview, usado por `wrangler dev`.
+	//
+	// Em `wrangler dev` local o KV é simulado em .wrangler/state e o valor do
+	// preview_id nem é consultado — por isso o placeholder abaixo funciona para
+	// desenvolver. Para PRODUÇÃO o "id" tem que ser um namespace real:
+	//
+	//   npx wrangler kv namespace create OAUTH_KV --config wrangler.jsonc
+	//
+	// O comando imprime o id; cole no "id" aqui, substituindo o placeholder.
+	// Com o placeholder, o deploy não serve para nada: o id não existe na conta,
+	// então ou o wrangler recusa no envio, ou o Worker sobe e esquece todo grant.
+	// `wrangler deploy --dry-run` NÃO pega isso, porque não fala com a conta.
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "7d284dfd93234ef9b8414845bdde2527",
+			"preview_id": "0000000000000000000000000000dev0"
+		}
+	]
+	// Secrets via `wrangler secret put`, nunca neste arquivo:
+	//   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
+	// Em dev eles vêm do .dev.vars (gitignored).
+	//
+	// PERMITIR_REDIRECT_LOCAL="1" existe SÓ no .dev.vars: é o que libera
+	// redirect_uri de loopback no /register para o MCP Inspector. Em produção
+	// esse secret não deve existir.
 }
