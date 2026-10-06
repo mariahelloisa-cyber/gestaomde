@@ -51,6 +51,7 @@ export type WorkspaceView =
   | { tipo: "clientes-inativos" }
   | { tipo: "configuracoes" }
   | { tipo: "demandas" }
+  | { tipo: "artes" }
   | { tipo: "links" }
   | { tipo: "finalizados" }
   | { tipo: "ideias" }

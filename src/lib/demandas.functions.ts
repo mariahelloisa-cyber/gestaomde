@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import { garantirResponsaveisAtivos } from "./responsaveis.server";
+import { camposParaExibir, statusParaSolicitante } from "./arte/tipos";
 
 /* ---------------- Public: criar demanda externa ---------------- */
 
@@ -85,6 +88,70 @@ export const createDemandaExterna = createServerFn({ method: "POST" })
     return { id: nova.id };
   });
 
+/** Dados de arte das demandas do próprio solicitante. Filtra por
+ * solicitante_user_id além do demanda_id: a leitura é com service role. */
+async function artesDoSolicitante(userId: string, demandaIds: string[]) {
+  const out = new Map<
+    string,
+    {
+      tipo: string;
+      status_solicitante: ReturnType<typeof statusParaSolicitante>;
+      projeto_nome: string | null;
+      briefing: string | null;
+      detalhes: ReturnType<typeof camposParaExibir>;
+      arquivos: Array<{ nome_arquivo: string; categoria: string; url: string | null }>;
+    }
+  >();
+  if (demandaIds.length === 0) return out;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { assinarLeitura } = await import("./arte.server");
+  const { data, error } = await supabaseAdmin
+    .from("art_requests")
+    .select(
+      "demanda_id, tipo, status, briefing, campos, largura_px, altura_px, medida_impressao, qtd_slides, data_comemorativa, projetos(nome), art_request_files(path, nome_arquivo, categoria, confirmado)",
+    )
+    .eq("solicitante_user_id", userId)
+    .in("demanda_id", demandaIds);
+  if (error) throw new Error(error.message);
+
+  const urls = await assinarLeitura(
+    (data ?? []).flatMap((a) => a.art_request_files.filter((f) => f.confirmado).map((f) => f.path)),
+  );
+  for (const a of data ?? []) {
+    if (!a.demanda_id) continue;
+    out.set(a.demanda_id, {
+      tipo: a.tipo,
+      status_solicitante: statusParaSolicitante(a.status),
+      projeto_nome: (a.projetos as { nome: string } | null)?.nome ?? null,
+      briefing: a.briefing,
+      detalhes: camposParaExibir(a),
+      arquivos: a.art_request_files
+        .filter((f) => f.confirmado)
+        .map((f) => ({
+          nome_arquivo: f.nome_arquivo,
+          categoria: f.categoria,
+          url: urls.get(f.path) ?? null,
+        })),
+    });
+  }
+  return out;
+}
+
+/** Demandas de arte têm fluxo próprio (aba Artes, arte.functions.ts). As ações
+ * de demanda geral recusam esse tipo para não criar tarefa sem atualizar o
+ * art_request nem apagar arquivos do bucket errado. */
+async function recusarSeArte(supabase: SupabaseClient<Database>, id: string) {
+  const { data } = await supabase
+    .from("demandas_externas")
+    .select("tipo")
+    .eq("id", id)
+    .maybeSingle();
+  if (data?.tipo === "arte") {
+    throw new Error("Demanda de arte: use a aba Artes para triar.");
+  }
+}
+
 /* ---------------- Auth externa: perfil e demandas da própria pessoa ---------------- */
 
 export const getMeuPerfilExterno = createServerFn({ method: "GET" })
@@ -108,13 +175,17 @@ export const listMinhasDemandas = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("demandas_externas")
       .select(
-        "id, descricao, prazo_sugerido, anexos, audio, video, status, justificativa_recusa, tarefa_id, criado_em, atualizado_em",
+        "id, tipo, descricao, prazo_sugerido, anexos, audio, video, status, justificativa_recusa, tarefa_id, criado_em, atualizado_em",
       )
       .eq("solicitante_user_id", context.userId)
       .order("criado_em", { ascending: false });
     if (error) throw new Error(error.message);
 
     const rows = data ?? [];
+    const artesPorDemanda = await artesDoSolicitante(
+      context.userId,
+      rows.filter((d) => d.tipo === "arte").map((d) => d.id),
+    );
     const tarefaIds = Array.from(
       new Set(rows.map((d) => d.tarefa_id).filter((id): id is string => !!id)),
     );
@@ -143,8 +214,11 @@ export const listMinhasDemandas = createServerFn({ method: "GET" })
           anexos,
           audio,
           video,
-          tarefa_status: tarefa?.status ?? null,
-          tarefa_concluido_em: tarefa?.concluido_em ?? null,
+          // Demanda de arte: o status mostrado vem de art_requests, nunca da
+          // tarefa — concluir a tarefa no Kanban não pode parecer entrega.
+          tarefa_status: d.tipo === "arte" ? null : (tarefa?.status ?? null),
+          tarefa_concluido_em: d.tipo === "arte" ? null : (tarefa?.concluido_em ?? null),
+          arte: artesPorDemanda.get(d.id) ?? null,
         };
       }),
     );
@@ -159,12 +233,14 @@ export const listDemandas = createServerFn({ method: "GET" })
 
     // Só demandas ainda pendentes: aceitas viram tarefa (e somem daqui, ficam só
     // na aba Tarefas) e recusadas são excluídas na hora — nunca aparecem aqui.
+    // Demandas de arte têm fila própria (aba Artes).
     const { data, error } = await supabase
       .from("demandas_externas")
       .select(
         "id, solicitante_nome, solicitante_email, setor, responsavel_id, descricao, prazo_sugerido, anexos, audio, video, status, tarefa_id, criado_em",
       )
       .eq("status", "pendente")
+      .eq("tipo", "geral")
       .order("criado_em", { ascending: false });
     if (error) throw new Error(error.message);
 
@@ -197,11 +273,12 @@ export const aceitarDemanda = createServerFn({ method: "POST" })
     const { data: dem, error: errDem } = await supabase
       .from("demandas_externas")
       .select(
-        "id, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id, audio, anexos, video",
+        "id, tipo, solicitante_nome, descricao, prazo_sugerido, responsavel_id, status, tarefa_id, audio, anexos, video",
       )
       .eq("id", data.id)
       .single();
     if (errDem || !dem) throw new Error(errDem?.message ?? "Demanda não encontrada");
+    if (dem.tipo === "arte") throw new Error("Demanda de arte: use a aba Artes para triar.");
     if (dem.status === "recusada") throw new Error("Esta demanda foi recusada.");
 
     // Se já foi aceita e a tarefa ainda existe, devolve a tarefa atual (idempotente).
@@ -274,6 +351,7 @@ export const recusarDemanda = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await recusarSeArte(supabase, data.id);
 
     const { data: dem } = await supabase
       .from("demandas_externas")
@@ -322,6 +400,7 @@ export const transferirDemanda = createServerFn({ method: "POST" })
   .inputValidator((input) => transferirSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await recusarSeArte(supabase, data.id);
     await garantirResponsaveisAtivos([data.novo_responsavel_id]);
     const { error } = await supabase
       .from("demandas_externas")

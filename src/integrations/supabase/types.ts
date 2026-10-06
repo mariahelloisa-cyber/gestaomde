@@ -502,6 +502,7 @@ export type Database = {
           largura_px: number
           max_geracoes: number
           medida_impressao: Json | null
+          projeto_id: string | null
           qtd_slides: number
           responsavel_id: string | null
           solicitante_user_id: string | null
@@ -526,6 +527,7 @@ export type Database = {
           largura_px: number
           max_geracoes?: number
           medida_impressao?: Json | null
+          projeto_id?: string | null
           qtd_slides?: number
           responsavel_id?: string | null
           solicitante_user_id?: string | null
@@ -550,6 +552,7 @@ export type Database = {
           largura_px?: number
           max_geracoes?: number
           medida_impressao?: Json | null
+          projeto_id?: string | null
           qtd_slides?: number
           responsavel_id?: string | null
           solicitante_user_id?: string | null
@@ -585,6 +588,13 @@ export type Database = {
             columns: ["job_aprovado_id"]
             isOneToOne: false
             referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_requests_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
             referencedColumns: ["id"]
           },
           {

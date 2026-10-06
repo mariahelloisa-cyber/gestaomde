@@ -14,6 +14,7 @@ import { FinancialView } from "@/components/dashboard/FinancialView";
 import { PlansView } from "@/components/dashboard/PlansView";
 import { DashboardView } from "@/components/dashboard/DashboardView";
 import { DemandasView } from "@/components/dashboard/DemandasView";
+import { ArtesView } from "@/components/dashboard/ArtesView";
 import { LinksView } from "@/components/dashboard/LinksView";
 import { FinalizadosView } from "@/components/dashboard/FinalizadosView";
 import { IdeiasView } from "@/components/dashboard/IdeiasView";
@@ -185,6 +186,14 @@ function WorkspaceContent() {
     return (
       <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
         <DemandasView />
+      </div>
+    );
+  }
+
+  if (workspace.tipo === "artes") {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[var(--surface-1)]">
+        <ArtesView />
       </div>
     );
   }

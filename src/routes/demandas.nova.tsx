@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { createDemandaExterna, getMeuPerfilExterno } from "@/lib/demandas.functions";
 import { MinhasDemandasView } from "@/components/portal/MinhasDemandasView";
+import { NovaArteForm } from "@/components/portal/NovaArteForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ import {
   LogOut,
   Mail,
   Mic,
+  Palette,
   Plus,
   Send,
   Square,
@@ -259,6 +261,7 @@ function CadastroForm({ onCriada }: { onCriada: () => void }) {
 
 function PortalLogado() {
   const [aba, setAba] = useState<"nova" | "minhas">("nova");
+  const [tipoDemanda, setTipoDemanda] = useState<"geral" | "arte">("geral");
   const perfilFn = useServerFn(getMeuPerfilExterno);
   const { data: perfil } = useQuery({
     queryKey: ["meu-perfil-externo"],
@@ -296,11 +299,37 @@ function PortalLogado() {
             <TabsTrigger value="minhas">Minhas demandas</TabsTrigger>
           </TabsList>
           <TabsContent value="nova">
-            <NovaDemandaForm
-              nomeInicial={perfil?.nome ?? ""}
-              emailInicial={perfil?.email ?? ""}
-              onEnviado={() => setAba("minhas")}
-            />
+            <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+              {(["geral", "arte"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTipoDemanda(t)}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-medium transition-colors",
+                    tipoDemanda === t
+                      ? "bg-background text-foreground shadow"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {t === "geral" ? (
+                    <FileText className="h-4 w-4" />
+                  ) : (
+                    <Palette className="h-4 w-4" />
+                  )}
+                  {t === "geral" ? "Demanda geral" : "Arte"}
+                </button>
+              ))}
+            </div>
+            {tipoDemanda === "geral" ? (
+              <NovaDemandaForm
+                nomeInicial={perfil?.nome ?? ""}
+                emailInicial={perfil?.email ?? ""}
+                onEnviado={() => setAba("minhas")}
+              />
+            ) : (
+              <NovaArteForm onEnviado={() => setAba("minhas")} />
+            )}
           </TabsContent>
           <TabsContent value="minhas">
             <MinhasDemandasView />

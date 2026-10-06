@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Inbox, Link2, CheckCheck, Lightbulb, Sun, Moon, FolderKanban, Network, Cake } from "lucide-react";
+import { Home, Calendar, Users, UserCircle, UserPlus, LogOut, Search, ChevronDown, Menu, Wallet, Settings, UserMinus, ClipboardList, Inbox, Link2, CheckCheck, Lightbulb, Sun, Moon, FolderKanban, Network, Cake, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/lib/tasks-store";
 import { InviteDialog } from "./InviteDialog";
@@ -38,6 +38,8 @@ export function PrimarySidebar() {
                     ? "Tarefas"
                     : workspace.tipo === "demandas"
                       ? "Demandas"
+                      : workspace.tipo === "artes"
+                        ? "Artes"
                       : workspace.tipo === "links"
                         ? "Links"
                         : workspace.tipo === "finalizados"
@@ -56,6 +58,8 @@ export function PrimarySidebar() {
     ...(isAdminLike
       ? [{ icon: Inbox, label: "Demandas", onClick: () => setWorkspace({ tipo: "demandas" as const }) }]
       : []),
+    // Artes: toda a equipe interna ativa (não só Admin/Supervisor).
+    { icon: Palette, label: "Artes", onClick: () => setWorkspace({ tipo: "artes" }) },
     { icon: Calendar, label: "Calendário", onClick: () => setWorkspace({ tipo: "calendario-geral" }) },
     { icon: UserCircle, label: "Membros", onClick: () => setWorkspace({ tipo: "membros" }) },
     { icon: Network, label: "Organograma", onClick: () => setWorkspace({ tipo: "organograma" }) },
@@ -70,7 +74,7 @@ export function PrimarySidebar() {
         )}
       >
         {/* Header / toggle */}
-        <div className={cn("flex items-center border-b border-sidebar-border py-2.5", expanded ? "gap-2 px-3" : "justify-center px-2")}>
+        <div className={cn("flex shrink-0 items-center border-b border-sidebar-border py-2.5", expanded ? "gap-2 px-3" : "justify-center px-2")}>
           <button
             onClick={() => setExpanded((v) => !v)}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -91,7 +95,7 @@ export function PrimarySidebar() {
 
         {/* Quick search */}
         {expanded && (
-          <div className="px-3 pt-3">
+          <div className="shrink-0 px-3 pt-3">
             <div className="flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-1.5">
               <Search className="h-3.5 w-3.5 text-sidebar-foreground/70" />
               <input
@@ -104,7 +108,9 @@ export function PrimarySidebar() {
         )}
 
         {/* Nav */}
-        <nav className={cn("flex-1 pt-3", expanded ? "px-2" : "px-2")}>
+        {/* min-h-0 + overflow: sem isso o flex-1 cresce além da tela e os
+            últimos itens (e o rodapé) ficam inalcançáveis em telas baixas. */}
+        <nav className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-2 pt-3", expanded ? "px-2" : "px-2")}>
           {items.map((item) => (
             <NavButton
               key={item.label}
@@ -204,7 +210,7 @@ export function PrimarySidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-sidebar-border p-2">
+        <div className="shrink-0 border-t border-sidebar-border p-2">
           <NavButton
             icon={theme === "dark" ? Sun : Moon}
             label={theme === "dark" ? "Modo claro" : "Modo escuro"}
