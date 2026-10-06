@@ -39,6 +39,237 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_generation_jobs: {
+        Row: {
+          art_request_id: string
+          cancelado_por: string | null
+          concluido_em: string | null
+          criado_em: string
+          custo_estimado_usd: number | null
+          erro: string | null
+          id: string
+          iniciado_em: string | null
+          instrucoes_ajuste: string | null
+          insumos: Json
+          lease_ate: string | null
+          max_tentativas: number
+          modelo: string | null
+          openai_response_id: string | null
+          origem: string
+          parametros: Json
+          prompt_final: string | null
+          prompt_versao: string | null
+          qtd_variacoes: number
+          solicitado_por: string | null
+          status: string
+          tentativas: number
+          uso: Json | null
+        }
+        Insert: {
+          art_request_id: string
+          cancelado_por?: string | null
+          concluido_em?: string | null
+          criado_em?: string
+          custo_estimado_usd?: number | null
+          erro?: string | null
+          id?: string
+          iniciado_em?: string | null
+          instrucoes_ajuste?: string | null
+          insumos?: Json
+          lease_ate?: string | null
+          max_tentativas?: number
+          modelo?: string | null
+          openai_response_id?: string | null
+          origem?: string
+          parametros?: Json
+          prompt_final?: string | null
+          prompt_versao?: string | null
+          qtd_variacoes?: number
+          solicitado_por?: string | null
+          status?: string
+          tentativas?: number
+          uso?: Json | null
+        }
+        Update: {
+          art_request_id?: string
+          cancelado_por?: string | null
+          concluido_em?: string | null
+          criado_em?: string
+          custo_estimado_usd?: number | null
+          erro?: string | null
+          id?: string
+          iniciado_em?: string | null
+          instrucoes_ajuste?: string | null
+          insumos?: Json
+          lease_ate?: string | null
+          max_tentativas?: number
+          modelo?: string | null
+          openai_response_id?: string | null
+          origem?: string
+          parametros?: Json
+          prompt_final?: string | null
+          prompt_versao?: string | null
+          qtd_variacoes?: number
+          solicitado_por?: string | null
+          status?: string
+          tentativas?: number
+          uso?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generation_jobs_art_request_id_fkey"
+            columns: ["art_request_id"]
+            isOneToOne: false
+            referencedRelation: "art_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generation_jobs_cancelado_por_fkey"
+            columns: ["cancelado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generation_jobs_solicitado_por_fkey"
+            columns: ["solicitado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_generation_reviews: {
+        Row: {
+          art_request_id: string
+          comentario: string | null
+          criado_em: string
+          decisao: string
+          generation_ids: string[]
+          id: string
+          job_id: string
+          revisor_id: string | null
+        }
+        Insert: {
+          art_request_id: string
+          comentario?: string | null
+          criado_em?: string
+          decisao: string
+          generation_ids?: string[]
+          id?: string
+          job_id: string
+          revisor_id?: string | null
+        }
+        Update: {
+          art_request_id?: string
+          comentario?: string | null
+          criado_em?: string
+          decisao?: string
+          generation_ids?: string[]
+          id?: string
+          job_id?: string
+          revisor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generation_reviews_art_request_id_fkey"
+            columns: ["art_request_id"]
+            isOneToOne: false
+            referencedRelation: "art_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generation_reviews_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generation_reviews_revisor_id_fkey"
+            columns: ["revisor_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_generations: {
+        Row: {
+          altura: number | null
+          art_request_id: string
+          criado_em: string
+          id: string
+          job_id: string
+          largura: number | null
+          mime_type: string
+          path: string
+          path_aprovado: string | null
+          revised_prompt: string | null
+          slide_index: number
+          status: string
+          status_alterado_em: string | null
+          status_alterado_por: string | null
+          variacao: number
+        }
+        Insert: {
+          altura?: number | null
+          art_request_id: string
+          criado_em?: string
+          id?: string
+          job_id: string
+          largura?: number | null
+          mime_type?: string
+          path: string
+          path_aprovado?: string | null
+          revised_prompt?: string | null
+          slide_index?: number
+          status?: string
+          status_alterado_em?: string | null
+          status_alterado_por?: string | null
+          variacao?: number
+        }
+        Update: {
+          altura?: number | null
+          art_request_id?: string
+          criado_em?: string
+          id?: string
+          job_id?: string
+          largura?: number | null
+          mime_type?: string
+          path?: string
+          path_aprovado?: string | null
+          revised_prompt?: string | null
+          slide_index?: number
+          status?: string
+          status_alterado_em?: string | null
+          status_alterado_por?: string | null
+          variacao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generations_art_request_id_fkey"
+            columns: ["art_request_id"]
+            isOneToOne: false
+            referencedRelation: "art_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generations_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generations_status_alterado_por_fkey"
+            columns: ["status_alterado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aniversariante_visualizacoes: {
         Row: {
           aniversariante_id: string
@@ -120,6 +351,309 @@ export type Database = {
           {
             foreignKeyName: "aniversariantes_publicado_por_fkey"
             columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      art_references: {
+        Row: {
+          altura: number | null
+          ativo: boolean
+          atualizado_em: string
+          categoria: string | null
+          cliente_id: string | null
+          criado_em: string
+          criado_por: string | null
+          descricao: string | null
+          id: string
+          largura: number | null
+          metadados: Json
+          mime_type: string
+          path: string
+          tags: string[]
+          tipos_arte: string[]
+          titulo: string
+        }
+        Insert: {
+          altura?: number | null
+          ativo?: boolean
+          atualizado_em?: string
+          categoria?: string | null
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          largura?: number | null
+          metadados?: Json
+          mime_type?: string
+          path: string
+          tags?: string[]
+          tipos_arte?: string[]
+          titulo: string
+        }
+        Update: {
+          altura?: number | null
+          ativo?: boolean
+          atualizado_em?: string
+          categoria?: string | null
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          largura?: number | null
+          metadados?: Json
+          mime_type?: string
+          path?: string
+          tags?: string[]
+          tipos_arte?: string[]
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "art_references_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_references_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      art_request_files: {
+        Row: {
+          altura: number | null
+          art_request_id: string
+          categoria: string
+          confirmado: boolean
+          confirmado_em: string | null
+          criado_em: string
+          enviado_por: string | null
+          id: string
+          largura: number | null
+          mime_type: string
+          nome_arquivo: string
+          path: string
+          tamanho_bytes: number | null
+        }
+        Insert: {
+          altura?: number | null
+          art_request_id: string
+          categoria: string
+          confirmado?: boolean
+          confirmado_em?: string | null
+          criado_em?: string
+          enviado_por?: string | null
+          id?: string
+          largura?: number | null
+          mime_type: string
+          nome_arquivo: string
+          path: string
+          tamanho_bytes?: number | null
+        }
+        Update: {
+          altura?: number | null
+          art_request_id?: string
+          categoria?: string
+          confirmado?: boolean
+          confirmado_em?: string | null
+          criado_em?: string
+          enviado_por?: string | null
+          id?: string
+          largura?: number | null
+          mime_type?: string
+          nome_arquivo?: string
+          path?: string
+          tamanho_bytes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "art_request_files_art_request_id_fkey"
+            columns: ["art_request_id"]
+            isOneToOne: false
+            referencedRelation: "art_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      art_requests: {
+        Row: {
+          altura_px: number
+          aprovado_em: string | null
+          aprovado_por: string | null
+          atualizado_em: string
+          briefing: string | null
+          campos: Json
+          cliente_id: string | null
+          criado_em: string
+          data_comemorativa: string | null
+          demanda_id: string | null
+          id: string
+          job_aprovado_id: string | null
+          largura_px: number
+          max_geracoes: number
+          medida_impressao: Json | null
+          qtd_slides: number
+          responsavel_id: string | null
+          solicitante_user_id: string | null
+          status: string
+          status_alterado_em: string | null
+          status_alterado_por: string | null
+          tipo: string
+        }
+        Insert: {
+          altura_px: number
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          atualizado_em?: string
+          briefing?: string | null
+          campos?: Json
+          cliente_id?: string | null
+          criado_em?: string
+          data_comemorativa?: string | null
+          demanda_id?: string | null
+          id?: string
+          job_aprovado_id?: string | null
+          largura_px: number
+          max_geracoes?: number
+          medida_impressao?: Json | null
+          qtd_slides?: number
+          responsavel_id?: string | null
+          solicitante_user_id?: string | null
+          status?: string
+          status_alterado_em?: string | null
+          status_alterado_por?: string | null
+          tipo: string
+        }
+        Update: {
+          altura_px?: number
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          atualizado_em?: string
+          briefing?: string | null
+          campos?: Json
+          cliente_id?: string | null
+          criado_em?: string
+          data_comemorativa?: string | null
+          demanda_id?: string | null
+          id?: string
+          job_aprovado_id?: string | null
+          largura_px?: number
+          max_geracoes?: number
+          medida_impressao?: Json | null
+          qtd_slides?: number
+          responsavel_id?: string | null
+          solicitante_user_id?: string | null
+          status?: string
+          status_alterado_em?: string | null
+          status_alterado_por?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "art_requests_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_requests_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_requests_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: true
+            referencedRelation: "demandas_externas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_requests_job_aprovado_fk"
+            columns: ["job_aprovado_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generation_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_requests_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_requests_status_alterado_por_fkey"
+            columns: ["status_alterado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_assets: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          cliente_id: string | null
+          criado_em: string
+          criado_por: string | null
+          id: string
+          mime_type: string | null
+          nome: string
+          path: string | null
+          tipo: string
+          valor: Json
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          mime_type?: string | null
+          nome: string
+          path?: string | null
+          tipo: string
+          valor?: Json
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          mime_type?: string | null
+          nome?: string
+          path?: string | null
+          tipo?: string
+          valor?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_assets_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_assets_criado_por_fkey"
+            columns: ["criado_por"]
             isOneToOne: false
             referencedRelation: "perfis_usuarios"
             referencedColumns: ["id"]
@@ -265,17 +799,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "compartilhamentos_tarefa_id_fkey"
-            columns: ["tarefa_id"]
-            isOneToOne: false
-            referencedRelation: "tarefas"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "compartilhamentos_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compartilhamentos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
             referencedColumns: ["id"]
           },
           {
@@ -286,10 +820,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "compartilhamentos_criado_por_fkey"
-            columns: ["criado_por"]
+            foreignKeyName: "compartilhamentos_tarefa_id_fkey"
+            columns: ["tarefa_id"]
             isOneToOne: false
-            referencedRelation: "perfis_usuarios"
+            referencedRelation: "tarefas"
             referencedColumns: ["id"]
           },
         ]
@@ -403,6 +937,7 @@ export type Database = {
           solicitante_user_id: string | null
           status: Database["public"]["Enums"]["status_demanda"]
           tarefa_id: string | null
+          tipo: string
           video: Json | null
         }
         Insert: {
@@ -421,6 +956,7 @@ export type Database = {
           solicitante_user_id?: string | null
           status?: Database["public"]["Enums"]["status_demanda"]
           tarefa_id?: string | null
+          tipo?: string
           video?: Json | null
         }
         Update: {
@@ -439,6 +975,7 @@ export type Database = {
           solicitante_user_id?: string | null
           status?: Database["public"]["Enums"]["status_demanda"]
           tarefa_id?: string | null
+          tipo?: string
           video?: Json | null
         }
         Relationships: []
@@ -595,6 +1132,44 @@ export type Database = {
           },
         ]
       }
+      murais: {
+        Row: {
+          cor: string
+          criado_em: string
+          descricao: string | null
+          id: string
+          nome: string
+          posicao: number
+          usuario_id: string
+        }
+        Insert: {
+          cor: string
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          posicao?: number
+          usuario_id?: string
+        }
+        Update: {
+          cor?: string
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          posicao?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "murais_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mural_itens: {
         Row: {
           criado_em: string
@@ -625,11 +1200,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "mural_itens_quadro_id_fkey"
-            columns: ["quadro_id"]
+            foreignKeyName: "mural_itens_quadro_fkey"
+            columns: ["quadro_id", "mural_id"]
             isOneToOne: false
             referencedRelation: "mural_quadros"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "mural_id"]
           },
           {
             foreignKeyName: "mural_itens_tarefa_id_fkey"
@@ -685,44 +1260,6 @@ export type Database = {
           },
           {
             foreignKeyName: "mural_quadros_usuario_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "perfis_usuarios"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      murais: {
-        Row: {
-          cor: string
-          criado_em: string
-          descricao: string | null
-          id: string
-          nome: string
-          posicao: number
-          usuario_id: string
-        }
-        Insert: {
-          cor: string
-          criado_em?: string
-          descricao?: string | null
-          id?: string
-          nome: string
-          posicao?: number
-          usuario_id?: string
-        }
-        Update: {
-          cor?: string
-          criado_em?: string
-          descricao?: string | null
-          id?: string
-          nome?: string
-          posicao?: number
-          usuario_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "murais_usuario_id_fkey"
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "perfis_usuarios"
@@ -1098,20 +1635,81 @@ export type Database = {
           },
         ]
       }
+      whatsapp_conversas: {
+        Row: {
+          conteudo: string
+          criado_em: string
+          id: string
+          mensagem_id: string | null
+          role: string
+          whatsapp_numero: string
+        }
+        Insert: {
+          conteudo: string
+          criado_em?: string
+          id?: string
+          mensagem_id?: string | null
+          role: string
+          whatsapp_numero: string
+        }
+        Update: {
+          conteudo?: string
+          criado_em?: string
+          id?: string
+          mensagem_id?: string | null
+          role?: string
+          whatsapp_numero?: string
+        }
+        Relationships: []
+      }
+      whatsapp_usuarios: {
+        Row: {
+          criado_em: string
+          id: string
+          usuario_id: string
+          whatsapp_numero: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          usuario_id: string
+          whatsapp_numero: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          usuario_id?: string
+          whatsapp_numero?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_usuarios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      aniversariante_imagens_validas: {
+        Args: { _imagens: Json }
+        Returns: boolean
+      }
+      eh_equipe_interna: { Args: { _user_id: string }; Returns: boolean }
       excluir_mural: { Args: { _mural_id: string }; Returns: undefined }
       excluir_mural_quadro: { Args: { _quadro_id: string }; Returns: undefined }
-      aniversariante_imagens_validas: { Args: { _imagens: Json }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       marcar_aniversariante_publicado: {
         Args: { _id: string; _publicado: boolean }
         Returns: undefined
       }
       mural_tarefa_permitida: { Args: { _tarefa_id: string }; Returns: boolean }
+      tarefa_de_admin: { Args: { _tarefa_id: string }; Returns: boolean }
       tem_perfil: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
@@ -1138,12 +1736,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1167,11 +1765,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1192,11 +1790,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1217,11 +1815,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1234,11 +1832,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
