@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import {
   BUCKET_MARCA,
   BUCKET_REFERENCIAS,
@@ -16,6 +18,9 @@ import {
   ASSET_DE_TEXTO,
   ASSET_EXIGE_EMPRESA,
   ASSET_TEXTO_MAX,
+  CAMPOS_ARQUIVO_FICHA,
+  FICHA_ARQUIVO_MIMES,
+  FICHA_CAMPO_UNICO,
   MARCA_MIMES,
   MOLDURA_MIMES,
   NIVEIS_CARGO,
@@ -245,118 +250,258 @@ export const removerReferencia = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/* ---------------- Marcas das empresas (por empresa) ---------------- */
+/* ---------------- Ficha de marca (por empresa) ----------------
+ * Uma ficha única por projeto na tela; por trás, uma linha de brand_assets
+ * por campo, com o tipo decidido aqui (nunca pelo usuário). Campos de valor
+ * único (paleta, slogan, briefing, briefing_documento, fonte, tags_marca)
+ * têm no máximo uma linha ativa por empresa — o índice
+ * brand_assets_ficha_unica_idx garante no banco. Logos e elementos visuais
+ * podem ser vários; cada logo é uma versão nomeada em `nome`. Gravações com
+ * o JWT do membro: RLS da equipe interna + autoria pelo trigger. */
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
-const salvarAssetSchema = z
-  .object({
-    projeto_id: projetoSchema,
-    tipo: z.enum(tiposAsset),
-    nome: z.string().trim().min(1, "Dê um nome ao asset.").max(200),
-    descricao: z.string().trim().max(2000).optional(),
-    tags: tagsSchema,
-    valor: z.record(z.unknown()).default({}),
-    arquivo: z
-      .object({ path: z.string().min(1).max(300), mime_type: z.enum(MARCA_MIMES) })
-      .nullable(),
-  })
-  .superRefine((d, ctx) => {
-    const erro = (message: string, path: string[] = ["valor"]) =>
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
-    if (JSON.stringify(d.valor).length > 12000) erro("Valor JSON grande demais.");
-    if (d.tipo === "moldura_cargo") {
-      // Moldura tem fluxo próprio (salvarModeloFotoPerfil), com o nível fixo.
-      erro("Molduras são cadastradas em Modelos de foto de perfil.", ["tipo"]);
-    } else if (d.tipo === "paleta") {
-      const cores = d.valor.cores;
-      if (
-        !Array.isArray(cores) ||
-        cores.length === 0 ||
-        !cores.every((c) => typeof c === "string" && HEX.test(c))
-      )
-        erro("Informe ao menos uma cor no formato #RRGGBB.");
-    } else if (d.tipo === "slogan" || d.tipo === "briefing") {
-      const texto = typeof d.valor.texto === "string" ? d.valor.texto.trim() : "";
-      if (!texto) erro(d.tipo === "slogan" ? "Escreva o slogan." : "Escreva o briefing.");
-      if (texto.length > ASSET_TEXTO_MAX[d.tipo]) erro("Texto longo demais.");
-      if (d.arquivo) erro("Este tipo de asset não tem arquivo.", ["arquivo"]);
-    } else if (!d.arquivo) {
-      erro("Envie o arquivo deste asset.", ["arquivo"]);
-    }
+type LinhaFicha = {
+  id: string;
+  tipo: string;
+  nome: string;
+  valor: unknown;
+  tags: string[];
+  path: string | null;
+  mime_type: string | null;
+};
+
+async function linhasDaFicha(
+  supabase: SupabaseClient<Database>,
+  projetoId: string,
+): Promise<LinhaFicha[]> {
+  const { data, error } = await supabase
+    .from("brand_assets")
+    .select("id, tipo, nome, valor, tags, path, mime_type")
+    .eq("projeto_id", projetoId)
+    .eq("ativo", true)
+    .order("criado_em");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as LinhaFicha[];
+}
+
+export const getFichaMarca = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ projeto_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await exigirEquipeInterna(userId);
+    const linhas = await linhasDaFicha(supabase, data.projeto_id);
+    const urls = await assinarLeitura(
+      linhas.flatMap((l) => (l.path ? [l.path] : [])),
+      BUCKET_MARCA,
+    );
+    const umDe = (tipo: string) => linhas.find((l) => l.tipo === tipo) ?? null;
+    const valorDe = (l: LinhaFicha | null) => (l?.valor ?? {}) as Record<string, unknown>;
+    const arquivoDe = (l: LinhaFicha | null) =>
+      l?.path
+        ? {
+            id: l.id,
+            nome: l.nome,
+            mime_type: l.mime_type,
+            url: urls.get(l.path) ?? null,
+          }
+        : null;
+
+    const fonte = umDe("fonte");
+    const cores = valorDe(umDe("paleta")).cores;
+    const varios = (tipo: string) =>
+      linhas
+        .filter((l) => l.tipo === tipo)
+        .map((l) => arquivoDe(l))
+        .filter((a): a is NonNullable<typeof a> => !!a);
+    return {
+      logos: varios("logo"),
+      paleta: Array.isArray(cores) ? cores.filter((c): c is string => typeof c === "string") : [],
+      tags: umDe("tags_marca")?.tags ?? [],
+      slogan: String(valorDe(umDe("slogan")).texto ?? ""),
+      briefing: String(valorDe(umDe("briefing")).texto ?? ""),
+      briefing_documento: arquivoDe(umDe("briefing_documento")),
+      fonte_nome: String(valorDe(fonte).nome_fonte ?? ""),
+      fonte_arquivo: arquivoDe(fonte),
+      elementos: varios("elemento_visual"),
+    };
   });
 
-export const salvarBrandAsset = createServerFn({ method: "POST" })
+const salvarTextosSchema = z.object({
+  projeto_id: z.string().uuid(),
+  paleta: z.array(z.string().regex(HEX, "Cor no formato #RRGGBB.")).max(20, "No máximo 20 cores."),
+  tags: z.array(z.string().trim().min(1).max(40)).max(30),
+  slogan: z.string().trim().max(ASSET_TEXTO_MAX.slogan),
+  briefing: z.string().trim().max(ASSET_TEXTO_MAX.briefing),
+  fonte_nome: z.string().trim().max(120),
+});
+
+/** Salva os campos de texto da ficha. Campo vazio = remove a linha (ou, na
+ * fonte com arquivo, só limpa o nome). */
+export const salvarTextosFicha = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => salvarAssetSchema.parse(input))
+  .inputValidator((input) => salvarTextosSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await exigirEquipeInterna(userId);
+    const projetoId = data.projeto_id;
+    const linhas = await linhasDaFicha(supabase, projetoId);
+
+    const gravar = async (
+      tipo: TipoAsset,
+      conteudo: { valor?: Record<string, unknown>; tags?: string[] } | null,
+    ) => {
+      const atual = linhas.find((l) => l.tipo === tipo);
+      if (!conteudo) {
+        if (!atual) return;
+        // Fonte com arquivo: tira só o nome, o arquivo continua.
+        const r =
+          tipo === "fonte" && atual.path
+            ? await supabase.from("brand_assets").update({ valor: {} }).eq("id", atual.id)
+            : await supabase.from("brand_assets").delete().eq("id", atual.id);
+        if (r.error) throw new Error(r.error.message);
+        return;
+      }
+      const campos = {
+        nome: TIPOS_ASSET[tipo],
+        ...(conteudo.valor ? { valor: conteudo.valor as never } : {}),
+        ...(conteudo.tags ? { tags: conteudo.tags } : {}),
+      };
+      const r = atual
+        ? await supabase.from("brand_assets").update(campos).eq("id", atual.id)
+        : await supabase.from("brand_assets").insert({ ...campos, projeto_id: projetoId, tipo });
+      if (r.error) throw new Error(r.error.message);
+    };
+
+    const cores = Array.from(new Set(data.paleta.map((c) => c.toUpperCase())));
+    await gravar("paleta", cores.length ? { valor: { cores } } : null);
+    await gravar("tags_marca", data.tags.length ? { tags: data.tags } : null);
+    await gravar("slogan", data.slogan ? { valor: { texto: data.slogan } } : null);
+    await gravar("briefing", data.briefing ? { valor: { texto: data.briefing } } : null);
+    await gravar("fonte", data.fonte_nome ? { valor: { nome_fonte: data.fonte_nome } } : null);
+    return { ok: true };
+  });
+
+const salvarArquivoSchema = z.object({
+  projeto_id: z.string().uuid(),
+  campo: z.enum(CAMPOS_ARQUIVO_FICHA),
+  path: z.string().min(1).max(300),
+  mime_type: z.string().min(1).max(100),
+  nome_arquivo: z.string().trim().min(1).max(200),
+  /** Logo: nome da versão ("Com nome", "Versão branca"…). Vira o `nome`. */
+  versao: z.string().trim().max(80).optional(),
+});
+
+/**
+ * Registra um arquivo da ficha já enviado por URL assinada. Briefing
+ * completo e fonte SUBSTITUEM o arquivo anterior (mesma linha; o objeto
+ * antigo é apagado depois). Logos e elementos visuais acumulam.
+ */
+export const salvarArquivoFicha = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => salvarArquivoSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await exigirEquipeInterna(userId);
 
-    const projetoId = projetoDoAsset(data.tipo, data.projeto_id);
-    let valor: Record<string, unknown> = data.valor;
-    if (ASSET_DE_TEXTO.has(data.tipo)) {
-      valor = { texto: String(data.valor.texto).trim() };
-    }
-
-    if (data.arquivo) {
-      const formato = new RegExp(
-        `^${projetoId ?? "_agencia"}/${data.tipo}/${UUID}\\.${EXTENSAO[data.arquivo.mime_type]}$`,
-      );
-      if (!formato.test(data.arquivo.path)) throw new Error("Arquivo inválido. Envie de novo.");
-      const { data: jaExiste } = await supabase
-        .from("brand_assets")
-        .select("id")
-        .eq("path", data.arquivo.path)
-        .maybeSingle();
-      if (jaExiste) throw new Error("Este arquivo já está cadastrado.");
-    }
+    const mimes = FICHA_ARQUIVO_MIMES[data.campo] as readonly string[];
+    if (!mimes.includes(data.mime_type)) throw new Error("Formato de arquivo não aceito aqui.");
+    const formato = new RegExp(
+      `^${data.projeto_id}/${data.campo}/${UUID}\\.${EXTENSAO[data.mime_type]}$`,
+    );
+    if (!formato.test(data.path)) throw new Error("Arquivo inválido. Envie de novo.");
+    const { data: jaExiste } = await supabase
+      .from("brand_assets")
+      .select("id")
+      .eq("path", data.path)
+      .maybeSingle();
+    if (jaExiste) throw new Error("Este arquivo já está cadastrado.");
 
     try {
-      if (data.arquivo) {
-        await verificarObjeto(
-          data.arquivo.path,
-          data.arquivo.mime_type,
-          MARCA_TAMANHO_MAX_MB * MB,
-          BUCKET_MARCA,
+      await verificarObjeto(data.path, data.mime_type, MARCA_TAMANHO_MAX_MB * MB, BUCKET_MARCA);
+      const nome = data.campo === "logo" ? data.versao || "Logo" : data.nome_arquivo;
+      const arquivo = { path: data.path, mime_type: data.mime_type, nome };
+
+      if (FICHA_CAMPO_UNICO.has(data.campo)) {
+        const atual = (await linhasDaFicha(supabase, data.projeto_id)).find(
+          (l) => l.tipo === data.campo,
         );
+        if (atual) {
+          const { error } = await supabase.from("brand_assets").update(arquivo).eq("id", atual.id);
+          if (error) throw new Error(error.message);
+          if (atual.path && atual.path !== data.path)
+            await removerObjetos([atual.path], BUCKET_MARCA);
+          return { id: atual.id };
+        }
       }
+
       const { data: novo, error } = await supabase
         .from("brand_assets")
-        .insert({
-          projeto_id: projetoId,
-          tipo: data.tipo,
-          nome: data.nome,
-          descricao: data.descricao || null,
-          tags: data.tags,
-          valor: valor as never,
-          path: data.arquivo?.path ?? null,
-          mime_type: data.arquivo?.mime_type ?? null,
-        })
+        .insert({ ...arquivo, projeto_id: data.projeto_id, tipo: data.campo })
         .select("id")
         .single();
-      if (error || !novo) throw new Error(error?.message ?? "Falha ao salvar o asset.");
+      if (error || !novo) throw new Error(error?.message ?? "Falha ao salvar o arquivo.");
       return { id: novo.id };
     } catch (e) {
-      if (data.arquivo) await removerObjetos([data.arquivo.path], BUCKET_MARCA);
+      await removerObjetos([data.path], BUCKET_MARCA);
       throw e;
     }
   });
 
-export const removerBrandAsset = createServerFn({ method: "POST" })
+/** Remove um arquivo da ficha. Na fonte com nome cadastrado, mantém a linha
+ * (o nome continua valendo) e só tira o arquivo. */
+export const removerArquivoFicha = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await exigirEquipeInterna(userId);
-    const { data: asset, error } = await supabase
+    const { data: linha, error } = await supabase
       .from("brand_assets")
-      .delete()
+      .select("id, tipo, valor, path, projeto_id")
       .eq("id", data.id)
-      .select("path")
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (asset?.path) await removerObjetos([asset.path], BUCKET_MARCA);
+    // Só itens da ficha de uma empresa; molduras têm fluxo próprio.
+    if (!linha || !linha.projeto_id || !linha.path) throw new Error("Arquivo não encontrado.");
+
+    const temNome = linha.tipo === "fonte" && Object.keys((linha.valor ?? {}) as object).length > 0;
+    const r = temNome
+      ? await supabase
+          .from("brand_assets")
+          .update({ path: null, mime_type: null })
+          .eq("id", linha.id)
+      : await supabase.from("brand_assets").delete().eq("id", linha.id);
+    if (r.error) throw new Error(r.error.message);
+    await removerObjetos([linha.path], BUCKET_MARCA);
+    return { ok: true };
+  });
+
+/** Renomeia a versão de uma logo ("Com nome", "Versão branca"…). */
+export const renomearLogoFicha = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        versao: z.string().trim().min(1, "Dê um nome à versão.").max(80),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await exigirEquipeInterna(userId);
+    const { data: linha, error } = await supabase
+      .from("brand_assets")
+      .update({ nome: data.versao })
+      .eq("id", data.id)
+      .eq("tipo", "logo")
+      .not("projeto_id", "is", null)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!linha) throw new Error("Logo não encontrada.");
     return { ok: true };
   });
 

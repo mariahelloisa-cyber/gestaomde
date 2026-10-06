@@ -12,7 +12,7 @@ import {
 } from "@/lib/arte/tipos";
 import { useTasks } from "@/lib/tasks-store";
 import { ArteProducao } from "./ArteProducao";
-import { AssetsMarca, ModelosFotoPerfil, ReferenciasArte } from "./AcervoArteView";
+import { FichaMarca, ModelosFotoPerfil, ReferenciasArte } from "./AcervoArteView";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -114,7 +114,7 @@ export function ArtesView() {
       </header>
       {secao === "solicitacoes" && <SolicitacoesArte />}
       {secao === "referencias" && <ReferenciasArte />}
-      {secao === "assets" && <AssetsMarca />}
+      {secao === "assets" && <FichaMarca />}
       {secao === "fotoPerfil" && <ModelosFotoPerfil />}
     </div>
   );

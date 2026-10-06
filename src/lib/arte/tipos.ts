@@ -435,6 +435,8 @@ export const TIPOS_ASSET = {
   paleta: "Cores / paleta",
   slogan: "Slogan",
   briefing: "Briefing da marca",
+  briefing_documento: "Briefing completo (PDF)",
+  tags_marca: "Tags da marca",
   fonte: "Fonte",
   elemento_visual: "Elemento visual",
   modelo_base: "Modelo",
@@ -450,14 +452,48 @@ export const ASSET_EXIGE_EMPRESA: ReadonlySet<TipoAsset> = new Set<TipoAsset>([
   "paleta",
   "slogan",
   "briefing",
+  "briefing_documento",
+  "tags_marca",
   "fonte",
   "elemento_visual",
 ]);
-/** Tipos da tela "Marcas das empresas". Moldura de cargo fica de fora: tem
- * seção própria ("Modelos de foto de perfil"), porque é da agência. */
-export const TIPOS_ASSET_MARCA = (Object.keys(TIPOS_ASSET) as TipoAsset[]).filter(
-  (t) => t !== "moldura_cargo",
-);
+
+/* ---------------- Ficha de marca (por empresa) ----------------
+ * A tela "Marcas das empresas" é uma ficha única; por trás, cada campo é uma
+ * linha em brand_assets com o tipo decidido pelo sistema. Campos de valor
+ * único têm no máximo uma linha ativa por empresa (índice
+ * brand_assets_ficha_unica_idx, 20261006180000/20261006190000). Logos e
+ * elementos visuais podem ser vários; cada logo é uma versão identificada
+ * por `nome` ("Com nome", "Sem nome", "Versão branca"…). */
+
+/** Campos da ficha que são arquivo, com os formatos aceitos. */
+export const FICHA_ARQUIVO_MIMES = {
+  logo: ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
+  briefing_documento: ["application/pdf"],
+  fonte: ["font/ttf", "font/otf", "font/woff", "font/woff2"],
+  elemento_visual: ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
+} as const;
+export type CampoArquivoFicha = keyof typeof FICHA_ARQUIVO_MIMES;
+export const CAMPOS_ARQUIVO_FICHA = Object.keys(FICHA_ARQUIVO_MIMES) as [
+  CampoArquivoFicha,
+  ...CampoArquivoFicha[],
+];
+/** Logos e elementos visuais podem ser vários; estes são um por empresa. */
+export const FICHA_CAMPO_UNICO: ReadonlySet<CampoArquivoFicha> = new Set<CampoArquivoFicha>([
+  "briefing_documento",
+  "fonte",
+]);
+
+/** Sugestões de nome para as versões de logo (o campo é livre). */
+export const SUGESTOES_VERSAO_LOGO = [
+  "Com nome",
+  "Sem nome",
+  "Versão branca",
+  "Versão preta",
+  "Horizontal",
+  "Vertical",
+  "Ícone",
+] as const;
 
 /** Moldura é sobreposição sobre a foto: precisa de transparência. */
 export const MOLDURA_MIMES = ["image/png", "image/webp", "image/svg+xml"] as const;
