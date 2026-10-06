@@ -4,16 +4,23 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { garantirResponsaveisAtivos } from "./responsaveis.server";
 import {
+  BUCKET_APROVADAS,
   BUCKET_ARQUIVOS,
+  BUCKET_GERADAS,
+  EXTENSAO,
   assinarLeitura,
   exigirEquipeInterna,
   pathArquivo,
   removerObjetos,
+  urlDeUpload,
   verificarObjeto,
 } from "./arte.server";
 import {
+  ARQUIVO_MIMES,
   ARQUIVO_TAMANHO_MAX,
+  ARTE_PRONTA_TAMANHO_MAX_MB,
   arquivoDeclaradoSchema,
+  slidesEsperados,
   camposDe,
   camposParaExibir,
   dimensoesDe,
@@ -29,23 +36,11 @@ import {
  * Portal externo
  * =========================================================================== */
 
-/** Molduras de foto de perfil cadastradas pela agência (brand_assets). */
-async function tiposDeCargo(): Promise<string[]> {
-  const { data, error } = await supabaseAdmin
-    .from("brand_assets")
-    .select("valor")
-    .eq("tipo", "moldura_cargo")
-    .is("cliente_id", null)
-    .eq("ativo", true);
-  if (error) throw new Error(error.message);
-  const nomes = (data ?? [])
-    .map((r) => String((r.valor as { tipo_cargo?: unknown } | null)?.tipo_cargo ?? "").trim())
-    .filter(Boolean);
-  return Array.from(new Set(nomes)).sort((a, b) => a.localeCompare(b, "pt-BR"));
-}
-
 /** Opções do formulário. Projetos só têm RLS para a equipe interna, então a
- * leitura é aqui no servidor e devolve o mínimo: id e nome. */
+ * leitura é aqui no servidor e devolve o mínimo: id e nome.
+ * O nível do cargo da foto de perfil é uma lista FIXA (NIVEIS_CARGO em
+ * arte/tipos.ts), não vem das molduras cadastradas: a moldura é insumo da
+ * geração, não define as opções do formulário. */
 export const listOpcoesFormularioArte = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
@@ -56,9 +51,6 @@ export const listOpcoesFormularioArte = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return {
       projetos: (data ?? []).map((p) => ({ id: p.id, nome: p.nome })),
-      // Vazio enquanto a lista oficial de cargos não for cadastrada; o
-      // formulário cai para texto livre nesse caso.
-      tiposCargo: await tiposDeCargo(),
     };
   });
 
@@ -92,18 +84,6 @@ export const iniciarSolicitacaoArte = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       if (!projeto) throw new Error("Empresa não encontrada. Recarregue a página.");
       projetoId = projeto.id;
-    }
-
-    if (dados.tipo === "foto_perfil") {
-      const cargos = await tiposDeCargo();
-      if (
-        cargos.length > 0 &&
-        !cargos.some(
-          (c) => c.toLocaleLowerCase("pt-BR") === dados.tipo_cargo.toLocaleLowerCase("pt-BR"),
-        )
-      ) {
-        throw new Error("Tipo de cargo inválido.");
-      }
     }
 
     // Um formulário aberto por vez: rascunhos anteriores (abas fechadas,
@@ -285,10 +265,12 @@ export const listArtes = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await exigirEquipeInterna(context.userId);
 
+    // ai_generation_jobs tem DUAS relações com art_requests (jobs.art_request_id
+    // e art_requests.job_aprovado_id): o embed precisa do nome da FK.
     const { data, error } = await context.supabase
       .from("art_requests")
       .select(
-        "id, tipo, status, briefing, campos, largura_px, altura_px, medida_impressao, qtd_slides, data_comemorativa, responsavel_id, status_alterado_por, status_alterado_em, criado_em, projetos(nome), demandas_externas(id, solicitante_nome, solicitante_email, justificativa_recusa, tarefa_id), art_request_files(id, path, categoria, nome_arquivo, mime_type, confirmado)",
+        "id, tipo, status, briefing, campos, largura_px, altura_px, medida_impressao, qtd_slides, data_comemorativa, responsavel_id, status_alterado_por, status_alterado_em, aprovado_por, aprovado_em, job_aprovado_id, criado_em, projetos(nome), demandas_externas(id, solicitante_nome, solicitante_email, justificativa_recusa, tarefa_id), art_request_files(id, path, categoria, nome_arquivo, mime_type, confirmado), ai_generation_jobs!ai_generation_jobs_art_request_id_fkey(id, origem, status, solicitado_por, criado_em, concluido_em, ai_generations(id, slide_index, variacao, path, path_aprovado, status)), ai_generation_reviews(id, job_id, decisao, comentario, revisor_id, criado_em)",
       )
       .neq("status", "rascunho")
       .order("criado_em", { ascending: false })
@@ -296,15 +278,58 @@ export const listArtes = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const rows = data ?? [];
-    const urls = await assinarLeitura(
-      rows.flatMap((r) => r.art_request_files.filter((f) => f.confirmado).map((f) => f.path)),
-    );
+    // Só as 3 versões mais recentes de cada arte vão com imagem assinada.
+    const versoesDe = (r: (typeof rows)[number]) =>
+      [...r.ai_generation_jobs]
+        .filter((j) => j.status === "concluido")
+        .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+        .slice(0, 3);
+    const gens = rows.flatMap((r) => versoesDe(r).flatMap((j) => j.ai_generations));
+    const [urls, urlsGeradas, urlsAprovadas] = await Promise.all([
+      assinarLeitura(
+        rows.flatMap((r) => r.art_request_files.filter((f) => f.confirmado).map((f) => f.path)),
+      ),
+      assinarLeitura(
+        gens.map((g) => g.path),
+        BUCKET_GERADAS,
+      ),
+      assinarLeitura(
+        gens.flatMap((g) => (g.path_aprovado ? [g.path_aprovado] : [])),
+        BUCKET_APROVADAS,
+      ),
+    ]);
 
     return rows.map((r) => ({
       id: r.id,
       tipo: r.tipo as TipoArte,
       status: r.status,
       briefing: r.briefing,
+      qtd_slides: r.qtd_slides,
+      aprovado_por: r.aprovado_por,
+      aprovado_em: r.aprovado_em,
+      job_aprovado_id: r.job_aprovado_id,
+      // Envio que ficou aberto (ex.: aba fechada no meio do upload) — a tela
+      // oferece descartar, senão o índice de job ativo bloqueia novos envios.
+      job_ativo_id:
+        r.ai_generation_jobs.find((j) => j.status === "na_fila" || j.status === "processando")
+          ?.id ?? null,
+      versoes: versoesDe(r).map((j) => ({
+        id: j.id,
+        origem: j.origem,
+        solicitado_por: j.solicitado_por,
+        concluido_em: j.concluido_em,
+        imagens: [...j.ai_generations]
+          .sort((a, b) => a.slide_index - b.slide_index || a.variacao - b.variacao)
+          .map((g) => ({
+            id: g.id,
+            slide_index: g.slide_index,
+            status: g.status,
+            url: g.path_aprovado
+              ? (urlsAprovadas.get(g.path_aprovado) ?? null)
+              : (urlsGeradas.get(g.path) ?? null),
+          })),
+      })),
+      revisoes: [...r.ai_generation_reviews].sort((a, b) => b.criado_em.localeCompare(a.criado_em)),
       detalhes: camposParaExibir(r),
       projeto_nome: (r.projetos as { nome: string } | null)?.nome ?? null,
       demanda: r.demandas_externas as {
@@ -474,4 +499,388 @@ export const recusarDemandaArte = createServerFn({ method: "POST" })
     await supabaseAdmin.from("art_request_files").delete().eq("art_request_id", art.id);
 
     return { ok: true };
+  });
+
+/* ===========================================================================
+ * Arte pronta enviada pela equipe (sem IA) -> revisão -> entrega
+ * =========================================================================== */
+
+const MB = 1024 * 1024;
+const STATUS_RECEBE_ARTE = ["aceita", "ajustes", "aguardando_revisao"];
+
+type ArquivoManual = { slide_index: number; path: string; mime_type: string };
+
+const iniciarManualSchema = z.object({
+  art_request_id: z.string().uuid(),
+  arquivos: z
+    .array(
+      z.object({
+        slide_index: z.number().int().min(1).max(10),
+        mime_type: z.enum(ARQUIVO_MIMES),
+        tamanho_bytes: z
+          .number()
+          .int()
+          .min(1)
+          .max(ARTE_PRONTA_TAMANHO_MAX_MB * MB),
+      }),
+    )
+    .min(1)
+    .max(10),
+});
+
+/**
+ * Passo 1: abre um job com origem 'manual' (gravado com service role — a
+ * coluna origem não é gravável pelo membro) e devolve uma URL assinada por
+ * slide. O job nasce 'processando', então o índice "um job ativo por demanda"
+ * da Fase 1 impede dois envios simultâneos para a mesma arte.
+ */
+export const iniciarUploadManual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => iniciarManualSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await exigirEquipeInterna(userId);
+
+    const { data: art, error } = await supabase
+      .from("art_requests")
+      .select("id, tipo, status, qtd_slides")
+      .eq("id", data.art_request_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!art) throw new Error("Demanda de arte não encontrada.");
+    if (!STATUS_RECEBE_ARTE.includes(art.status)) {
+      throw new Error("Só dá para enviar arte de uma demanda aceita.");
+    }
+
+    const esperado = slidesEsperados(art.tipo, art.qtd_slides);
+    const slides = new Set(data.arquivos.map((a) => a.slide_index));
+    const completo =
+      data.arquivos.length === esperado &&
+      slides.size === esperado &&
+      Array.from({ length: esperado }, (_, i) => i + 1).every((s) => slides.has(s));
+    if (!completo) {
+      throw new Error(
+        esperado === 1
+          ? "Envie uma imagem."
+          : `Envie uma imagem para cada um dos ${esperado} slides.`,
+      );
+    }
+
+    const jobId = crypto.randomUUID();
+    const arquivos: ArquivoManual[] = data.arquivos.map((a) => ({
+      slide_index: a.slide_index,
+      mime_type: a.mime_type,
+      path: `${art.id}/${jobId}/s${String(a.slide_index).padStart(2, "0")}-v1.${EXTENSAO[a.mime_type]}`,
+    }));
+
+    const { error: errJob } = await supabaseAdmin.from("ai_generation_jobs").insert({
+      id: jobId,
+      art_request_id: art.id,
+      origem: "manual",
+      status: "processando",
+      solicitado_por: userId,
+      iniciado_em: new Date().toISOString(),
+      insumos: { arquivos },
+    });
+    if (errJob) {
+      if (errJob.code === "23505") throw new Error("Já há um envio em andamento para esta arte.");
+      throw new Error(errJob.message);
+    }
+
+    try {
+      const uploads = await Promise.all(
+        arquivos.map(async (a) => ({
+          slide_index: a.slide_index,
+          ...(await urlDeUpload(BUCKET_GERADAS, a.path)),
+        })),
+      );
+      return { job_id: jobId, uploads };
+    } catch (e) {
+      await supabaseAdmin
+        .from("ai_generation_jobs")
+        .update({ status: "falhou", erro: "Falha ao preparar o upload." })
+        .eq("id", jobId);
+      throw e;
+    }
+  });
+
+async function jobManualAberto(jobId: string) {
+  const { data: job, error } = await supabaseAdmin
+    .from("ai_generation_jobs")
+    .select("id, art_request_id, origem, status, insumos")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!job || job.origem !== "manual" || job.status !== "processando") {
+    throw new Error("Envio não encontrado ou já encerrado.");
+  }
+  const lista = (job.insumos as { arquivos?: ArquivoManual[] } | null)?.arquivos ?? [];
+  const arquivos = lista.filter(
+    (a) => typeof a.path === "string" && a.path.startsWith(`${job.art_request_id}/${job.id}/`),
+  );
+  return { job, arquivos };
+}
+
+/** Passo 3: confere os arquivos, registra as imagens e põe a arte em revisão. */
+export const concluirUploadManual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ job_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await exigirEquipeInterna(userId);
+    const { job, arquivos } = await jobManualAberto(data.job_id);
+
+    try {
+      for (const a of arquivos) {
+        await verificarObjeto(a.path, a.mime_type, ARTE_PRONTA_TAMANHO_MAX_MB * MB, BUCKET_GERADAS);
+      }
+      const { error: errGen } = await supabaseAdmin.from("ai_generations").insert(
+        arquivos.map((a) => ({
+          job_id: job.id,
+          art_request_id: job.art_request_id,
+          slide_index: a.slide_index,
+          variacao: 1,
+          path: a.path,
+          mime_type: a.mime_type,
+        })),
+      );
+      if (errGen) throw new Error(errGen.message);
+
+      const { error: errJob } = await supabaseAdmin
+        .from("ai_generation_jobs")
+        .update({ status: "concluido" })
+        .eq("id", job.id);
+      if (errJob) throw new Error(errJob.message);
+    } catch (e) {
+      await supabaseAdmin
+        .from("ai_generation_jobs")
+        .update({
+          status: "falhou",
+          erro: e instanceof Error ? e.message.slice(0, 500) : "falhou",
+        })
+        .eq("id", job.id);
+      await removerObjetos(
+        arquivos.map((a) => a.path),
+        BUCKET_GERADAS,
+      );
+      throw e;
+    }
+
+    // Versão anterior ainda sem decisão deixa de valer: só a nova vai para revisão.
+    await supabaseAdmin
+      .from("ai_generations")
+      .update({ status: "descartada" })
+      .eq("art_request_id", job.art_request_id)
+      .eq("status", "gerada")
+      .neq("job_id", job.id);
+
+    // Com o JWT do membro: o trigger registra quem mandou para revisão.
+    const { error: errArt } = await supabase
+      .from("art_requests")
+      .update({ status: "aguardando_revisao" })
+      .eq("id", job.art_request_id)
+      .in("status", STATUS_RECEBE_ARTE);
+    if (errArt) throw new Error(errArt.message);
+
+    return { ok: true };
+  });
+
+/** Desfaz um envio interrompido (falha de upload no navegador). */
+export const cancelarUploadManual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ job_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await exigirEquipeInterna(context.userId);
+    const { job, arquivos } = await jobManualAberto(data.job_id);
+    await supabaseAdmin
+      .from("ai_generation_jobs")
+      .update({ status: "cancelado", cancelado_por: context.userId })
+      .eq("id", job.id);
+    await removerObjetos(
+      arquivos.map((a) => a.path),
+      BUCKET_GERADAS,
+    );
+    return { ok: true };
+  });
+
+const revisarSchema = z
+  .object({
+    job_id: z.string().uuid(),
+    decisao: z.enum(["aprovada", "ajuste_solicitado", "recusada"]),
+    comentario: z.string().trim().max(2000).optional(),
+  })
+  .refine((d) => d.decisao !== "ajuste_solicitado" || !!d.comentario, {
+    message: "Descreva o ajuste pedido.",
+    path: ["comentario"],
+  });
+
+/**
+ * Revisão por qualquer membro interno ativo.
+ *
+ * Aprovar: copia as imagens para approved-arts, registra a revisão, marca as
+ * imagens e conclui a arte. A conclusão passa pelo trigger da Fase 1, que só
+ * aceita 'concluida' com uma revisão 'aprovada' deste job — então mesmo um
+ * bug aqui não entrega arte sem aprovação.
+ *
+ * Pedir ajuste / recusar versão: registra a revisão e devolve a arte para
+ * 'ajustes' (a demanda continua; a equipe envia outra versão).
+ */
+export const revisarArte = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => revisarSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await exigirEquipeInterna(userId);
+
+    const { data: job, error } = await supabase
+      .from("ai_generation_jobs")
+      .select(
+        "id, art_request_id, status, ai_generations(id, slide_index, path, mime_type, status)",
+      )
+      .eq("id", data.job_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!job || job.status !== "concluido") throw new Error("Versão não encontrada.");
+
+    const { data: art, error: errArt } = await supabase
+      .from("art_requests")
+      .select("id, tipo, status, qtd_slides, demandas_externas(tarefa_id)")
+      .eq("id", job.art_request_id)
+      .maybeSingle();
+    if (errArt) throw new Error(errArt.message);
+    if (!art || art.status !== "aguardando_revisao") {
+      throw new Error("Esta arte não está aguardando revisão.");
+    }
+
+    const imagens = job.ai_generations.filter((g) => g.status === "gerada");
+    if (imagens.length === 0) throw new Error("Esta versão já foi revisada ou substituída.");
+    const ids = imagens.map((g) => g.id);
+
+    if (data.decisao !== "aprovada") {
+      const { error: errRev } = await supabase.from("ai_generation_reviews").insert({
+        art_request_id: art.id,
+        job_id: job.id,
+        decisao: data.decisao,
+        generation_ids: ids,
+        comentario: data.comentario || null,
+      });
+      if (errRev) throw new Error(errRev.message);
+      await supabase.from("ai_generations").update({ status: "recusada" }).in("id", ids);
+      const { error: errSt } = await supabase
+        .from("art_requests")
+        .update({ status: "ajustes" })
+        .eq("id", art.id)
+        .eq("status", "aguardando_revisao");
+      if (errSt) throw new Error(errSt.message);
+      return { ok: true };
+    }
+
+    const esperado = slidesEsperados(art.tipo, art.qtd_slides);
+    const slides = new Set(imagens.map((g) => g.slide_index));
+    if (imagens.length !== esperado || slides.size !== esperado) {
+      throw new Error("Esta versão está incompleta: falta imagem de algum slide.");
+    }
+
+    // 1) Cópia para approved-arts. Remove antes para o retry ser idempotente.
+    for (const g of imagens) {
+      const destino = `${art.id}/${g.id}.${EXTENSAO[g.mime_type] ?? "png"}`;
+      await supabaseAdmin.storage.from(BUCKET_APROVADAS).remove([destino]);
+      const { error: errCopia } = await supabaseAdmin.storage
+        .from(BUCKET_GERADAS)
+        .copy(g.path, destino, { destinationBucket: BUCKET_APROVADAS });
+      if (errCopia) throw new Error(`Falha ao copiar a arte aprovada: ${errCopia.message}`);
+      // path_aprovado não é gravável pelo membro (GRANT da Fase 1).
+      const { error: errPath } = await supabaseAdmin
+        .from("ai_generations")
+        .update({ path_aprovado: destino })
+        .eq("id", g.id);
+      if (errPath) throw new Error(errPath.message);
+    }
+
+    // 2) Revisão e status, com o JWT do membro (autoria registrada por trigger).
+    const { error: errRev } = await supabase.from("ai_generation_reviews").insert({
+      art_request_id: art.id,
+      job_id: job.id,
+      decisao: "aprovada",
+      generation_ids: ids,
+      comentario: data.comentario || null,
+    });
+    if (errRev) throw new Error(errRev.message);
+
+    const { error: errGen } = await supabase
+      .from("ai_generations")
+      .update({ status: "aprovada" })
+      .in("id", ids);
+    if (errGen) throw new Error(errGen.message);
+
+    const { error: errFim } = await supabase
+      .from("art_requests")
+      .update({ job_aprovado_id: job.id, status: "concluida" })
+      .eq("id", art.id)
+      .eq("status", "aguardando_revisao");
+    if (errFim) throw new Error(errFim.message);
+
+    // 3) A tarefa criada no aceite acompanha a entrega. Não bloqueia a
+    //    aprovação se a RLS de tarefas não deixar este membro editá-la.
+    const tarefaId = (art.demandas_externas as { tarefa_id: string | null } | null)?.tarefa_id;
+    if (tarefaId) {
+      const { error: errTar } = await supabase
+        .from("tarefas")
+        .update({ status: "Concluído" })
+        .eq("id", tarefaId);
+      if (errTar) console.error("[arte] não concluiu a tarefa", tarefaId, errTar.message);
+    }
+
+    return { ok: true };
+  });
+
+/**
+ * Download para o SOLICITANTE: só da própria demanda, só com a arte
+ * 'concluida', só os arquivos aprovados. Links de 5 minutos, gerados na hora
+ * do clique — nunca vão na listagem.
+ */
+export const linksArteAprovada = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ demanda_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: art, error } = await supabaseAdmin
+      .from("art_requests")
+      .select("id, tipo, status, job_aprovado_id")
+      .eq("demanda_id", data.demanda_id)
+      .eq("solicitante_user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!art || art.status !== "concluida" || !art.job_aprovado_id) {
+      throw new Error("A arte ainda não está disponível.");
+    }
+
+    const { data: gens, error: errGen } = await supabaseAdmin
+      .from("ai_generations")
+      .select("slide_index, path_aprovado, mime_type")
+      .eq("job_id", art.job_aprovado_id)
+      .eq("status", "aprovada")
+      .not("path_aprovado", "is", null)
+      .order("slide_index");
+    if (errGen) throw new Error(errGen.message);
+    if (!gens || gens.length === 0) throw new Error("A arte ainda não está disponível.");
+
+    const base = rotuloTipo(art.tipo)
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .toLowerCase();
+    return Promise.all(
+      gens.map(async (g) => {
+        const ext = EXTENSAO[g.mime_type] ?? "png";
+        const nome =
+          gens.length > 1
+            ? `${base}-slide-${String(g.slide_index).padStart(2, "0")}.${ext}`
+            : `${base}.${ext}`;
+        const { data: signed, error: errUrl } = await supabaseAdmin.storage
+          .from(BUCKET_APROVADAS)
+          .createSignedUrl(g.path_aprovado!, 60 * 5, { download: nome });
+        if (errUrl || !signed) throw new Error("Falha ao gerar o link de download.");
+        return { nome, url: signed.signedUrl };
+      }),
+    );
   });

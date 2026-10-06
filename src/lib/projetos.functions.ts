@@ -82,6 +82,13 @@ export const deleteProjeto = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { error } = await supabase.from("projetos").delete().eq("id", data.id);
+    // brand_assets.projeto_id é ON DELETE RESTRICT: a marca de uma empresa
+    // nunca vira global, então ela precisa ser removida antes (aba Artes).
+    if (error?.code === "23503" && error.message.includes("brand_assets")) {
+      throw new Error(
+        "Este projeto tem assets de marca cadastrados (logo, cores, slogan…). Remova-os em Artes › Marcas das empresas antes de excluir.",
+      );
+    }
     if (error) throw new Error(error.message);
     return { ok: true };
   });

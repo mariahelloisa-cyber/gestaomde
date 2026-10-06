@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Calendar, FileText, Inbox, Mic, Palette, Video } from "lucide-react";
+import { toast } from "sonner";
+import { Calendar, Download, FileText, Inbox, Loader2, Mic, Palette, Video } from "lucide-react";
 import { listMinhasDemandas } from "@/lib/demandas.functions";
+import { linksArteAprovada } from "@/lib/arte.functions";
 import { rotuloTipo } from "@/lib/arte/tipos";
+import { Button } from "@/components/ui/button";
 import { dataCurta, statusPillStyle, type Status } from "@/lib/mock-data";
 
 type MinhaDemanda = Awaited<ReturnType<typeof listMinhasDemandas>>[number];
@@ -56,6 +60,59 @@ function badgeFor(d: MinhaDemanda): {
   }
   // "pendente" ou "transferida": ainda não foi triada pela equipe.
   return { label: "Em análise", style: { backgroundColor: "#F59E0B", color: "#fff" } };
+}
+
+/** Download da arte aprovada. Os links (5 min) são pedidos ao servidor só no
+ * clique: ele confere dono e status 'concluida' antes de assinar. */
+function BaixarArte({ demandaId }: { demandaId: string }) {
+  const linksFn = useServerFn(linksArteAprovada);
+  const [links, setLinks] = useState<Array<{ nome: string; url: string }> | null>(null);
+  const [carregando, setCarregando] = useState(false);
+
+  const baixar = async () => {
+    setCarregando(true);
+    try {
+      const r = await linksFn({ data: { demanda_id: demandaId } });
+      if (r.length === 1) {
+        window.location.href = r[0].url;
+      } else {
+        setLinks(r);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível baixar a arte.");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 pt-1">
+      <Button size="sm" onClick={baixar} disabled={carregando}>
+        {carregando ? (
+          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="mr-1.5 h-4 w-4" />
+        )}
+        Baixar arte
+      </Button>
+      {links && (
+        <ul className="space-y-1">
+          {links.map((l) => (
+            <li key={l.nome}>
+              <a
+                href={l.url}
+                className="flex items-center gap-2 rounded-md border border-border bg-gray-50 px-3 py-2 text-sm text-black hover:bg-gray-100"
+              >
+                <Download className="h-4 w-4 text-gray-500" />
+                <span className="truncate">{l.nome}</span>
+              </a>
+            </li>
+          ))}
+          <li className="text-[11px] text-gray-500">Os links valem por 5 minutos.</li>
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function MinhasDemandasView() {
@@ -135,6 +192,7 @@ export function MinhasDemandasView() {
                     A arte fica disponível aqui depois de aprovada pela equipe.
                   </p>
                 )}
+                {d.arte.status_solicitante === "Concluída" && <BaixarArte demandaId={d.id} />}
                 {d.arte.arquivos.length > 0 && (
                   <ul className="space-y-1 pt-1">
                     {d.arte.arquivos.map((a, i) => (

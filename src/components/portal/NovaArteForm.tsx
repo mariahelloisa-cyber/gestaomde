@@ -28,6 +28,8 @@ import {
   ARQUIVO_TAMANHO_MAX_MB,
   CARROSSEL_SLIDES_MAX,
   CARROSSEL_SLIDES_MIN,
+  NIVEIS_CARGO,
+  NIVEL_CARGO_CONFIG,
   PANFLETO_MM_MAX,
   PANFLETO_MM_MIN,
   TIPOS_ARTE,
@@ -35,6 +37,7 @@ import {
   solicitacaoArteSchema,
   validarArquivos,
   type CategoriaArquivo,
+  type NivelCargo,
   type TipoArte,
 } from "@/lib/arte/tipos";
 import { Button } from "@/components/ui/button";
@@ -92,7 +95,7 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
   const [briefing, setBriefing] = useState("");
   const [nome, setNome] = useState("");
   const [cargo, setCargo] = useState("");
-  const [tipoCargo, setTipoCargo] = useState("");
+  const [nivelCargo, setNivelCargo] = useState<NivelCargo | "">("");
   const [tamanho, setTamanho] = useState<"padrao" | "personalizado">("padrao");
   const [larguraMm, setLarguraMm] = useState("");
   const [alturaMm, setAlturaMm] = useState("");
@@ -148,7 +151,7 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
     const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
     switch (tipo) {
       case "foto_perfil":
-        return { tipo, nome, cargo, tipo_cargo: tipoCargo };
+        return { tipo, nome, nivel_cargo: nivelCargo, cargo };
       case "panfleto":
         return {
           tipo,
@@ -173,7 +176,7 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
     tipo,
     nome,
     cargo,
-    tipoCargo,
+    nivelCargo,
     projetoId,
     briefing,
     tamanho,
@@ -193,7 +196,7 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
     setBriefing("");
     setNome("");
     setCargo("");
-    setTipoCargo("");
+    setNivelCargo("");
     setTamanho("padrao");
     setLarguraMm("");
     setAlturaMm("");
@@ -333,17 +336,37 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
 
           {tipo === "foto_perfil" && (
             <Campo icon={User}>
+              <div className="space-y-1.5">
+                <Label htmlFor="arte-nome" className="font-semibold">
+                  Nome *
+                </Label>
+                <Input
+                  id="arte-nome"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  maxLength={120}
+                  placeholder="Como deve aparecer na foto"
+                />
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="arte-nome" className="font-semibold">
-                    Nome *
-                  </Label>
-                  <Input
-                    id="arte-nome"
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    maxLength={120}
-                  />
+                  <Label className="font-semibold">Nível do cargo *</Label>
+                  <Select
+                    value={nivelCargo}
+                    onValueChange={(v) => setNivelCargo(v as NivelCargo)}
+                    disabled={enviando}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Escolha o nível" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NIVEIS_CARGO.map((n) => (
+                        <SelectItem key={n} value={n}>
+                          {NIVEL_CARGO_CONFIG[n].rotulo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="arte-cargo" className="font-semibold">
@@ -354,33 +377,14 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
                     value={cargo}
                     onChange={(e) => setCargo(e.target.value)}
                     maxLength={120}
+                    placeholder="Ex: Gerente Comercial"
                   />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label className="font-semibold">Tipo de cargo *</Label>
-                {opcoes.tiposCargo.length > 0 ? (
-                  <Select value={tipoCargo} onValueChange={setTipoCargo} disabled={enviando}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Escolha o tipo de cargo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {opcoes.tiposCargo.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    value={tipoCargo}
-                    onChange={(e) => setTipoCargo(e.target.value)}
-                    maxLength={60}
-                    placeholder="Ex: diretoria, coordenação"
-                  />
-                )}
-              </div>
+              <p className="text-xs text-muted-foreground">
+                O modelo é sempre o mesmo: a moldura segue o nível escolhido e o cargo aparece
+                abaixo do nome.
+              </p>
             </Campo>
           )}
 

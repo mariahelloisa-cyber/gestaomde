@@ -115,6 +115,37 @@ export const TIPOS_CONFIG: Record<TipoArte, TipoConfig> = {
   },
 };
 
+/** Tipos que usam referências globais. Foto de perfil fica de fora: é sempre
+ * o mesmo modelo (muda só a moldura pelo nível), não se inspira em referência. */
+export const TIPOS_ARTE_REFERENCIA = TIPOS_ARTE.filter(
+  (t): t is Exclude<TipoArte, "foto_perfil"> => t !== "foto_perfil",
+);
+
+/* ---------------- Foto de perfil: nível do cargo -> moldura ----------------
+ * Foto de perfil NÃO é arte generativa: é sempre o mesmo modelo. Muda só a
+ * moldura (pelo nível) e os textos (nome e cargo). A geração futura compõe
+ * foto + moldura + textos em 1080x1080, sem reinventar layout nem mexer no
+ * rosto. O nível é escolhido pelo solicitante — nunca inferido do cargo. */
+
+export const NIVEIS_CARGO = ["diretor", "supervisor", "gerente", "colaborador"] as const;
+export type NivelCargo = (typeof NIVEIS_CARGO)[number];
+
+export const NIVEL_CARGO_CONFIG: Record<
+  NivelCargo,
+  { rotulo: string; moldura: string; corPadrao: string }
+> = {
+  diretor: { rotulo: "Diretor", moldura: "preta", corPadrao: "#000000" },
+  supervisor: { rotulo: "Supervisor", moldura: "vermelha", corPadrao: "#C62828" },
+  gerente: { rotulo: "Gerente", moldura: "dourada", corPadrao: "#C9A227" },
+  colaborador: { rotulo: "Colaborador", moldura: "branca", corPadrao: "#FFFFFF" },
+};
+
+export function rotuloNivel(nivel: string): string {
+  return (
+    (NIVEL_CARGO_CONFIG as Record<string, { rotulo: string } | undefined>)[nivel]?.rotulo ?? nivel
+  );
+}
+
 export const CATEGORIA_ROTULO: Record<CategoriaArquivo, string> = {
   foto_pessoa: "Foto da pessoa",
   referencia: "Referência",
@@ -139,8 +170,10 @@ export const solicitacaoArteSchema = z
     z.object({
       tipo: z.literal("foto_perfil"),
       nome: texto(120, "o nome"),
+      nivel_cargo: z.enum(NIVEIS_CARGO, {
+        errorMap: () => ({ message: "Escolha o nível do cargo." }),
+      }),
       cargo: texto(120, "o cargo"),
-      tipo_cargo: texto(60, "o tipo de cargo"),
     }),
     z.object({
       tipo: z.literal("panfleto"),
@@ -264,7 +297,7 @@ export function dimensoesDe(d: SolicitacaoArte): {
 export function camposDe(d: SolicitacaoArte): Record<string, string | number> {
   switch (d.tipo) {
     case "foto_perfil":
-      return { nome: d.nome, cargo: d.cargo, tipo_cargo: d.tipo_cargo };
+      return { nome: d.nome, nivel_cargo: d.nivel_cargo, cargo: d.cargo };
     case "panfleto":
       return { tamanho: d.tamanho };
     case "feed_data_comemorativa":
@@ -280,7 +313,9 @@ export function camposDe(d: SolicitacaoArte): Record<string, string | number> {
 
 const CAMPO_ROTULO: Record<string, string> = {
   nome: "Nome",
+  nivel_cargo: "Nível do cargo",
   cargo: "Cargo",
+  // Formato antigo (antes do select fixo de nível); mantido só para exibir.
   tipo_cargo: "Tipo de cargo",
   descricao_data: "Data comemorativa",
   funcao: "Função",
@@ -302,6 +337,16 @@ export function camposParaExibir(row: {
   const campos = (row.campos ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(campos)) {
     if (k === "tamanho" || v == null || v === "") continue;
+    if (k === "nivel_cargo") {
+      const nivel = String(v);
+      const moldura = (NIVEL_CARGO_CONFIG as Record<string, { moldura: string } | undefined>)[nivel]
+        ?.moldura;
+      out.push({
+        rotulo: CAMPO_ROTULO[k],
+        valor: `${rotuloNivel(nivel)}${moldura ? ` (moldura ${moldura})` : ""}`,
+      });
+      continue;
+    }
     out.push({ rotulo: CAMPO_ROTULO[k] ?? k, valor: String(v) });
   }
   if (row.data_comemorativa) {
@@ -362,4 +407,80 @@ export function statusParaSolicitante(
 
 export function rotuloTipo(tipo: string): string {
   return (TIPOS_CONFIG as Record<string, TipoConfig | undefined>)[tipo]?.rotulo ?? tipo;
+}
+
+/* ---------------- Acervo (referências e assets) e arte pronta ---------------- */
+
+/** Limites espelham os buckets da Fase 1 (file_size_limit / allowed_mime_types). */
+export const REFERENCIA_TAMANHO_MAX_MB = 15;
+export const MARCA_TAMANHO_MAX_MB = 20;
+export const ARTE_PRONTA_TAMANHO_MAX_MB = 25;
+
+export const MARCA_MIMES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+  "application/pdf",
+  "font/ttf",
+  "font/otf",
+  "font/woff",
+  "font/woff2",
+] as const;
+export type MarcaMime = (typeof MARCA_MIMES)[number];
+
+/** Tipos de asset oferecidos na tela (o banco aceita outros valores legados). */
+export const TIPOS_ASSET = {
+  logo: "Logo",
+  paleta: "Cores / paleta",
+  slogan: "Slogan",
+  briefing: "Briefing da marca",
+  fonte: "Fonte",
+  elemento_visual: "Elemento visual",
+  modelo_base: "Modelo",
+  moldura_cargo: "Moldura de cargo",
+} as const;
+export type TipoAsset = keyof typeof TIPOS_ASSET;
+
+/* Escopo (espelha o CHECK brand_assets_escopo de 20261006170000): identidade
+ * visual é sempre de uma empresa; moldura de cargo é sempre da agência;
+ * modelo pode ser de uma empresa ou da agência. */
+export const ASSET_EXIGE_EMPRESA: ReadonlySet<TipoAsset> = new Set<TipoAsset>([
+  "logo",
+  "paleta",
+  "slogan",
+  "briefing",
+  "fonte",
+  "elemento_visual",
+]);
+/** Tipos da tela "Marcas das empresas". Moldura de cargo fica de fora: tem
+ * seção própria ("Modelos de foto de perfil"), porque é da agência. */
+export const TIPOS_ASSET_MARCA = (Object.keys(TIPOS_ASSET) as TipoAsset[]).filter(
+  (t) => t !== "moldura_cargo",
+);
+
+/** Moldura é sobreposição sobre a foto: precisa de transparência. */
+export const MOLDURA_MIMES = ["image/png", "image/webp", "image/svg+xml"] as const;
+
+/** Assets só de texto (guardado em valor.texto, sem arquivo). */
+export const ASSET_DE_TEXTO: ReadonlySet<TipoAsset> = new Set<TipoAsset>(["slogan", "briefing"]);
+export const ASSET_TEXTO_MAX = { slogan: 300, briefing: 10000 } as const;
+
+/** Navegadores costumam mandar fonte sem content-type (ou com um x-font-*):
+ * resolve pela extensão para bater com o allowed_mime_types do bucket. */
+export function mimeDoArquivo(file: { name: string; type: string }): string {
+  const ext = file.name.toLowerCase().split(".").pop() ?? "";
+  const porExtensao: Record<string, string> = {
+    ttf: "font/ttf",
+    otf: "font/otf",
+    woff: "font/woff",
+    woff2: "font/woff2",
+    svg: "image/svg+xml",
+  };
+  return porExtensao[ext] ?? file.type;
+}
+
+/** Quantos arquivos a arte pronta precisa: um por slide no carrossel, um no resto. */
+export function slidesEsperados(tipo: string, qtdSlides: number): number {
+  return tipo === "carrossel" ? qtdSlides : 1;
 }

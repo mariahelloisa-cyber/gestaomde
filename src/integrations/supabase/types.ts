@@ -372,6 +372,7 @@ export type Database = {
           metadados: Json
           mime_type: string
           path: string
+          projeto_id: string | null
           tags: string[]
           tipos_arte: string[]
           titulo: string
@@ -390,6 +391,7 @@ export type Database = {
           metadados?: Json
           mime_type?: string
           path: string
+          projeto_id?: string | null
           tags?: string[]
           tipos_arte?: string[]
           titulo: string
@@ -408,6 +410,7 @@ export type Database = {
           metadados?: Json
           mime_type?: string
           path?: string
+          projeto_id?: string | null
           tags?: string[]
           tipos_arte?: string[]
           titulo?: string
@@ -425,6 +428,13 @@ export type Database = {
             columns: ["criado_por"]
             isOneToOne: false
             referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "art_references_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
             referencedColumns: ["id"]
           },
         ]
@@ -620,10 +630,13 @@ export type Database = {
           cliente_id: string | null
           criado_em: string
           criado_por: string | null
+          descricao: string | null
           id: string
           mime_type: string | null
           nome: string
           path: string | null
+          projeto_id: string | null
+          tags: string[]
           tipo: string
           valor: Json
         }
@@ -633,10 +646,13 @@ export type Database = {
           cliente_id?: string | null
           criado_em?: string
           criado_por?: string | null
+          descricao?: string | null
           id?: string
           mime_type?: string | null
           nome: string
           path?: string | null
+          projeto_id?: string | null
+          tags?: string[]
           tipo: string
           valor?: Json
         }
@@ -646,10 +662,13 @@ export type Database = {
           cliente_id?: string | null
           criado_em?: string
           criado_por?: string | null
+          descricao?: string | null
           id?: string
           mime_type?: string | null
           nome?: string
           path?: string | null
+          projeto_id?: string | null
+          tags?: string[]
           tipo?: string
           valor?: Json
         }
@@ -666,6 +685,13 @@ export type Database = {
             columns: ["criado_por"]
             isOneToOne: false
             referencedRelation: "perfis_usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_assets_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
             referencedColumns: ["id"]
           },
         ]

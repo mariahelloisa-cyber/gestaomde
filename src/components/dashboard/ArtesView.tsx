@@ -11,6 +11,8 @@ import {
   type StatusArte,
 } from "@/lib/arte/tipos";
 import { useTasks } from "@/lib/tasks-store";
+import { ArteProducao } from "./ArteProducao";
+import { AssetsMarca, ModelosFotoPerfil, ReferenciasArte } from "./AcervoArteView";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -70,7 +72,55 @@ function dataHora(iso: string | null): string {
     : d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+const SECOES = {
+  solicitacoes: "Solicitações",
+  referencias: "Referências globais",
+  assets: "Marcas das empresas",
+  fotoPerfil: "Modelos de foto de perfil",
+} as const;
+type Secao = keyof typeof SECOES;
+
 export function ArtesView() {
+  const [secao, setSecao] = useState<Secao>("solicitacoes");
+  return (
+    <div className="mx-auto max-w-5xl space-y-6 p-8">
+      <header className="space-y-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <Palette className="h-6 w-6 text-primary" /> Artes
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Solicitações do portal externo, referências globais por tipo de arte e a identidade
+            visual de cada empresa.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-4 border-b border-border">
+          {(Object.keys(SECOES) as Secao[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSecao(s)}
+              className={cn(
+                "-mb-px border-b-2 px-1 pb-2 text-sm font-medium transition-colors",
+                secao === s
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {SECOES[s]}
+            </button>
+          ))}
+        </div>
+      </header>
+      {secao === "solicitacoes" && <SolicitacoesArte />}
+      {secao === "referencias" && <ReferenciasArte />}
+      {secao === "assets" && <AssetsMarca />}
+      {secao === "fotoPerfil" && <ModelosFotoPerfil />}
+    </div>
+  );
+}
+
+function SolicitacoesArte() {
   const { membros, membrosAtivos } = useTasks();
   const qc = useQueryClient();
   const listFn = useServerFn(listArtes);
@@ -129,16 +179,7 @@ export function ArtesView() {
     id ? (membros.find((m) => m.id === id)?.nome ?? "—") : "—";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-8">
-      <header>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold">
-          <Palette className="h-6 w-6 text-primary" /> Artes
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Solicitações de arte enviadas pelo portal externo.
-        </p>
-      </header>
-
+    <div className="space-y-6">
       <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
         {(Object.keys(ABAS) as Aba[]).map((k) => (
           <button
@@ -181,6 +222,7 @@ export function ArtesView() {
               a={a}
               nomeResponsavel={nomeDe(a.responsavel_id)}
               nomeQuemAlterou={nomeDe(a.status_alterado_por)}
+              nomeDe={nomeDe}
               onAceitar={() => setAceitar({ id: a.id, responsavel_id: "" })}
               onRecusar={() => setRecusar({ id: a.id, justificativa: "" })}
               ocupado={aceitarMut.isPending || recusarMut.isPending}
@@ -275,6 +317,7 @@ function ArteCard({
   a,
   nomeResponsavel,
   nomeQuemAlterou,
+  nomeDe,
   onAceitar,
   onRecusar,
   ocupado,
@@ -282,6 +325,7 @@ function ArteCard({
   a: Arte;
   nomeResponsavel: string;
   nomeQuemAlterou: string;
+  nomeDe: (id: string | null) => string;
   onAceitar: () => void;
   onRecusar: () => void;
   ocupado: boolean;
@@ -368,6 +412,8 @@ function ArteCard({
           ))}
         </div>
       )}
+
+      <ArteProducao a={a} nomeDe={nomeDe} />
 
       {status !== "enviada" && a.status_alterado_em && (
         <p className="mt-3 text-[11px] text-gray-500">
