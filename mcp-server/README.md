@@ -2,15 +2,14 @@
 
 Servidor MCP remoto do CRM, em Cloudflare Workers. Transporte Streamable HTTP em `/mcp`.
 
-Estado: **etapa 3 de 6** — OAuth 2.1 completo e sete ferramentas de LEITURA sob RLS.
-Nada escreve no CRM ainda.
+Estado: **etapa 4 de 6** — OAuth 2.1 completo, sete ferramentas de LEITURA e seis de
+ESCRITA sob RLS, com log de auditoria (`mcp_audit_log`).
 
-Próximas etapas: (4) ferramentas de escrita com escopos e log de auditoria, (5) revisão
-de segurança final, (6) conector personalizado no Claude.
+Próximas etapas: (5) revisão de segurança final, (6) conector personalizado no Claude.
 
 ## Ferramentas
 
-Todas são de leitura, registradas só quando o token tem `crm:read`, e toda consulta usa
+As de leitura são registradas só quando o token tem `crm:read`, e toda consulta usa
 o JWT do usuário — quem decide o que aparece é o RLS, não este código.
 
 | Ferramenta        | Para que serve                                                       |
@@ -23,6 +22,38 @@ o JWT do usuário — quem decide o que aparece é o RLS, não este código.
 | `listar_projetos` | Projetos com contagem de tarefas por status                          |
 | `buscar_links`    | Pastas de links salvos e as URLs dentro delas                        |
 | `resumo_do_dia`   | Atrasadas, vencem hoje, próximos 7 dias e em análise, com amostra    |
+
+As de escrita são registradas só quando o token tem `crm:write` **e** o escopo está em
+`ESCOPOS_SUPORTADOS` (tirar de lá desliga a escrita para todos). Mesmo JWT, mesmo RLS.
+Código em `mcp/ferramentas/escrita.ts` (o comum), `tarefas-escrita.ts` e
+`colaboracao.ts`.
+
+| Ferramenta                  | Para que serve                                              |
+| --------------------------- | ----------------------------------------------------------- |
+| `criar_tarefa`              | Cria tarefa Pendente; cada responsável recebe e-mail do CRM |
+| `atualizar_tarefa`          | Altera campos; devolve o valor anterior de cada um          |
+| `definir_responsaveis`      | Adiciona/remove responsáveis; quem entra recebe e-mail      |
+| `comentar_tarefa`           | Comentário assinado pela conta conectada                    |
+| `adicionar_itens_checklist` | Até 20 itens de uma vez; texto repetido é pulado            |
+| `marcar_item_checklist`     | Marca/desmarca um item, gravando o valor pedido             |
+
+O que vale saber antes de mexer nelas:
+
+- **Toda escrita passa por `executarEscrita`**: limite de 30 por pessoa em 10 min (KV),
+  checagem de que `mcp_audit_log` existe (sem ela, nada é escrito), o corpo, e a linha de
+  auditoria. Erro de entrada não audita; recusa e duplicata auditam.
+- **A tarefa é lida pelo RLS antes de qualquer escrita nela.** Lembretes ficam de fora.
+- **Responsáveis entram num INSERT só.** Com um Admin na lista, a tarefa vira "de Admin"
+  e um segundo INSERT de quem não é Admin seria recusado. Na remoção, apaga antes de
+  inserir pelo mesmo motivo. O ensaio `supabase/tests/ensaio_responsaveis_herda_tarefa.sql`
+  prova os dois lados.
+- **Concluir** exige cargo `Admin` lido do banco na hora e tarefa sem anexo — as duas
+  são regras do app que o banco não impõe.
+- **Duplicata**: criar e comentar olham os últimos 2 minutos; `criar_tarefa` grava também
+  um marcador `dup:` no KV, porque a tarefa pode sumir da visão de quem a criou (Membro
+  que designa Admin) e a consulta não a acharia.
+- O texto do aviso de designação sai de `CANAL_DE_AVISO`: hoje só e-mail existe em
+  produção.
 
 Decisões que valem saber antes de mexer:
 
@@ -110,7 +141,9 @@ No Inspector:
 4. **Permitir**. O Inspector volta com um token e lista as ferramentas.
 5. Rode `whoami`: deve vir `autenticado: true`, seu e-mail, seu cargo,
    `escopos: ["crm:read","crm:write"]` e `sessaoCrm: "ativa"`.
-6. Com `crm:read` no token, as outras sete aparecem na lista. Roteiro curto:
+6. Com `crm:read` no token, as outras sete aparecem na lista; com `crm:write`, mais as
+   seis de escrita — que gravam no CRM de produção, então teste-as só pelo roteiro da
+   seção 10.5 do DEPLOY.md, numa tarefa de teste. Roteiro curto da leitura:
 
    | Ferramenta        | Entrada de teste                  | O que conferir                                             |
    | ----------------- | --------------------------------- | ---------------------------------------------------------- |
@@ -225,6 +258,16 @@ npm run verificar   # typecheck + testes do formato + portabilidade + dry-run
 npm run dry-run   # valida o bundle sem publicar
 npm run deploy
 ```
+
+Depois de publicar, verifique (Windows/PowerShell, sem curl):
+
+```powershell
+npm run verificar-producao -- https://gestaomde-mcp.SEU-SUBDOMINIO.workers.dev
+```
+
+Node puro, sem dependência: roda as 9 verificações pós-deploy, mostra tabela OK/FALHOU
+com esperado e obtido, e lista os `client_id` de teste criados com o comando pronto para
+apagar. Sai com código 1 se algo falhar.
 
 Depois de publicar, verifique (Windows/PowerShell, sem curl):
 

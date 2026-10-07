@@ -11,10 +11,9 @@
 /**
  * TODOS os escopos que este servidor conhece.
  *
- * Conhecer não é conceder: `crm:write` existe aqui, com texto pronto, para a
- * etapa 4 — mas não entra em ESCOPOS_SUPORTADOS enquanto não houver ferramenta
- * de escrita. Pedir permissão que nada usa treina o usuário a aprovar sem ler,
- * e deixa um grant com poder que o código não exerce.
+ * Conhecer não é conceder: um escopo só é concedido se também estiver em
+ * ESCOPOS_SUPORTADOS. Pedir permissão que nada usa treina o usuário a aprovar
+ * sem ler, e deixa um grant com poder que o código não exerce.
  */
 export const ESCOPOS_CONHECIDOS = ["crm:read", "crm:write"] as const;
 
@@ -25,10 +24,14 @@ export type Escopo = (typeof ESCOPOS_CONHECIDOS)[number];
  *
  * É esta lista que vai em `scopesSupported` do provider, e é contra ela que o
  * `approveConsent` valida — ele LANÇA `invalid_scope` se receber escopo de
- * fora. Então acrescentar `crm:write` aqui é o gatilho da etapa 4, e tem que
- * acontecer junto com o registro das ferramentas de escrita, não antes.
+ * fora. `crm:write` entrou na etapa 4, junto com as ferramentas de escrita
+ * (src/mcp/server.ts só as registra com ele).
+ *
+ * Grant antigo não ganha `crm:write` sozinho: o refresh do provider só deixa
+ * REDUZIR os escopos do grant (`downscope`), nunca ampliar. Quem conectou com
+ * só `crm:read` segue lendo e não vê ferramenta de escrita até reconectar.
  */
-export const ESCOPOS_SUPORTADOS: readonly Escopo[] = ["crm:read"];
+export const ESCOPOS_SUPORTADOS: readonly Escopo[] = ["crm:read", "crm:write"];
 
 /**
  * O que um cliente recebe quando não pede nada.
@@ -36,7 +39,7 @@ export const ESCOPOS_SUPORTADOS: readonly Escopo[] = ["crm:read"];
  * É o caso do MCP Inspector, que não manda `scope` nenhum. Sem um padrão, o
  * grant nascia com `[]`: o token valia, a tela de consentimento listava zero
  * permissões, e as ferramentas não eram registradas — sem erro nenhum para
- * explicar por quê.
+ * explicar por quê. Decisão da etapa 4: leitura e escrita juntas por padrão.
  */
 export const ESCOPOS_PADRAO: readonly Escopo[] = ESCOPOS_SUPORTADOS;
 
@@ -47,8 +50,9 @@ export const TEXTO_ESCOPO: Record<Escopo, { titulo: string; detalhe: string }> =
     detalhe: "Clientes, tarefas, projetos, pastas e comentários que você já vê no sistema.",
   },
   "crm:write": {
-    titulo: "Criar e alterar dados do CRM",
-    detalhe: "Tarefas, comentários e clientes. Nada que você mesmo não possa alterar.",
+    titulo: "Criar e alterar tarefas no CRM",
+    detalhe:
+      "Criar e alterar tarefas, responsáveis, comentários e checklists. Designar alguém envia e-mail para essa pessoa. Nada é excluído, e nada que você mesmo não possa alterar no sistema.",
   },
 };
 
@@ -72,6 +76,10 @@ export type ResultadoEscopos =
  * específico, e conceder outra coisa no lugar seria conceder o que ninguém
  * pediu. `parseAuthRequest` não filtra por `scopesSupported` — ele só valida a
  * gramática do token —, então escopo desconhecido chega aqui de verdade.
+ *
+ * `crm:write` sozinho vira `crm:read crm:write`: toda escrita começa lendo a
+ * tarefa pelo RLS, então escrita sem leitura não existe. Fica explícito na
+ * tela, em vez de ser um poder implícito que o consentimento não mostrou.
  */
 export function escoposEfetivos(pedidos: readonly string[]): ResultadoEscopos {
   if (pedidos.length === 0) {
@@ -80,7 +88,11 @@ export function escoposEfetivos(pedidos: readonly string[]): ResultadoEscopos {
 
   // Set para deduplicar: `scope=crm:read crm:read` é pedido válido, e
   // approveConsent também deduplica, mas a tela não deve listar duas vezes.
-  const efetivos = [...new Set(pedidos.filter(ehSuportado))];
+  let efetivos = [...new Set(pedidos.filter(ehSuportado))];
+
+  if (efetivos.includes("crm:write") && !efetivos.includes("crm:read")) {
+    efetivos = ["crm:read", ...efetivos];
+  }
 
   if (efetivos.length === 0) {
     return {

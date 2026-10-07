@@ -31,8 +31,8 @@ import {
 } from "./comuns";
 
 /** Valores reais das colunas, iguais aos enums do app (src/lib/data.functions.ts). */
-const STATUS = ["Pendente", "Em Progresso", "Em Análise", "Concluído"] as const;
-const PRIORIDADES = ["Alta", "Média", "Baixa", "Nenhuma"] as const;
+export const STATUS = ["Pendente", "Em Progresso", "Em Análise", "Concluído"] as const;
+export const PRIORIDADES = ["Alta", "Média", "Baixa", "Nenhuma"] as const;
 
 /** Colunas que as listagens leem. Sem áudio/vídeo/anexos: são paths de storage. */
 const COLUNAS_LISTA =

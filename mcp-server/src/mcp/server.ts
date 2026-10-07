@@ -1,10 +1,21 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { ESCOPOS_SUPORTADOS } from "../auth/escopos";
 import { criarClienteComJwt } from "../auth/supabase";
 import type { Env } from "../env";
 import { registrarBuscarClientes, registrarVerCliente } from "./ferramentas/clientes";
+import {
+  registrarAdicionarItensChecklist,
+  registrarComentarTarefa,
+  registrarMarcarItemChecklist,
+} from "./ferramentas/colaboracao";
 import { registrarLinks } from "./ferramentas/links";
 import { registrarProjetos } from "./ferramentas/projetos";
+import {
+  registrarAtualizarTarefa,
+  registrarCriarTarefa,
+  registrarDefinirResponsaveis,
+} from "./ferramentas/tarefas-escrita";
 import {
   registrarListarTarefas,
   registrarResumoDoDia,
@@ -13,7 +24,7 @@ import {
 import { consultar, MENSAGEM_SESSAO_EXPIRADA } from "./sessao";
 
 export const SERVER_NAME = "gestaomde-crm";
-export const SERVER_VERSION = "0.2.0";
+export const SERVER_VERSION = "0.3.0";
 
 /** O que o AuthHandler guardou em `props` no completeAuthorization. */
 export interface PropsUsuario {
@@ -58,8 +69,8 @@ const whoamiOutput = z.object({
  * quando não há token válido — o que na prática o OAuthProvider não deixa
  * acontecer na rota protegida, mas tratamos de todo jeito.
  *
- * Os escopos entram aqui para registro condicional de ferramenta: na etapa 4,
- * as de crm:write só são registradas se o token tiver esse escopo, para o
+ * Os escopos entram aqui para registro condicional de ferramenta: as de
+ * crm:write só são registradas se o token tiver esse escopo, para o
  * Claude nem ver o que não pode usar.
  */
 export function createServer(env: Env, props: PropsUsuario | null, escopos: string[]): McpServer {
@@ -137,7 +148,32 @@ export function createServer(env: Env, props: PropsUsuario | null, escopos: stri
     registrarLinks(server, supabase);
   }
 
-  // Etapa 4 registra as de escrita, condicionadas a escopos.includes("crm:write").
+  // Etapa 4: as de ESCRITA, só com crm:write.
+  //
+  // Quem tem grant só de leitura (conectou antes da etapa 4) não vê nenhuma
+  // delas: o refresh não amplia escopo, então é preciso reconectar.
+  //
+  // Também exige que o servidor SUPORTE crm:write hoje: tirar o escopo de
+  // ESCOPOS_SUPORTADOS e publicar é o botão de desligar a escrita (DEPLOY.md,
+  // seção 8.0), e precisa valer também para quem já tem grant com escrita.
+  //
+  // Mesmo JWT, mesmo RLS. O contexto leva o env por causa do KV (limite de
+  // escrita e marcador de duplicata); a auditoria vai para mcp_audit_log com o
+  // JWT do próprio usuário.
+  if (props && escopos.includes("crm:write") && ESCOPOS_SUPORTADOS.includes("crm:write")) {
+    const ctx = {
+      env,
+      supabase: criarClienteComJwt(env, props.sbAccess),
+      meuId: props.userId,
+    };
+
+    registrarCriarTarefa(server, ctx);
+    registrarAtualizarTarefa(server, ctx);
+    registrarDefinirResponsaveis(server, ctx);
+    registrarComentarTarefa(server, ctx);
+    registrarAdicionarItensChecklist(server, ctx);
+    registrarMarcarItemChecklist(server, ctx);
+  }
 
   return server;
 }

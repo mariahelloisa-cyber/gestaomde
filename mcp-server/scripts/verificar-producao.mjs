@@ -131,17 +131,58 @@ async function verificarMetadataAS(base) {
   const r = await pedir(`${base}/.well-known/oauth-authorization-server`);
   const escopos = r.json?.scopes_supported;
   const ok =
-    r.status === 200 && Array.isArray(escopos) && escopos.length === 1 && escopos[0] === "crm:read";
+    r.status === 200 &&
+    Array.isArray(escopos) &&
+    escopos.length === 2 &&
+    escopos[0] === "crm:read" &&
+    escopos[1] === "crm:write";
 
   registrar(
     "metadata do AS (RFC 8414)",
     ok,
-    'scopes_supported ["crm:read"]',
+    'scopes_supported ["crm:read","crm:write"]',
     r.erro ? `erro de rede: ${r.erro}` : `status ${r.status}, ${JSON.stringify(escopos)}`,
     ok
       ? undefined
-      : "Se aparecer crm:write, a etapa 4 entrou sem as ferramentas de escrita:\n" +
-          "   confira ESCOPOS_SUPORTADOS em src/auth/escopos.ts.",
+      : 'Se aparecer so ["crm:read"], o deploy e anterior a etapa 4 (escrita).\n' +
+          "   Confira ESCOPOS_SUPORTADOS em src/auth/escopos.ts e publique de novo.",
+  );
+}
+
+/**
+ * A tabela de auditoria existe em produção?
+ *
+ * As ferramentas de escrita falham FECHADAS sem ela ("a escrita está
+ * desativada"), então isto não derruba o conector — mas significa que a
+ * migration 20261007130000 não foi aplicada, e ninguém consegue escrever.
+ * O próprio Worker sonda o Supabase e devolve o resultado no /health.
+ */
+async function verificarAuditoria(base) {
+  const r = await pedir(`${base}/health`);
+  const estado = r.json?.auditoria;
+  const ok = r.status === 200 && estado === "ok";
+
+  let observacao;
+  if (estado === "ausente") {
+    observacao =
+      "A tabela mcp_audit_log nao existe: aplique a migration 20261007130000\n" +
+      "   (secao 10 do DEPLOY.md). Ate la, toda ferramenta de escrita responde\n" +
+      '   "a escrita esta desativada" e nada e gravado.';
+  } else if (estado === "ABERTA") {
+    observacao =
+      "PARE: anon consegue consultar mcp_audit_log. Alguem concedeu SELECT a anon;\n" +
+      "   rode REVOKE ALL ON public.mcp_audit_log FROM anon; e confira o ensaio.";
+  } else if (!ok) {
+    observacao =
+      "O Worker nao conseguiu sondar o Supabase. Rode de novo; se repetir, veja o wrangler tail.";
+  }
+
+  registrar(
+    "tabela de auditoria (mcp_audit_log)",
+    ok,
+    "auditoria:ok no /health",
+    r.erro ? `erro de rede: ${r.erro}` : `status ${r.status}, auditoria:${estado ?? "(ausente)"}`,
+    observacao,
   );
 }
 
@@ -290,7 +331,7 @@ async function verificarAuthorize(base, clientId) {
     response_type: "code",
     client_id: clientId,
     redirect_uri: CALLBACK_CLAUDE,
-    scope: "crm:read",
+    scope: "crm:read crm:write",
     state: "verificacao",
     code_challenge: DESAFIO_PKCE,
     code_challenge_method: "S256",
@@ -442,6 +483,7 @@ async function main() {
   );
   const clientId = await verificarRegistroAceito(base);
   await verificarAuthorize(base, clientId);
+  await verificarAuditoria(base);
   if (rateLimit) await verificarRateLimit(base);
 
   imprimirTabela(resultados);

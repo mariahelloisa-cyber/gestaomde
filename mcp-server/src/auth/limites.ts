@@ -41,6 +41,13 @@ export const LIMITE_LOGIN_EMAIL: Limite = { max: 5, janelaSegundos: 900 };
 /** Registros dinâmicos de cliente por IP. Conta TODAS as tentativas, não só as recusadas. */
 export const LIMITE_REGISTER_IP: Limite = { max: 20, janelaSegundos: 3600 };
 
+/**
+ * Chamadas de ferramenta de escrita do MCP, por usuário. Conta TODAS, inclusive
+ * as que caem na proteção de duplicata: o que isto freia é o modelo em loop,
+ * e um loop que repete a mesma chamada é exatamente o caso da duplicata.
+ */
+export const LIMITE_ESCRITA_USUARIO: Limite = { max: 30, janelaSegundos: 600 };
+
 /** Mínimo que o KV aceita em expirationTtl. */
 const TTL_MINIMO_KV = 60;
 
@@ -50,7 +57,7 @@ export function ipDoCliente(request: Request): string {
 }
 
 /** SHA-256 em hex. Usado para não gravar e-mail cru em chave de KV. */
-async function digerir(valor: string): Promise<string> {
+export async function digerir(valor: string): Promise<string> {
   const bytes = new TextEncoder().encode(valor);
   const hash = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");

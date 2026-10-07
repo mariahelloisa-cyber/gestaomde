@@ -363,8 +363,8 @@ async function encerrarGrant(
  *   grant existe NÃO é tocado. Ou seja: ninguém conectado é desconectado por
  *   esta rotina — o que ela remove já estava inutilizável.
  *
- *   `client:`, `transaction:`, `login_pendente:` e `rl:` nem são listados: os
- *   quatro têm TTL próprio e o KV os coleta sozinho.
+ *   `client:`, `transaction:`, `login_pendente:`, `rl:` e `dup:` nem são listados: os
+ *   cinco têm TTL próprio e o KV os coleta sozinho.
  *
  * O CURSOR NÃO É OPCIONAL
  *

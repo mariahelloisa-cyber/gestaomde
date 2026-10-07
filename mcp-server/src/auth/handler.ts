@@ -415,6 +415,32 @@ export const AuthHandler = {
  * A leitura do KV é de uma chave que não existe: prova que o binding está
  * ligado sem gravar nada e sem custo relevante.
  */
+/**
+ * A tabela mcp_audit_log existe, e está fechada para anon?
+ *
+ * Pergunta ao PostgREST com a chave publishable, sem JWT de usuário. A tabela
+ * não concede nada a anon, então o esperado é 401/403 com 42501 — o que prova
+ * que ela existe. 404 é "não existe" (migration não aplicada). 200 seria anon
+ * lendo a auditoria, o pior caso.
+ */
+async function sondarAuditoria(env: Env): Promise<"ok" | "ausente" | "ABERTA" | "nao_verificada"> {
+  try {
+    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/mcp_audit_log?select=id&limit=1`, {
+      headers: {
+        apikey: env.SUPABASE_PUBLISHABLE_KEY,
+        authorization: `Bearer ${env.SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (r.status === 404) return "ausente";
+    if (r.status === 200) return "ABERTA";
+    if (r.status === 401 || r.status === 403) return "ok";
+    return "nao_verificada";
+  } catch {
+    return "nao_verificada";
+  }
+}
+
 async function saude(env: Env): Promise<Response> {
   const supabase =
     env.SUPABASE_URL?.trim() && env.SUPABASE_PUBLISHABLE_KEY?.trim() ? "configurado" : "faltando";
@@ -428,11 +454,17 @@ async function saude(env: Env): Promise<Response> {
 
   const ok = supabase === "configurado" && kv === "ok";
 
+  // Fora do `ok` de propósito: sem a tabela, a leitura segue funcionando e só
+  // a escrita fica desligada (ela falha fechada). O verificar-producao confere
+  // este campo à parte.
+  const auditoria = supabase === "configurado" ? await sondarAuditoria(env) : "nao_verificada";
+
   return Response.json(
     {
       ok,
       supabase,
       kv,
+      auditoria,
       // Útil no checklist pós-deploy: diz se a flag de dev vazou para produção.
       redirect_local: env.PERMITIR_REDIRECT_LOCAL === "1" ? "LIGADO" : "desligado",
     },

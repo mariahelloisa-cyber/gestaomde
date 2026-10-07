@@ -18,6 +18,16 @@ import type { CallToolResult } from "@modelcontextprotocol/server";
  *   Daí a mensagem única e acionável: ela diz o que aconteceu e o que fazer.
  */
 
+/**
+ * Códigos que `consultar` devolve no lugar do SQLSTATE quando não houve um.
+ *
+ * As ferramentas de escrita usam o código para separar "o banco recusou"
+ * (42501, vai para a auditoria como negado) de "a sessão morreu" (nada
+ * aconteceu, e nem dá para auditar, porque o JWT é o mesmo).
+ */
+export const CODIGO_SESSAO_MORTA = "sessao-morta";
+export const CODIGO_SEM_RESPOSTA = "sem-resposta";
+
 /** A única mensagem de sessão expirada. Toda ferramenta responde exatamente esta. */
 export const MENSAGEM_SESSAO_EXPIRADA =
   "Sua sessão expirou. Reconecte o CRM nas configurações de conectores do Claude.";
@@ -108,7 +118,8 @@ export function respostaSessaoExpirada(): RespostaFerramenta {
 export async function consultar<T>(
   executar: () => PromiseLike<{ data: T | null; error: unknown; count?: number | null }>,
 ): Promise<
-  { ok: true; dados: T | null; total: number | null } | { ok: false; resposta: RespostaFerramenta }
+  | { ok: true; dados: T | null; total: number | null }
+  | { ok: false; resposta: RespostaFerramenta; codigo?: string }
 > {
   let resultado: { data: T | null; error: unknown; count?: number | null };
   try {
@@ -116,10 +127,13 @@ export async function consultar<T>(
   } catch (erro) {
     // Exceção (rede, fetch abortado) também passa pelo mesmo crivo: o
     // supabase-js lança em vez de devolver `error` em alguns caminhos.
-    if (ehSessaoMorta(erro)) return { ok: false, resposta: respostaSessaoExpirada() };
+    if (ehSessaoMorta(erro)) {
+      return { ok: false, resposta: respostaSessaoExpirada(), codigo: CODIGO_SESSAO_MORTA };
+    }
     console.error("[mcp] consulta falhou");
     return {
       ok: false,
+      codigo: CODIGO_SEM_RESPOSTA,
       resposta: {
         content: [
           { type: "text", text: "Não consegui falar com o CRM agora. Tente de novo em instantes." },
@@ -131,14 +145,16 @@ export async function consultar<T>(
 
   if (resultado.error) {
     if (ehSessaoMorta(resultado.error)) {
-      return { ok: false, resposta: respostaSessaoExpirada() };
+      return { ok: false, resposta: respostaSessaoExpirada(), codigo: CODIGO_SESSAO_MORTA };
     }
     // Só o código, nunca o objeto: a mensagem do PostgREST pode citar valores
     // da linha, e isso iria para o log do Worker.
-    const codigo = (resultado.error as { code?: unknown }).code;
-    console.error("[mcp] erro do supabase", typeof codigo === "string" ? codigo : "sem-codigo");
+    const bruto = (resultado.error as { code?: unknown }).code;
+    const codigo = typeof bruto === "string" ? bruto : "sem-codigo";
+    console.error("[mcp] erro do supabase", codigo);
     return {
       ok: false,
+      codigo,
       resposta: {
         content: [{ type: "text", text: "O CRM recusou a consulta. Avise um administrador." }],
         isError: true,
