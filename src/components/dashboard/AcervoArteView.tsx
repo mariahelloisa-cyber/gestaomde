@@ -36,6 +36,19 @@ import {
   type TipoArte,
   type TipoAsset,
 } from "@/lib/arte/tipos";
+import {
+  ESFORCO_PADRAO,
+  STATUS_ANALISE_ROTULO,
+  ehTagDaIA,
+  type StatusAnalise,
+} from "@/lib/arte/analise-referencias";
+import {
+  CardAnalise,
+  PainelAnaliseIA,
+  statusDaReferencia,
+  useAnalisarReferencia,
+  useResumoAnalise,
+} from "./AnaliseReferenciasIA";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -174,6 +187,18 @@ export function ReferenciasArte() {
   const [salvando, setSalvando] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<typeof TODOS | TipoArte>(TODOS);
   const [filtroCategoria, setFiltroCategoria] = useState(TODOS);
+  const [filtroStatus, setFiltroStatus] = useState<typeof TODOS | StatusAnalise>(TODOS);
+  const [abertas, setAbertas] = useState<Set<string>>(new Set());
+  const resumoIA = useResumoAnalise();
+  const analisarMut = useAnalisarReferencia();
+
+  const alternarAnalise = (id: string) =>
+    setAbertas((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   const removerMut = useMutation({
     mutationFn: (id: string) => removerFn({ data: { id } }),
@@ -198,7 +223,8 @@ export function ReferenciasArte() {
   const lista = refs.filter(
     (r) =>
       (filtroTipo === TODOS || r.tipos_arte.includes(filtroTipo)) &&
-      (filtroCategoria === TODOS || r.categoria === filtroCategoria),
+      (filtroCategoria === TODOS || r.categoria === filtroCategoria) &&
+      (filtroStatus === TODOS || statusDaReferencia(r) === filtroStatus),
   );
 
   if (!query.data) return <Estado query={query} />;
@@ -227,7 +253,7 @@ export function ReferenciasArte() {
     setSalvando(true);
     try {
       const up = await subir(arquivo, { destino: "referencia", tipo_arte: tipo }, "art-references");
-      await salvarFn({
+      const nova = await salvarFn({
         data: {
           tipo_arte: tipo,
           titulo: titulo.trim() || undefined,
@@ -239,6 +265,11 @@ export function ReferenciasArte() {
         },
       });
       toast.success("Referência cadastrada.");
+      // Análise automática da referência nova; se falhar, fica com status de
+      // erro na lista e pode ser refeita pelo botão.
+      if (resumoIA.data?.configurado) {
+        analisarMut.mutate({ id: nova.id, forcar: false, esforco: ESFORCO_PADRAO });
+      }
       limpar();
       setAberto(false);
     } catch (e) {
@@ -264,6 +295,8 @@ export function ReferenciasArte() {
         </Button>
       </div>
 
+      <PainelAnaliseIA refs={refs} />
+
       <div className="flex flex-wrap gap-1.5">
         {([TODOS, ...TIPOS_ARTE_REFERENCIA] as const).map((t) => (
           <button
@@ -284,24 +317,45 @@ export function ReferenciasArte() {
         ))}
       </div>
 
-      {categorias.length > 0 && (
+      <div className="flex flex-wrap gap-3">
+        {categorias.length > 0 && (
+          <div className="w-56 space-y-1">
+            <Label className="text-xs">Categoria</Label>
+            <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas as categorias</SelectItem>
+                {categorias.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="w-56 space-y-1">
-          <Label className="text-xs">Categoria</Label>
-          <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+          <Label className="text-xs">Análise com IA</Label>
+          <Select
+            value={filtroStatus}
+            onValueChange={(v) => setFiltroStatus(v as typeof TODOS | StatusAnalise)}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={TODOS}>Todas as categorias</SelectItem>
-              {categorias.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
+              <SelectItem value={TODOS}>Todos os status</SelectItem>
+              {(Object.keys(STATUS_ANALISE_ROTULO) as StatusAnalise[]).map((s) => (
+                <SelectItem key={s} value={s}>
+                  {STATUS_ANALISE_ROTULO[s]}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-      )}
+      </div>
 
       {aberto && (
         <div className="space-y-3 rounded-lg border border-border bg-card p-4">
@@ -429,9 +483,21 @@ export function ReferenciasArte() {
                 <div className="text-gray-600">
                   {r.tipos_arte.map(rotuloTipo).join(", ")}
                   {r.categoria ? ` • ${r.categoria}` : ""}
+                  {r.largura && r.altura ? ` • ${r.largura} × ${r.altura}` : ""}
                 </div>
-                <Tags tags={r.tags} />
+                <Tags tags={r.tags.filter((t) => !ehTagDaIA(t))} />
                 {r.descricao && <p className="whitespace-pre-wrap text-gray-700">{r.descricao}</p>}
+                <CardAnalise
+                  r={r}
+                  aberta={abertas.has(r.id)}
+                  onAlternar={() => alternarAnalise(r.id)}
+                  ocupado={analisarMut.isPending && analisarMut.variables?.id === r.id}
+                  podeAnalisar={!!resumoIA.data?.configurado}
+                  custo={resumoIA.data?.custoUsd}
+                  onAnalisar={(forcar, esforco) =>
+                    analisarMut.mutate({ id: r.id, forcar, esforco })
+                  }
+                />
               </div>
             </div>
           ))}

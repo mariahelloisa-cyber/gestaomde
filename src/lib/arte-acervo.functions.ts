@@ -32,6 +32,7 @@ import {
   rotuloTipo,
   type TipoAsset,
 } from "./arte/tipos";
+import { metadadosIA } from "./arte/analise-referencias";
 
 /* Acervo do módulo de artes.
  *
@@ -86,7 +87,9 @@ export const listAcervoArte = createServerFn({ method: "GET" })
       supabase.from("projetos").select("id, nome").order("nome"),
       supabase
         .from("art_references")
-        .select("id, titulo, descricao, tipos_arte, categoria, tags, path, mime_type, criado_em")
+        .select(
+          "id, titulo, descricao, tipos_arte, categoria, tags, path, mime_type, criado_em, largura, altura, metadados",
+        )
         .order("criado_em", { ascending: false })
         .limit(500),
       supabase
@@ -115,7 +118,12 @@ export const listAcervoArte = createServerFn({ method: "GET" })
 
     return {
       projetos: projetosRes.data ?? [],
-      referencias: refs.map((r) => ({ ...r, url: urlsRefs.get(r.path) ?? null })),
+      referencias: refs.map(({ metadados, ...r }) => ({
+        ...r,
+        url: urlsRefs.get(r.path) ?? null,
+        // Só a análise vai para a tela (sem o histórico de gastos).
+        analise: metadadosIA(metadados),
+      })),
       assets: assets.map((a) => ({
         ...a,
         url: a.path ? (urlsAssets.get(a.path) ?? null) : null,
