@@ -342,7 +342,8 @@ const createSchema = z.object({
   prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).default("Nenhuma"),
   complexidade: z.enum(["Fácil", "Média", "Difícil"]).default("Média"),
   data_vencimento: z.string().optional(),
-  descricao: z.string().max(5000).optional(),
+  // Mesmo teto do conector MCP (roteiros em lembretes). A coluna é text, sem limite.
+  descricao: z.string().max(20000).optional(),
   tipo: z.enum(["tarefa", "lembrete"]).default("tarefa"),
   escopo: z.enum(["geral", "pessoal"]).default("geral"),
   responsavel_ids: z.array(z.string().uuid()).default([]),
@@ -424,7 +425,7 @@ const updateSchema = z.object({
     prioridade: z.enum(["Alta", "Média", "Baixa", "Nenhuma"]).optional(),
     complexidade: z.enum(["Fácil", "Média", "Difícil"]).optional(),
     data_vencimento: z.string().optional(),
-    descricao: z.string().max(5000).optional(),
+    descricao: z.string().max(20000).optional(),
     projeto_id: z.string().uuid().nullable().optional(),
     responsavel_ids: z.array(z.string().uuid()).optional(),
   }),
