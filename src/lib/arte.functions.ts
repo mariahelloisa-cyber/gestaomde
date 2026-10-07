@@ -24,6 +24,7 @@ import {
   camposDe,
   camposParaExibir,
   dimensoesDe,
+  direcaoCriativaDe,
   rotuloTipo,
   solicitacaoArteSchema,
   validarArquivos,
@@ -409,7 +410,13 @@ export const aceitarDemandaArte = createServerFn({ method: "POST" })
       .from("tarefas")
       .insert({
         titulo: `Arte — ${rotuloTipo(art.tipo)} — ${demanda.solicitante_nome}`.slice(0, 200),
-        descricao: `${resumoParaDemanda(art, projetoNome)}\n\nArquivos e andamento na aba Artes.`,
+        descricao: [
+          resumoParaDemanda(art, projetoNome),
+          direcaoCriativaDe(art.tipo) && `Direção criativa: ${direcaoCriativaDe(art.tipo)}`,
+          "Arquivos e andamento na aba Artes.",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
         status: "Pendente",
         prioridade: "Média",
         data_vencimento: demanda.prazo_sugerido

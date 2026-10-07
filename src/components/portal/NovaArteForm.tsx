@@ -11,6 +11,8 @@ import {
   Layers,
   Loader2,
   Lock,
+  MapPin,
+  Megaphone,
   Ruler,
   Send,
   User,
@@ -26,14 +28,19 @@ import {
   ARQUIVO_MIMES,
   ARQUIVO_TAMANHO_MAX,
   ARQUIVO_TAMANHO_MAX_MB,
+  BANNER_PX_MAX,
+  BANNER_PX_MIN,
   CARROSSEL_SLIDES_MAX,
   CARROSSEL_SLIDES_MIN,
   NIVEIS_CARGO,
   NIVEL_CARGO_CONFIG,
   PANFLETO_MM_MAX,
   PANFLETO_MM_MIN,
+  SUGESTOES_LOCAL_BANNER,
   TIPOS_ARTE,
   TIPOS_CONFIG,
+  TRAFEGO_PX_MAX,
+  TRAFEGO_PX_MIN,
   solicitacaoArteSchema,
   validarArquivos,
   type CategoriaArquivo,
@@ -75,6 +82,51 @@ function Campo({
   );
 }
 
+function MedidasPx({
+  largura,
+  altura,
+  onLargura,
+  onAltura,
+  min,
+  max,
+}: {
+  largura: string;
+  altura: string;
+  onLargura: (v: string) => void;
+  onAltura: (v: string) => void;
+  min: number;
+  max: number;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="arte-largura-px">Largura (px)</Label>
+        <Input
+          id="arte-largura-px"
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          value={largura}
+          onChange={(e) => onLargura(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="arte-altura-px">Altura (px)</Label>
+        <Input
+          id="arte-altura-px"
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          value={altura}
+          onChange={(e) => onAltura(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
   const opcoesFn = useServerFn(listOpcoesFormularioArte);
   const iniciarFn = useServerFn(iniciarSolicitacaoArte);
@@ -105,6 +157,12 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
   const [funcao, setFuncao] = useState("");
   const [beneficios, setBeneficios] = useState("");
   const [aviso, setAviso] = useState("");
+  const [objetivo, setObjetivo] = useState("");
+  const [publicoAlvo, setPublicoAlvo] = useState("");
+  const [oferta, setOferta] = useState("");
+  const [localUso, setLocalUso] = useState("");
+  const [larguraPx, setLarguraPx] = useState("");
+  const [alturaPx, setAlturaPx] = useState("");
   const [arquivos, setArquivos] = useState<Arquivos>(SEM_ARQUIVOS);
   const [etapa, setEtapa] = useState<string | null>(null);
 
@@ -169,6 +227,27 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
         return { tipo, projeto_id: projetoId, funcao, beneficios, briefing };
       case "aviso":
         return { tipo, projeto_id: projetoId, aviso, briefing };
+      case "trafego":
+        return {
+          tipo,
+          projeto_id: projetoId,
+          objetivo,
+          publico_alvo: publicoAlvo,
+          oferta,
+          briefing,
+          tamanho,
+          largura_px: tamanho === "personalizado" ? num(larguraPx) : undefined,
+          altura_px: tamanho === "personalizado" ? num(alturaPx) : undefined,
+        };
+      case "banner":
+        return {
+          tipo,
+          projeto_id: projetoId,
+          local_uso: localUso,
+          briefing,
+          largura_px: num(larguraPx),
+          altura_px: num(alturaPx),
+        };
       default:
         return { tipo, projeto_id: projetoId, briefing };
     }
@@ -188,6 +267,12 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
     funcao,
     beneficios,
     aviso,
+    objetivo,
+    publicoAlvo,
+    oferta,
+    localUso,
+    larguraPx,
+    alturaPx,
   ]);
 
   const limpar = () => {
@@ -206,6 +291,12 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
     setFuncao("");
     setBeneficios("");
     setAviso("");
+    setObjetivo("");
+    setPublicoAlvo("");
+    setOferta("");
+    setLocalUso("");
+    setLarguraPx("");
+    setAlturaPx("");
     setArquivos(SEM_ARQUIVOS);
   };
 
@@ -532,10 +623,74 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
             </Campo>
           )}
 
+          {tipo === "trafego" && (
+            <Campo icon={Megaphone}>
+              <div className="space-y-1.5">
+                <Label htmlFor="arte-objetivo" className="font-semibold">
+                  Objetivo do anúncio/campanha *
+                </Label>
+                <Input
+                  id="arte-objetivo"
+                  value={objetivo}
+                  onChange={(e) => setObjetivo(e.target.value)}
+                  maxLength={300}
+                  placeholder="Ex: captar inscrições para o vestibular"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="arte-publico" className="font-semibold">
+                  Público-alvo *
+                </Label>
+                <Textarea
+                  id="arte-publico"
+                  rows={2}
+                  value={publicoAlvo}
+                  onChange={(e) => setPublicoAlvo(e.target.value)}
+                  maxLength={500}
+                  placeholder="Ex: adultos de 25 a 40 anos que querem voltar a estudar"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="arte-oferta" className="font-semibold">
+                  Oferta/chamada principal *
+                </Label>
+                <Textarea
+                  id="arte-oferta"
+                  rows={2}
+                  value={oferta}
+                  onChange={(e) => setOferta(e.target.value)}
+                  maxLength={500}
+                  placeholder="Ex: bolsas de até 50% — matrículas abertas"
+                />
+              </div>
+            </Campo>
+          )}
+
+          {tipo === "banner" && (
+            <Campo icon={MapPin}>
+              <Label htmlFor="arte-local-uso" className="font-semibold">
+                Onde o banner vai ser usado? *
+              </Label>
+              <Input
+                id="arte-local-uso"
+                list="arte-local-uso-sugestoes"
+                value={localUso}
+                onChange={(e) => setLocalUso(e.target.value)}
+                maxLength={120}
+                placeholder="Ex: site, WhatsApp, landing page, portal, anúncio, evento"
+              />
+              <datalist id="arte-local-uso-sugestoes">
+                {SUGESTOES_LOCAL_BANNER.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </Campo>
+          )}
+
           {tipo !== "foto_perfil" && (
             <Campo icon={FileText}>
               <Label htmlFor="arte-briefing" className="font-semibold">
-                Briefing *
+                {tipo === "trafego" || tipo === "banner" ? "Prompt / briefing *" : "Briefing *"}
               </Label>
               <Textarea
                 id="arte-briefing"
@@ -546,6 +701,57 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
                 placeholder="Descreva o que a arte precisa comunicar, tom, cores, público…"
               />
               <div className="text-right text-xs text-muted-foreground">{briefing.length}/5000</div>
+            </Campo>
+          )}
+
+          {tipo === "trafego" && (
+            <Campo icon={Ruler}>
+              <Label className="font-semibold">Tamanho *</Label>
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                {(["padrao", "personalizado"] as const).map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => setTamanho(op)}
+                    disabled={enviando}
+                    className={cn(
+                      "rounded-md py-1.5 text-sm font-medium transition-colors",
+                      tamanho === op
+                        ? "bg-background text-foreground shadow"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {op === "padrao" ? "Padrão 1080 × 1440 px" : "Personalizado"}
+                  </button>
+                ))}
+              </div>
+              {tamanho === "personalizado" && (
+                <MedidasPx
+                  largura={larguraPx}
+                  altura={alturaPx}
+                  onLargura={setLarguraPx}
+                  onAltura={setAlturaPx}
+                  min={TRAFEGO_PX_MIN}
+                  max={TRAFEGO_PX_MAX}
+                />
+              )}
+            </Campo>
+          )}
+
+          {tipo === "banner" && (
+            <Campo icon={Ruler}>
+              <Label className="font-semibold">Tamanho *</Label>
+              <MedidasPx
+                largura={larguraPx}
+                altura={alturaPx}
+                onLargura={setLarguraPx}
+                onAltura={setAlturaPx}
+                min={BANNER_PX_MIN}
+                max={BANNER_PX_MAX}
+              />
+              <p className="text-xs text-muted-foreground">
+                Medidas em pixels, entre {BANNER_PX_MIN} e {BANNER_PX_MAX} px.
+              </p>
             </Campo>
           )}
 

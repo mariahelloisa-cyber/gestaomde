@@ -27,6 +27,7 @@ import {
   REFERENCIA_TAMANHO_MAX_MB,
   SUGESTOES_VERSAO_LOGO,
   TIPOS_ARTE_REFERENCIA,
+  TIPOS_ASSET,
   TIPOS_CONFIG,
   mimeDoArquivo,
   rotuloTipo,
@@ -451,6 +452,26 @@ export function ReferenciasArte() {
 type Ficha = Awaited<ReturnType<typeof getFichaMarca>>;
 type ArquivoFicha = Ficha["logos"][number];
 
+/** Campos de texto que orientam a IA (um por empresa, em valor.texto). */
+type CampoOrientacao = "estilo_visual" | "evitar" | "observacao_ia";
+const CAMPOS_ORIENTACAO: Array<{ tipo: CampoOrientacao; ajuda: string; exemplo: string }> = [
+  {
+    tipo: "estilo_visual",
+    ajuda: "Composição, tipografia, uso de imagens, fundos, chamadas, CTA…",
+    exemplo: "Ex: foto grande ocupando metade da arte, título curto em caixa alta, CTA no rodapé…",
+  },
+  {
+    tipo: "evitar",
+    ajuda: "Restrições da marca: o que a IA não deve fazer.",
+    exemplo: "Ex: não usar fundo neon, não distorcer a logo, não usar emojis…",
+  },
+  {
+    tipo: "observacao_ia",
+    ajuda: "Qualquer orientação extra que ajude a IA.",
+    exemplo: "Ex: o público é jovem universitário; preferir pessoas reais a ilustrações…",
+  },
+];
+
 function Secao({
   titulo,
   ajuda,
@@ -484,8 +505,8 @@ export function FichaMarca() {
       <div>
         <h2 className="text-base font-semibold">Marcas das empresas</h2>
         <p className="text-xs text-muted-foreground">
-          Ficha de identidade visual de cada empresa: logo, cores, tags, slogan, briefing, fonte e
-          elementos. É o que a IA vai usar para aplicar a marca nas artes.
+          Ficha de identidade visual de cada empresa: logos, cores, tags, slogan, briefing e
+          orientações de estilo. É o que a IA vai usar para aplicar a marca nas artes.
         </p>
       </div>
 
@@ -561,7 +582,11 @@ function FichaForm({
   const [tags, setTags] = useState(ficha.tags.join(", "));
   const [slogan, setSlogan] = useState(ficha.slogan);
   const [briefing, setBriefing] = useState(ficha.briefing);
-  const [fonteNome, setFonteNome] = useState(ficha.fonte_nome);
+  const [orientacoes, setOrientacoes] = useState<Record<CampoOrientacao, string>>({
+    estilo_visual: ficha.estilo_visual,
+    evitar: ficha.evitar,
+    observacao_ia: ficha.observacao_ia,
+  });
 
   const tagsLista = separarTags(tags);
   const alterado =
@@ -569,7 +594,7 @@ function FichaForm({
     tagsLista.join() !== ficha.tags.join() ||
     slogan.trim() !== ficha.slogan ||
     briefing.trim() !== ficha.briefing ||
-    fonteNome.trim() !== ficha.fonte_nome;
+    CAMPOS_ORIENTACAO.some((c) => orientacoes[c.tipo].trim() !== ficha[c.tipo]);
 
   const salvarMut = useMutation({
     mutationFn: () =>
@@ -580,7 +605,9 @@ function FichaForm({
           tags: tagsLista,
           slogan: slogan.trim(),
           briefing: briefing.trim(),
-          fonte_nome: fonteNome.trim(),
+          estilo_visual: orientacoes.estilo_visual.trim(),
+          evitar: orientacoes.evitar.trim(),
+          observacao_ia: orientacoes.observacao_ia.trim(),
         },
       }),
     onSuccess: () => toast.success(`Ficha de ${nomeEmpresa} salva.`),
@@ -694,36 +721,34 @@ function FichaForm({
         </div>
       </Secao>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Secao titulo="Briefing completo (opcional)" ajuda="Documento em PDF.">
-          <CampoArquivo
-            projetoId={projetoId}
-            campo="briefing_documento"
-            atual={ficha.briefing_documento}
-          />
-        </Secao>
-        <Secao titulo="Fonte (opcional)" ajuda="Nome da fonte e/ou arquivo (TTF, OTF, WOFF).">
-          <Input
-            value={fonteNome}
-            onChange={(e) => setFonteNome(e.target.value)}
-            maxLength={120}
-            placeholder="Ex: Montserrat"
-          />
-          <CampoArquivo projetoId={projetoId} campo="fonte" atual={ficha.fonte_arquivo} />
-        </Secao>
-      </div>
-
-      <Secao
-        titulo="Elementos visuais (opcional)"
-        ajuda="Grafismos, ícones, texturas próprias da empresa. PNG, JPG, WebP ou SVG."
-      >
-        <ElementosVisuais projetoId={projetoId} elementos={ficha.elementos} />
+      <Secao titulo="Briefing completo (opcional)" ajuda="Documento em PDF.">
+        <CampoArquivo
+          projetoId={projetoId}
+          campo="briefing_documento"
+          atual={ficha.briefing_documento}
+        />
       </Secao>
+
+      {CAMPOS_ORIENTACAO.map((c) => (
+        <Secao key={c.tipo} titulo={TIPOS_ASSET[c.tipo]} ajuda={c.ajuda}>
+          <Textarea
+            rows={6}
+            value={orientacoes[c.tipo]}
+            onChange={(e) => setOrientacoes((o) => ({ ...o, [c.tipo]: e.target.value }))}
+            maxLength={ASSET_TEXTO_MAX[c.tipo]}
+            placeholder={c.exemplo}
+            className="text-sm leading-relaxed"
+          />
+          <div className="text-right text-xs text-muted-foreground">
+            {orientacoes[c.tipo].length}/{ASSET_TEXTO_MAX[c.tipo]}
+          </div>
+        </Secao>
+      ))}
 
       <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-border bg-[var(--surface-1)] py-3">
         <span className="text-xs text-muted-foreground">
           {alterado
-            ? "Há alterações não salvas em cores, tags, slogan, briefing ou fonte."
+            ? "Há alterações não salvas nos campos de texto da ficha."
             : "Arquivos são salvos na hora do envio."}
         </span>
         <Button disabled={!alterado || salvarMut.isPending} onClick={() => salvarMut.mutate()}>
@@ -1017,101 +1042,6 @@ function LogoCard({
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
-    </div>
-  );
-}
-
-function ElementosVisuais({
-  projetoId,
-  elementos,
-}: {
-  projetoId: string;
-  elementos: ArquivoFicha[];
-}) {
-  const enviar = useEnviarArquivoFicha(projetoId);
-  const remover = useRemoverArquivoFicha(projetoId);
-  const [enviando, setEnviando] = useState<string | null>(null);
-
-  const escolher = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const lista = Array.from(files).slice(0, 20);
-    let ok = 0;
-    for (const [i, file] of lista.entries()) {
-      setEnviando(`Enviando ${i + 1}/${lista.length}…`);
-      try {
-        await enviar("elemento_visual", file);
-        ok++;
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : `Falha no envio de "${file.name}".`);
-      }
-    }
-    setEnviando(null);
-    if (ok) toast.success(`${ok} elemento(s) adicionado(s).`);
-  };
-
-  return (
-    <div className="space-y-3">
-      {elementos.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-          {elementos.map((el) => (
-            <div
-              key={el.id}
-              className="group relative overflow-hidden rounded-md border border-border bg-gray-100"
-            >
-              <a href={el.url ?? "#"} target="_blank" rel="noopener noreferrer" title={el.nome}>
-                {el.url ? (
-                  <img
-                    src={el.url}
-                    alt={el.nome}
-                    className="h-24 w-full object-contain p-1.5"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-24 items-center justify-center text-xs text-gray-400">
-                    sem prévia
-                  </div>
-                )}
-              </a>
-              <button
-                type="button"
-                title="Remover"
-                disabled={remover.isPending}
-                onClick={() => {
-                  if (confirm("Remover este elemento?")) remover.mutate(el.id);
-                }}
-                className="absolute right-1 top-1 rounded bg-white/90 p-1 text-gray-500 opacity-0 shadow transition-opacity hover:text-red-600 group-hover:opacity-100"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">Nenhum elemento cadastrado.</p>
-      )}
-      <label
-        className={cn(
-          "inline-flex cursor-pointer items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-muted",
-          enviando && "pointer-events-none opacity-60",
-        )}
-      >
-        {enviando ? (
-          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-        ) : (
-          <Plus className="mr-1.5 h-4 w-4" />
-        )}
-        {enviando ?? "Adicionar elementos"}
-        <input
-          type="file"
-          multiple
-          accept={FICHA_ARQUIVO_MIMES.elemento_visual.join(",")}
-          className="hidden"
-          onChange={(e) => {
-            void escolher(e.target.files);
-            e.target.value = "";
-          }}
-        />
-      </label>
     </div>
   );
 }

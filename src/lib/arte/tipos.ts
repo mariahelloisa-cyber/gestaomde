@@ -3,8 +3,8 @@ import { z } from "zod";
 /*
  * Configuração única dos tipos de arte — usada pelo formulário (o que mostrar)
  * e pelo servidor (o que aceitar). Tamanhos e limites espelham os CHECKs de
- * public.art_requests (20261006130000_arte_fase1_tabelas.sql); se mudar um,
- * mude o outro.
+ * public.art_requests (20261006130000_arte_fase1_tabelas.sql, ampliados em
+ * 20261007120000_arte_tipos_trafego_banner.sql); se mudar um, mude o outro.
  */
 
 export const TIPOS_ARTE = [
@@ -16,6 +16,8 @@ export const TIPOS_ARTE = [
   "vaga_emprego",
   "aviso",
   "stories",
+  "trafego",
+  "banner",
 ] as const;
 export type TipoArte = (typeof TIPOS_ARTE)[number];
 
@@ -36,6 +38,32 @@ export const PANFLETO_DPI = 150;
 export const PANFLETO_MM_MIN = 60;
 export const PANFLETO_MM_MAX = 600;
 
+/* Tráfego: padrão 1080x1440 ou personalizado. Banner: sem padrão, largura e
+ * altura sempre informadas. Os dois em px (CHECK art_requests_dimensoes,
+ * 20261007120000). Banner aceita mínimo menor por causa de faixas de site
+ * (ex.: 728x90). */
+export const TRAFEGO_PADRAO_PX = { largura: 1080, altura: 1440 } as const;
+export const TRAFEGO_PX_MIN = 300;
+export const TRAFEGO_PX_MAX = 6000;
+export const BANNER_PX_MIN = 50;
+export const BANNER_PX_MAX = 6000;
+
+/** Sugestões para o local de uso do banner (o campo é livre). */
+export const SUGESTOES_LOCAL_BANNER = [
+  "Site",
+  "WhatsApp",
+  "Landing page",
+  "Portal",
+  "Anúncio",
+  "Evento",
+] as const;
+
+/** Direção criativa fixa de Tráfego e Banner. Vai para toda geração futura
+ * desses tipos, junto com a identidade da empresa e as referências. */
+export const DIRECAO_CRIATIVA_EDUCACIONAL =
+  "Foco em oportunidade educacional, acesso facilitado, bolsas, descontos e transformação de vida. " +
+  "Priorizar visual acolhedor, popular e confiável, com pessoas estudando ou buscando crescimento profissional.";
+
 type UploadConfig = {
   categoria: CategoriaArquivo;
   rotulo: string;
@@ -49,6 +77,8 @@ type TipoConfig = {
   formato: string;
   usaProjeto: boolean;
   uploads: UploadConfig[];
+  /** Orientação de estilo que a geração deste tipo deve sempre seguir. */
+  direcaoCriativa?: string;
 };
 
 const REFERENCIA: UploadConfig = {
@@ -62,6 +92,10 @@ const ELEMENTOS: UploadConfig = {
   rotulo: "Elementos que devem aparecer no post (opcional)",
   obrigatorio: false,
   max: 10,
+};
+const ELEMENTOS_ARTE: UploadConfig = {
+  ...ELEMENTOS,
+  rotulo: "Elementos que devem aparecer na arte (opcional)",
 };
 
 export const TIPOS_CONFIG: Record<TipoArte, TipoConfig> = {
@@ -113,7 +147,25 @@ export const TIPOS_CONFIG: Record<TipoArte, TipoConfig> = {
     usaProjeto: true,
     uploads: [REFERENCIA],
   },
+  trafego: {
+    rotulo: "Tráfego",
+    formato: "1080 × 1440 px ou tamanho personalizado",
+    usaProjeto: true,
+    uploads: [REFERENCIA, ELEMENTOS_ARTE],
+    direcaoCriativa: DIRECAO_CRIATIVA_EDUCACIONAL,
+  },
+  banner: {
+    rotulo: "Banner",
+    formato: "Tamanho personalizado (você informa as medidas)",
+    usaProjeto: true,
+    uploads: [REFERENCIA, ELEMENTOS_ARTE],
+    direcaoCriativa: DIRECAO_CRIATIVA_EDUCACIONAL,
+  },
 };
+
+export function direcaoCriativaDe(tipo: string): string | null {
+  return (TIPOS_CONFIG as Record<string, TipoConfig | undefined>)[tipo]?.direcaoCriativa ?? null;
+}
 
 /** Tipos que usam referências globais. Foto de perfil fica de fora: é sempre
  * o mesmo modelo (muda só a moldura pelo nível), não se inspira em referência. */
@@ -165,6 +217,16 @@ const medidaMm = z
   .min(PANFLETO_MM_MIN, `Medida mínima: ${PANFLETO_MM_MIN} mm.`)
   .max(PANFLETO_MM_MAX, `Medida máxima: ${PANFLETO_MM_MAX} mm.`);
 
+const medidaPx = (min: number, max: number) =>
+  z
+    .number({
+      required_error: "Informe largura e altura em px.",
+      invalid_type_error: "Informe a medida em px.",
+    })
+    .int("Use px inteiros.")
+    .min(min, `Medida mínima: ${min} px.`)
+    .max(max, `Medida máxima: ${max} px.`);
+
 export const solicitacaoArteSchema = z
   .discriminatedUnion("tipo", [
     z.object({
@@ -215,10 +277,40 @@ export const solicitacaoArteSchema = z
       briefing,
     }),
     z.object({ tipo: z.literal("stories"), projeto_id: projetoId, briefing }),
+    z.object({
+      tipo: z.literal("trafego"),
+      projeto_id: projetoId,
+      objetivo: texto(300, "o objetivo do anúncio"),
+      publico_alvo: texto(500, "o público-alvo"),
+      oferta: texto(500, "a oferta/chamada principal"),
+      briefing,
+      tamanho: z.enum(["padrao", "personalizado"]),
+      largura_px: medidaPx(TRAFEGO_PX_MIN, TRAFEGO_PX_MAX).optional(),
+      altura_px: medidaPx(TRAFEGO_PX_MIN, TRAFEGO_PX_MAX).optional(),
+    }),
+    z.object({
+      tipo: z.literal("banner"),
+      projeto_id: projetoId,
+      local_uso: texto(120, "o local de uso do banner"),
+      briefing,
+      largura_px: medidaPx(BANNER_PX_MIN, BANNER_PX_MAX),
+      altura_px: medidaPx(BANNER_PX_MIN, BANNER_PX_MAX),
+    }),
   ])
   // .refine dentro de discriminatedUnion não é aceito pelo zod 3, então a regra
   // do tamanho personalizado fica aqui, na união.
   .superRefine((d, ctx) => {
+    if (
+      d.tipo === "trafego" &&
+      d.tamanho === "personalizado" &&
+      (d.largura_px == null || d.altura_px == null)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["largura_px"],
+        message: `Informe largura e altura entre ${TRAFEGO_PX_MIN} e ${TRAFEGO_PX_MAX} px.`,
+      });
+    }
     if (
       d.tipo === "panfleto" &&
       d.tamanho === "personalizado" &&
@@ -288,6 +380,16 @@ export function dimensoesDe(d: SolicitacaoArte): {
         medida_impressao: { largura_mm, altura_mm, personalizado, dpi: PANFLETO_DPI },
       };
     }
+    case "trafego": {
+      const personalizado = d.tamanho === "personalizado";
+      return {
+        largura_px: personalizado ? d.largura_px! : TRAFEGO_PADRAO_PX.largura,
+        altura_px: personalizado ? d.altura_px! : TRAFEGO_PADRAO_PX.altura,
+        medida_impressao: null,
+      };
+    }
+    case "banner":
+      return { largura_px: d.largura_px, altura_px: d.altura_px, medida_impressao: null };
     default:
       return { largura_px: 1080, altura_px: 1440, medida_impressao: null };
   }
@@ -306,6 +408,15 @@ export function camposDe(d: SolicitacaoArte): Record<string, string | number> {
       return { funcao: d.funcao, beneficios: d.beneficios };
     case "aviso":
       return { aviso: d.aviso };
+    case "trafego":
+      return {
+        objetivo: d.objetivo,
+        publico_alvo: d.publico_alvo,
+        oferta: d.oferta,
+        tamanho: d.tamanho,
+      };
+    case "banner":
+      return { local_uso: d.local_uso };
     default:
       return {};
   }
@@ -321,6 +432,10 @@ const CAMPO_ROTULO: Record<string, string> = {
   funcao: "Função",
   beneficios: "Benefícios",
   aviso: "Aviso",
+  objetivo: "Objetivo",
+  publico_alvo: "Público-alvo",
+  oferta: "Oferta / chamada principal",
+  local_uso: "Local de uso",
 };
 
 /** Linhas "rótulo: valor" dos campos específicos, para exibir em telas. */
@@ -359,10 +474,12 @@ export function camposParaExibir(row: {
     altura_mm?: number;
     personalizado?: boolean;
   } | null;
+  const pxPersonalizado =
+    row.tipo === "banner" || (row.tipo === "trafego" && campos.tamanho === "personalizado");
   const formato =
     row.tipo === "panfleto" && mi?.largura_mm && mi?.altura_mm
       ? `${mi.largura_mm / 10} × ${mi.altura_mm / 10} cm${mi.personalizado ? " (personalizado)" : ""}`
-      : `${row.largura_px} × ${row.altura_px} px`;
+      : `${row.largura_px} × ${row.altura_px} px${pxPersonalizado ? " (personalizado)" : ""}`;
   out.push({ rotulo: "Formato", valor: formato });
   return out;
 }
@@ -437,6 +554,9 @@ export const TIPOS_ASSET = {
   briefing: "Briefing da marca",
   briefing_documento: "Briefing completo (PDF)",
   tags_marca: "Tags da marca",
+  estilo_visual: "Estilo visual recomendado",
+  evitar: "O que evitar",
+  observacao_ia: "Observação útil para a IA",
   fonte: "Fonte",
   elemento_visual: "Elemento visual",
   modelo_base: "Modelo",
@@ -454,6 +574,9 @@ export const ASSET_EXIGE_EMPRESA: ReadonlySet<TipoAsset> = new Set<TipoAsset>([
   "briefing",
   "briefing_documento",
   "tags_marca",
+  "estilo_visual",
+  "evitar",
+  "observacao_ia",
   "fonte",
   "elemento_visual",
 ]);
@@ -499,8 +622,20 @@ export const SUGESTOES_VERSAO_LOGO = [
 export const MOLDURA_MIMES = ["image/png", "image/webp", "image/svg+xml"] as const;
 
 /** Assets só de texto (guardado em valor.texto, sem arquivo). */
-export const ASSET_DE_TEXTO: ReadonlySet<TipoAsset> = new Set<TipoAsset>(["slogan", "briefing"]);
-export const ASSET_TEXTO_MAX = { slogan: 300, briefing: 10000 } as const;
+export const ASSET_DE_TEXTO: ReadonlySet<TipoAsset> = new Set<TipoAsset>([
+  "slogan",
+  "briefing",
+  "estilo_visual",
+  "evitar",
+  "observacao_ia",
+]);
+export const ASSET_TEXTO_MAX = {
+  slogan: 300,
+  briefing: 10000,
+  estilo_visual: 5000,
+  evitar: 5000,
+  observacao_ia: 5000,
+} as const;
 
 /** Navegadores costumam mandar fonte sem content-type (ou com um x-font-*):
  * resolve pela extensão para bater com o allowed_mime_types do bucket. */

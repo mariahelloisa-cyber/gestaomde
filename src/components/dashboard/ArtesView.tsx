@@ -7,6 +7,7 @@ import { aceitarDemandaArte, listArtes, recusarDemandaArte } from "@/lib/arte.fu
 import {
   CATEGORIA_ROTULO,
   STATUS_INTERNO_ROTULO,
+  direcaoCriativaDe,
   rotuloTipo,
   type StatusArte,
 } from "@/lib/arte/tipos";
@@ -375,6 +376,12 @@ function ArteCard({
       </dl>
 
       {a.briefing && <p className="mt-3 whitespace-pre-wrap text-sm text-black">{a.briefing}</p>}
+
+      {direcaoCriativaDe(a.tipo) && (
+        <p className="mt-2 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <strong className="text-gray-700">Direção criativa:</strong> {direcaoCriativaDe(a.tipo)}
+        </p>
+      )}
 
       {status === "recusada" && a.demanda?.justificativa_recusa && (
         <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">

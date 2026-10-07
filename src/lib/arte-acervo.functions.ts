@@ -322,6 +322,11 @@ export const getFichaMarca = createServerFn({ method: "GET" })
       slogan: String(valorDe(umDe("slogan")).texto ?? ""),
       briefing: String(valorDe(umDe("briefing")).texto ?? ""),
       briefing_documento: arquivoDe(umDe("briefing_documento")),
+      estilo_visual: String(valorDe(umDe("estilo_visual")).texto ?? ""),
+      evitar: String(valorDe(umDe("evitar")).texto ?? ""),
+      observacao_ia: String(valorDe(umDe("observacao_ia")).texto ?? ""),
+      // Fonte e elementos visuais saíram da tela (2026-10-06), mas os dados
+      // continuam no banco e seguem disponíveis para a IA.
       fonte_nome: String(valorDe(fonte).nome_fonte ?? ""),
       fonte_arquivo: arquivoDe(fonte),
       elementos: varios("elemento_visual"),
@@ -334,11 +339,14 @@ const salvarTextosSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(40)).max(30),
   slogan: z.string().trim().max(ASSET_TEXTO_MAX.slogan),
   briefing: z.string().trim().max(ASSET_TEXTO_MAX.briefing),
-  fonte_nome: z.string().trim().max(120),
+  estilo_visual: z.string().trim().max(ASSET_TEXTO_MAX.estilo_visual),
+  evitar: z.string().trim().max(ASSET_TEXTO_MAX.evitar),
+  observacao_ia: z.string().trim().max(ASSET_TEXTO_MAX.observacao_ia),
 });
 
-/** Salva os campos de texto da ficha. Campo vazio = remove a linha (ou, na
- * fonte com arquivo, só limpa o nome). */
+/** Salva os campos de texto da ficha. Campo vazio = remove a linha.
+ * A fonte NÃO passa mais por aqui: saiu da tela, e um campo ausente não
+ * pode apagar a fonte já cadastrada. */
 export const salvarTextosFicha = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => salvarTextosSchema.parse(input))
@@ -355,11 +363,7 @@ export const salvarTextosFicha = createServerFn({ method: "POST" })
       const atual = linhas.find((l) => l.tipo === tipo);
       if (!conteudo) {
         if (!atual) return;
-        // Fonte com arquivo: tira só o nome, o arquivo continua.
-        const r =
-          tipo === "fonte" && atual.path
-            ? await supabase.from("brand_assets").update({ valor: {} }).eq("id", atual.id)
-            : await supabase.from("brand_assets").delete().eq("id", atual.id);
+        const r = await supabase.from("brand_assets").delete().eq("id", atual.id);
         if (r.error) throw new Error(r.error.message);
         return;
       }
@@ -379,7 +383,9 @@ export const salvarTextosFicha = createServerFn({ method: "POST" })
     await gravar("tags_marca", data.tags.length ? { tags: data.tags } : null);
     await gravar("slogan", data.slogan ? { valor: { texto: data.slogan } } : null);
     await gravar("briefing", data.briefing ? { valor: { texto: data.briefing } } : null);
-    await gravar("fonte", data.fonte_nome ? { valor: { nome_fonte: data.fonte_nome } } : null);
+    for (const tipo of ["estilo_visual", "evitar", "observacao_ia"] as const) {
+      await gravar(tipo, data[tipo] ? { valor: { texto: data[tipo] } } : null);
+    }
     return { ok: true };
   });
 
