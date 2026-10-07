@@ -47,12 +47,13 @@ export const ESCOPOS_PADRAO: readonly Escopo[] = ESCOPOS_SUPORTADOS;
 export const TEXTO_ESCOPO: Record<Escopo, { titulo: string; detalhe: string }> = {
   "crm:read": {
     titulo: "Ler dados do CRM",
-    detalhe: "Clientes, tarefas, projetos, pastas e comentários que você já vê no sistema.",
+    detalhe:
+      "Clientes, tarefas, projetos, pastas, comentários, e os seus murais e lembretes — o que você já vê no sistema.",
   },
   "crm:write": {
-    titulo: "Criar e alterar tarefas no CRM",
+    titulo: "Criar e alterar tarefas, murais e lembretes no CRM",
     detalhe:
-      "Criar e alterar tarefas, responsáveis, comentários e checklists. Designar alguém envia e-mail para essa pessoa. Nada é excluído, e nada que você mesmo não possa alterar no sistema.",
+      "Criar e alterar tarefas, responsáveis, comentários, checklists, e os seus murais e lembretes. Designar alguém envia e-mail para essa pessoa. Nada é excluído (tirar um cartão do mural não apaga a tarefa), e nada que você mesmo não possa alterar no sistema.",
   },
 };
 

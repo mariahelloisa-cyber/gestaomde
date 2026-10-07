@@ -2,8 +2,9 @@
 
 Servidor MCP remoto do CRM, em Cloudflare Workers. Transporte Streamable HTTP em `/mcp`.
 
-Estado: **etapa 4 de 6** — OAuth 2.1 completo, sete ferramentas de LEITURA e seis de
-ESCRITA sob RLS, com log de auditoria (`mcp_audit_log`).
+Estado: **etapa 4b de 6** — OAuth 2.1 completo, 11 ferramentas de LEITURA (com `whoami`)
+e 14 de ESCRITA sob RLS, com log de auditoria (`mcp_audit_log`). A 4b acrescentou murais e
+lembretes.
 
 Próximas etapas: (5) revisão de segurança final, (6) conector personalizado no Claude.
 
@@ -54,6 +55,26 @@ O que vale saber antes de mexer nelas:
   que designa Admin) e a consulta não a acharia.
 - O texto do aviso de designação sai de `CANAL_DE_AVISO`: hoje só e-mail existe em
   produção.
+
+### Murais e lembretes (etapa 4b)
+
+Leitura: `listar_murais`, `ver_mural`, `ver_lembrete`. Escrita: `criar_mural`,
+`editar_mural`, `criar_quadro`, `editar_quadro`, `colocar_tarefa_no_mural`,
+`tirar_tarefa_do_mural`, `criar_lembrete_no_mural`, `editar_lembrete`. Código em
+`murais.ts` (leitura, cores e resolução por nome), `murais-escrita.ts` e `lembretes.ts`.
+O DEPLOY.md, seção 10.8, tem as regras e o roteiro de teste.
+
+- **Mural é pessoal, e nenhuma policy de mural foi tocada.** Toda consulta filtra
+  `usuario_id = eu` também no código, como o app.
+- **`mural_tarefa_permitida` é chamada antes de pôr E de mover** cartão: a policy de
+  UPDATE de `mural_itens` não repete a checagem, e o app não deixa mexer em cartão de
+  tarefa da qual a pessoa saiu.
+- **Lembrete sem data no último mural não sai do mural**: ficaria invisível no app.
+- **Conteúdo de lembrete vai até 20.000** (`CONTEUDO_MAXIMO`), o mesmo teto do app
+  (`src/lib/data.functions.ts`): se um mudar, mude o outro. Na auditoria entra só
+  `conteudo_len`.
+- **Cores** são os nomes da paleta do app (`CORES` em `murais.ts`, espelho de
+  `CORES_MURAL`).
 
 Decisões que valem saber antes de mexer:
 

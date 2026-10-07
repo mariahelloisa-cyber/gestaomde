@@ -7,7 +7,21 @@
  * desatento quebraria sem nenhum typecheck reclamar — por exemplo, o -03:00 do
  * prazo virar UTC e toda tarefa vencer um dia antes.
  */
-import { escoposEfetivos, ESCOPOS_PADRAO, ESCOPOS_SUPORTADOS } from "../src/auth/escopos.ts";
+import {
+  escoposEfetivos,
+  ESCOPOS_PADRAO,
+  ESCOPOS_SUPORTADOS,
+  TEXTO_ESCOPO,
+} from "../src/auth/escopos.ts";
+import {
+  COR_PADRAO,
+  CONTEUDO_MAXIMO,
+  CORES,
+  escolherPorNome,
+  nomeDaCor,
+  trechoInicial,
+} from "../src/mcp/ferramentas/murais.ts";
+import { posicaoEntre } from "../src/mcp/ferramentas/murais-escrita.ts";
 import {
   avisoDePrazo,
   avisoDeVisibilidade,
@@ -139,6 +153,15 @@ const ESCRITA = [
   "comentar_tarefa",
   "adicionar_itens_checklist",
   "marcar_item_checklist",
+  // etapa 4b
+  "criar_mural",
+  "editar_mural",
+  "criar_quadro",
+  "editar_quadro",
+  "colocar_tarefa_no_mural",
+  "tirar_tarefa_do_mural",
+  "criar_lembrete_no_mural",
+  "editar_lembrete",
 ];
 
 /** Mesmo truque do portabilidade.mjs: acha o mapa de ferramentas no McpServer. */
@@ -173,14 +196,77 @@ conferir(
   soLeitura.filter((n) => ESCRITA.includes(n)),
   [],
 );
-conferir("grant só de leitura: 8 ferramentas", soLeitura.length, 8);
+conferir("grant só de leitura: 11 ferramentas", soLeitura.length, 11);
 conferir(
-  "com crm:write: as 6 de escrita aparecem",
+  "grant só de leitura: as 3 de mural/lembrete aparecem",
+  ["listar_murais", "ver_lembrete", "ver_mural"].every((n) => soLeitura.includes(n)),
+  true,
+);
+conferir(
+  "com crm:write: as 14 de escrita aparecem",
   comEscrita.filter((n) => ESCRITA.includes(n)),
   [...ESCRITA].sort(),
 );
-conferir("com crm:write: 14 ferramentas", comEscrita.length, 14);
+conferir("com crm:write: 25 ferramentas", comEscrita.length, 25);
 conferir("sem login: só o whoami", semLogin, ["whoami"]);
+
+// --- etapa 4b: murais e lembretes ---
+conferir("cor padrão é a primeira da paleta do app", CORES[COR_PADRAO], "#7B68EE");
+conferir("paleta tem as 10 cores do app", Object.keys(CORES).length, 10);
+conferir("hex da paleta vira nome", nomeDaCor("#ef4444"), "vermelho");
+conferir("hex fora da paleta volta como hex", nomeDaCor("#123456"), "#123456");
+
+const quadros = [
+  { id: "a", nome: "Hoje" },
+  { id: "b", nome: "Hoje cedo" },
+  { id: "c", nome: "Semana" },
+];
+conferir(
+  "nome exato vence o parcial",
+  escolherPorNome(quadros, " hoje ").map((q) => q.id),
+  ["a"],
+);
+conferir(
+  "parcial único resolve",
+  escolherPorNome(quadros, "sem").map((q) => q.id),
+  ["c"],
+);
+conferir(
+  "trecho do meio resolve",
+  escolherPorNome(quadros, "oje c").map((q) => q.id),
+  ["b"],
+);
+conferir(
+  "parcial ambíguo devolve todos (vira pedido de escolha)",
+  escolherPorNome(quadros, "e").map((q) => q.id),
+  ["a", "b", "c"],
+);
+conferir("nada casa: vazio", escolherPorNome(quadros, "mês"), []);
+
+// posicaoEntre: a mesma regra do app (MuralView.tsx).
+conferir("entre dois vizinhos: ponto médio", posicaoEntre(1, 2), 1.5);
+conferir("depois do último: +1", posicaoEntre(3, undefined), 4);
+conferir("antes do primeiro: -1", posicaoEntre(undefined, 1), 0);
+conferir("lista vazia: 1", posicaoEntre(undefined, undefined), 1);
+
+conferir("conteúdo de lembrete vai até 20 mil", CONTEUDO_MAXIMO, 20000);
+conferir("trecho inicial corta e delimita", trechoInicial("x".repeat(500), 20).length, 22);
+conferir("trecho inicial de vazio", trechoInicial("  "), "(sem conteúdo)");
+
+// A auditoria nunca recebe o roteiro: só o tamanho. O resumo corta texto em
+// 120, mas o conteúdo nem chega lá — este teste garante o corte de qualquer
+// string que escape.
+conferir(
+  "resumo da auditoria não carrega texto longo",
+  JSON.stringify(resumirArgumentos({ titulo: "t", conteudo_len: 18000 })).length < 200,
+  true,
+);
+
+conferir(
+  "consentimento de escrita cita murais e lembretes",
+  TEXTO_ESCOPO["crm:write"].detalhe.includes("murais e lembretes"),
+  true,
+);
 
 if (falhas > 0) {
   console.error(`\n${falhas} teste(s) falharam.`);

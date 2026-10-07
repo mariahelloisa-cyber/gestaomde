@@ -282,7 +282,7 @@ export function recusarSeLembrete(t: TarefaParaEscrita): Desfecho | null {
   if (t.tipo === "tarefa") return null;
   return {
     resposta: erro(
-      "Isto é um lembrete, não uma tarefa. Lembretes não são alterados por aqui; use o app.",
+      "Isto é um lembrete, não uma tarefa. Lembrete seu se altera com editar_lembrete; o resto, pelo app.",
     ),
     auditoria: { resultado: "negado", tarefaId: t.id, detalhe: "lembrete fora do escopo" },
   };

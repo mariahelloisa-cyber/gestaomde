@@ -9,7 +9,21 @@ import {
   registrarComentarTarefa,
   registrarMarcarItemChecklist,
 } from "./ferramentas/colaboracao";
+import { registrarCriarLembreteNoMural, registrarEditarLembrete } from "./ferramentas/lembretes";
 import { registrarLinks } from "./ferramentas/links";
+import {
+  registrarListarMurais,
+  registrarVerLembrete,
+  registrarVerMural,
+} from "./ferramentas/murais";
+import {
+  registrarColocarTarefaNoMural,
+  registrarCriarMural,
+  registrarCriarQuadro,
+  registrarEditarMural,
+  registrarEditarQuadro,
+  registrarTirarTarefaDoMural,
+} from "./ferramentas/murais-escrita";
 import { registrarProjetos } from "./ferramentas/projetos";
 import {
   registrarAtualizarTarefa,
@@ -24,7 +38,7 @@ import {
 import { consultar, MENSAGEM_SESSAO_EXPIRADA } from "./sessao";
 
 export const SERVER_NAME = "gestaomde-crm";
-export const SERVER_VERSION = "0.3.0";
+export const SERVER_VERSION = "0.4.0";
 
 /** O que o AuthHandler guardou em `props` no completeAuthorization. */
 export interface PropsUsuario {
@@ -146,6 +160,12 @@ export function createServer(env: Env, props: PropsUsuario | null, escopos: stri
     registrarResumoDoDia(server, supabase, props.userId);
     registrarProjetos(server, supabase);
     registrarLinks(server, supabase);
+
+    // Etapa 4b: murais e lembretes. Mural é pessoal (o RLS só devolve os do
+    // próprio usuário), então ler os próprios murais é leitura comum.
+    registrarListarMurais(server, supabase, props.userId);
+    registrarVerMural(server, supabase, props.userId);
+    registrarVerLembrete(server, supabase, props.userId);
   }
 
   // Etapa 4: as de ESCRITA, só com crm:write.
@@ -173,6 +193,16 @@ export function createServer(env: Env, props: PropsUsuario | null, escopos: stri
     registrarComentarTarefa(server, ctx);
     registrarAdicionarItensChecklist(server, ctx);
     registrarMarcarItemChecklist(server, ctx);
+
+    // Etapa 4b. Excluir mural e excluir quadro ficam de fora: só pelo app.
+    registrarCriarMural(server, ctx);
+    registrarEditarMural(server, ctx);
+    registrarCriarQuadro(server, ctx);
+    registrarEditarQuadro(server, ctx);
+    registrarColocarTarefaNoMural(server, ctx);
+    registrarTirarTarefaDoMural(server, ctx);
+    registrarCriarLembreteNoMural(server, ctx);
+    registrarEditarLembrete(server, ctx);
   }
 
   return server;

@@ -24,6 +24,14 @@ const CALLBACK_CLAUDE = "https://claude.ai/api/mcp/auth_callback";
 /** PKCE de exemplo da RFC 7636. O servidor só guarda o desafio nesta etapa. */
 const DESAFIO_PKCE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
 
+/**
+ * Quantas ferramentas cada escopo registra (etapa 4b). O mesmo número é
+ * conferido em scripts/escrita.test.mjs, contra o createServer de verdade.
+ */
+const VERSAO_ESPERADA = "0.4.0";
+const FERRAMENTAS_LEITURA = 11;
+const FERRAMENTAS_COM_ESCRITA = 25;
+
 const resultados = [];
 const clientesCriados = [];
 let registrosFeitos = 0;
@@ -544,6 +552,13 @@ async function main() {
     console.log(`Tudo passou: ${resultados.length} verificacao(oes).`);
     console.log("Proximo passo: item 6 do DEPLOY.md, adicionar o conector no Claude.");
     console.log(`A URL do conector e ${base}/mcp`);
+    // O tools/list exige token, que este script nao tem: a contagem se confere
+    // a mao, no Claude. Os numeros vem de scripts/escrita.test.mjs.
+    console.log("");
+    console.log(`Ferramentas que cada conexao deve ver no Claude (servidor ${VERSAO_ESPERADA}):`);
+    console.log(`  so leitura (crm:read):         ${FERRAMENTAS_LEITURA}`);
+    console.log(`  leitura e escrita (crm:write): ${FERRAMENTAS_COM_ESCRITA}`);
+    console.log("  Se aparecerem menos, o Worker publicado e anterior a etapa 4b.");
     return;
   }
 

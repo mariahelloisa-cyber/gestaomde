@@ -1,9 +1,10 @@
-# Deploy em produção — etapas 3 e 4 (leitura e escrita)
+# Deploy em produção — etapas 3, 4 e 4b (leitura, escrita, murais e lembretes)
 
-Passo a passo para publicar o `gestaomde-mcp` na Cloudflare com as sete ferramentas de
-leitura e as seis de escrita. As seções 1 a 9 são o deploy-base (feito na etapa 3); a
+Passo a passo para publicar o `gestaomde-mcp` na Cloudflare: 11 ferramentas de leitura
+(com `whoami`) e 14 de escrita. As seções 1 a 9 são o deploy-base (feito na etapa 3); a
 **seção 10** é o que a etapa 4 acrescenta — duas migrations, a reconexão de cada pessoa
-e o roteiro de teste da escrita.
+e o roteiro de teste da escrita — e a **10.8**, murais e lembretes (etapa 4b, sem
+migration).
 
 Antes de começar, rode a verificação local:
 
@@ -262,7 +263,8 @@ vezes, o que trancaria essa pessoa por 15 minutos.
    - **o domínio de destino em destaque** deve ser `claude.ai` (ou `claude.com`). Se
      aparecer outro, não aprove: o nome do aplicativo é auto-declarado, o domínio não;
    - as permissões listadas devem ser "Ler dados do CRM" (`crm:read`) e "Criar e alterar
-     tarefas no CRM" (`crm:write`) — desde a etapa 4 as duas vêm juntas por padrão.
+     tarefas, murais e lembretes no CRM" (`crm:write`) — desde a etapa 4 as duas vêm
+     juntas por padrão.
 7. **Permitir**. O Claude volta conectado.
 8. Siga a seção 10.4 para deixar as ferramentas de escrita pedindo aprovação.
 
@@ -289,9 +291,11 @@ O que observar:
   Claude deve voltar perguntando qual das pessoas, não escolher uma.
 - **Permissões de verdade.** Entre com uma conta de Membro e pergunte algo que só Admin
   vê. O Claude tem que não encontrar — quem corta é o RLS, não o prompt.
-- **Escrita.** O teste das seis ferramentas de escrita tem roteiro próprio, numa tarefa
-  de teste: seção 10.5. Quem ainda está com grant só de leitura não tem essas
+- **Escrita.** As ferramentas de escrita têm roteiro próprio: tarefas na seção 10.5,
+  murais e lembretes na 10.8. Quem ainda está com grant só de leitura não tem essas
   ferramentas: se ele disser que criou algo, é alucinação — confira no CRM.
+- **Murais.** "Quais são meus murais?" (`listar_murais`) e "Me mostra o mural X"
+  (`ver_mural`). Cada pessoa só vê os próprios — inclusive Admin.
 - **Datas.** As respostas devem usar dd/mm/aaaa e marcar as atrasadas.
 
 ### Se um membro for desativado
@@ -349,7 +353,7 @@ Se o problema é a escrita (um loop, uma ferramenta se comportando mal), tire
 npm run deploy
 ```
 
-Efeito imediato: as seis ferramentas somem de toda conexão, inclusive das que já têm
+Efeito imediato: as 14 ferramentas de escrita somem de toda conexão, inclusive das que já têm
 grant com `crm:write` — o `server.ts` só as registra se o escopo estiver no token **e**
 em `ESCOPOS_SUPORTADOS`, e conexão nova nem recebe o escopo. A leitura continua igual.
 Para voltar, recoloque o escopo e publique; quem tinha o grant com escrita volta a ver as
@@ -747,7 +751,7 @@ Para ganhar escrita, cada pessoa faz:
 1. No Claude, **Configurações → Conectores → CRM da agência → Desconectar**.
 2. **Conectar** de novo. Entrar com a conta do CRM.
 3. Na tela de consentimento, conferir que aparecem **as duas** permissões: "Ler dados do
-   CRM" e "Criar e alterar tarefas no CRM". **Permitir**.
+   CRM" e "Criar e alterar tarefas, murais e lembretes no CRM". **Permitir**.
 4. Numa conversa nova, perguntar: _"Com qual conta do CRM você está conectado?"_. O
    `whoami` tem que responder `Permissões: crm:read, crm:write`.
 
@@ -763,10 +767,14 @@ Quem não deve escrever pelo Claude pode simplesmente não reconectar.
 
 Recomendado para todos: deixar as ferramentas de escrita pedindo confirmação a cada uso.
 No Claude, em **Configurações → Conectores → CRM da agência**, se aparecer a lista de
-ferramentas com permissão por ferramenta, deixe as seis de escrita (`criar_tarefa`,
+ferramentas com permissão por ferramenta, deixe as 14 de escrita em **pedir aprovação**
+(o rótulo exato pode variar) e as de leitura liberadas. As de escrita são: `criar_tarefa`,
 `atualizar_tarefa`, `definir_responsaveis`, `comentar_tarefa`,
-`adicionar_itens_checklist`, `marcar_item_checklist`) em **pedir aprovação** (o rótulo
-exato pode variar) e as de leitura liberadas.
+`adicionar_itens_checklist`, `marcar_item_checklist` e, da etapa 4b, `criar_mural`,
+`editar_mural`, `criar_quadro`, `editar_quadro`, `colocar_tarefa_no_mural`,
+`tirar_tarefa_do_mural`, `criar_lembrete_no_mural` e `editar_lembrete`. Ferramenta nova
+pode entrar já liberada: depois de cada deploy que acrescenta ferramentas, revise essa
+lista.
 
 Se essa opção não existir na sua conta, não há como forçar pelo servidor. As ferramentas
 são anunciadas com `readOnlyHint: false` (e `destructiveHint: true` nas que sobrescrevem
@@ -868,6 +876,105 @@ algo; vale olhar a conversa com ela.
   `crm:write` e publique ANTES de rodar, e exporte a tabela se ela já tiver uso. Depois de
   qualquer rollback, desmarque a migration com `supabase migration repair --status
 reverted <versão>`.
+
+### 10.8 Etapa 4b: murais e lembretes
+
+**Sem migration e sem mudança de policy.** É só código: `npm run verificar` e
+`npm run deploy`. Depende da etapa 4 já estar no ar (`mcp_audit_log` existe).
+
+**Ninguém precisa reconectar.** Os escopos são os mesmos: quem tem `crm:read` passa a ver
+as 3 de leitura novas, e quem tem `crm:write`, as 8 de escrita, no primeiro uso depois do
+deploy. O texto novo do consentimento ("…murais e lembretes") só aparece em conexão
+nova. Confira a contagem no Claude: **11** ferramentas só com leitura, **25** com escrita
+(o `verificar-producao` imprime esses números no fim).
+
+| Ferramenta                | Escopo  | Faz                                                                                |
+| ------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| `listar_murais`           | leitura | Meus murais, com contagem de quadros e cartões                                     |
+| `ver_mural`               | leitura | Quadros em ordem e seus cartões (título, tipo, status, prazo, ids)                 |
+| `ver_lembrete`            | leitura | Um lembrete meu inteiro, com o conteúdo (roteiro) completo                         |
+| `criar_mural`             | escrita | Mural novo, no fim                                                                 |
+| `editar_mural`            | escrita | Nome, cor, descrição                                                               |
+| `criar_quadro`            | escrita | Quadro novo num mural, no fim                                                      |
+| `editar_quadro`           | escrita | Nome, cor, posição (1 = primeiro)                                                  |
+| `colocar_tarefa_no_mural` | escrita | Põe tarefa (sou responsável) ou lembrete meu num quadro; se já está no mural, move |
+| `tirar_tarefa_do_mural`   | escrita | Tira só o cartão; a tarefa continua                                                |
+| `criar_lembrete_no_mural` | escrita | Cria o lembrete (com o roteiro) e o cartão no quadro, nessa ordem                  |
+| `editar_lembrete`         | escrita | Título, conteúdo (substitui o inteiro), data — só lembrete meu                     |
+
+As regras, todas no servidor:
+
+- **Mural é pessoal**, inclusive para Admin: é o RLS de `murais`, `mural_quadros` e
+  `mural_itens`, que não foi tocado.
+- **Mural e quadro precisam existir.** Nome que não existe é erro listando os que
+  existem; nada é criado sozinho. Nome exatamente igual vence o parcial ("Hoje" ×
+  "Hoje cedo"); ambíguo pede para escolher.
+- **Cartão:** só tarefa em que a pessoa é responsável, ou lembrete que ela criou
+  (`mural_tarefa_permitida`, checada também ao **mover**, porque a policy de UPDATE não
+  repete a checagem). Tarefa finalizada (concluída há 7 dias ou mais) é recusada, como no
+  app. Uma tarefa fica num quadro só por mural: pôr de novo **move** o cartão.
+- **Lembrete sem data no último mural não sai do mural.** O app não tem "remover do
+  quadro" para lembrete (só "excluir"), a Agenda só mostra lembrete com data e o Kanban
+  não mostra lembrete: tirar o cartão o deixaria invisível em todas as telas. A
+  ferramenta recusa e sugere mover, dar data, ou excluir pelo app.
+- **Lembrete:** escopo padrão `pessoal`; `geral` (toda a equipe vê na Agenda) só a pedido
+  explícito. **Data opcional** — o banco e o app não exigem; sem data ele aparece no mural
+  ("Sem data") e não na Agenda, e a resposta diz isso. Lembrete não tem responsável, então
+  **não gera e-mail**.
+- **Se o cartão falhar** depois de criado o lembrete, o lembrete **fica** (não é apagado)
+  e a resposta diz o id e como pôr no mural depois. Auditoria: `parcial`.
+- **Duplicata:** mesmo mural (nome), mesmo quadro (nome, no mesmo mural) ou mesmo
+  lembrete (título) criado pela mesma pessoa em menos de 2 minutos devolve o existente.
+- **Auditoria:** do lembrete, só `conteudo_len`. O texto do roteiro nunca vai para
+  `mcp_audit_log`.
+- **Fora:** excluir mural, excluir quadro (só pelo app, que mostra quantos lembretes vão
+  junto), reordenar cartões dentro do quadro, reordenar murais.
+
+**Limite do conteúdo: 20.000 caracteres, no MCP e no app.** A coluna
+`tarefas.descricao` é `text` sem limite no banco; o teto é de validação, igual nos dois
+lados (`CONTEUDO_MAXIMO` em `lembretes`/`murais.ts` e `createSchema`/`updateSchema` em
+`src/lib/data.functions.ts`, commit "app: descrição até 20000 caracteres").
+
+**Ordem de publicação:** o app com esse commit tem que estar no ar quando o MCP da 4b
+entrar. Com o app antigo (5.000), um roteiro maior que 5.000 feito pelo Claude abre normal
+no app, mas **editar o conteúdo pelo app** falha na validação (título e data funcionam,
+porque o app só manda o campo que mudou).
+
+#### Roteiro de teste de murais e lembretes
+
+Com uma conta sua conectada com escrita. Anote a hora de início.
+
+| #   | Peça ao Claude                                                                        | Ferramenta                         | Esperado                                                                                                                                |
+| --- | ------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | "Cria o mural 'TESTE MCP 4b' com um quadro 'Roteiros' e outro 'Gravados'"             | `criar_mural`, `criar_quadro` ×2   | Mural e quadros aparecem no app, nessa ordem                                                                                            |
+| 2   | "Cria de novo o mural 'TESTE MCP 4b'" (em menos de 2 min)                             | `criar_mural`                      | "Não criei outro", mesmo id                                                                                                             |
+| 3   | "Cria um roteiro curto sobre teste e adiciona no mural TESTE MCP 4b, quadro Roteiros" | `criar_lembrete_no_mural`          | Resposta: id, "sem data", "pessoal", N caracteres. No app: cartão de lembrete no quadro Roteiros; ao abrir, o roteiro está na descrição |
+| 4   | "Me mostra o roteiro inteiro"                                                         | `ver_lembrete`                     | O texto completo, entre « » / com o prefixo `│`, e o rodapé de dados                                                                    |
+| 5   | "Ajusta o final do roteiro: termina convidando a pessoa a seguir o perfil"            | `ver_lembrete` + `editar_lembrete` | Resposta: tamanho antes → depois e os dois trechos iniciais (iguais). No app, o final mudou                                             |
+| 6   | "Cria um roteiro sobre teste no mural Mural Que Não Existe"                           | `criar_lembrete_no_mural`          | **Erro listando os seus murais**; nada criado (confira no app)                                                                          |
+| 7   | "Move o roteiro para o quadro Gravados"                                               | `colocar_tarefa_no_mural`          | "movido do quadro «Roteiros»". No app, o cartão está em Gravados                                                                        |
+| 8   | "Coloca o quadro Gravados em primeiro"                                                | `editar_quadro`                    | "Posição: 2º → 1º". No app, Gravados à esquerda                                                                                         |
+| 9   | "Tira o roteiro do mural"                                                             | `tirar_tarefa_do_mural`            | **Recusa**: lembrete sem data e único mural. Nada muda no app                                                                           |
+| 10  | "Põe no quadro Roteiros uma tarefa em que eu sou responsável" (diga qual)             | `colocar_tarefa_no_mural`          | Cartão da tarefa em Roteiros                                                                                                            |
+| 11  | "Tira essa tarefa do mural"                                                           | `tirar_tarefa_do_mural`            | Cartão some; a tarefa continua em Tarefas                                                                                               |
+| 12  | "Põe no mural uma tarefa em que eu NÃO sou responsável" (diga qual)                   | `colocar_tarefa_no_mural`          | **Recusa**: "Você não é responsável por essa tarefa"                                                                                    |
+| 13  | Rode a consulta do passo 13 da 10.5, com a nova hora                                  | —                                  | Linhas abaixo                                                                                                                           |
+
+Resultado esperado em `mcp_audit_log`, em ordem: `criar_mural` ok, `criar_quadro` ok ×2,
+`criar_mural` duplicata, `criar_lembrete_no_mural` ok (`argumentos.conteudo_len` com o
+tamanho, **sem texto**), `editar_lembrete` ok (`campos: ["conteudo"]`),
+`colocar_tarefa_no_mural` ok (`acao: "mover"`), `editar_quadro` ok,
+`tirar_tarefa_do_mural` negado ("lembrete sem data ficaria invisivel no app"),
+`colocar_tarefa_no_mural` ok (`acao: "inserir"`), `tirar_tarefa_do_mural` ok,
+`colocar_tarefa_no_mural` negado (`mural_tarefa_permitida = false`). O passo 6 não gera
+linha (erro de entrada), nem os de leitura.
+
+Confira também: `select argumentos from mcp_audit_log where ferramenta in
+('criar_lembrete_no_mural','editar_lembrete')` — nenhum valor pode conter frase do
+roteiro.
+
+Limpeza: **exclua o mural pelo app**. O `excluir_mural` apaga junto os lembretes que só
+estavam nele (o roteiro de teste vai junto); a tarefa do passo 10 não é afetada.
 
 ---
 
