@@ -51,8 +51,10 @@ import {
   type Complexidade,
   type Prioridade,
   type Status,
+  type Tarefa,
 } from "@/lib/mock-data";
-import { useTasks } from "@/lib/tasks-store";
+import { useTasks, type AlteracoesChecklist } from "@/lib/tasks-store";
+import { toast } from "sonner";
 import { ShareDialog } from "./ShareDialog";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +79,76 @@ function relativo(iso: string): string {
   return format(new Date(iso), "dd 'de' MMM", { locale: ptBR });
 }
 
+type Responsavel = { id: string; nome: string; iniciais: string };
+type ItemRascunho = { id: string; texto: string; concluido: boolean; novo?: boolean };
+
+/** Cópia editável da tarefa: nada vai pro servidor até clicar em Salvar. */
+interface Rascunho {
+  tarefaId: string;
+  titulo: string;
+  descricao: string;
+  status: Status;
+  prioridade: Prioridade;
+  complexidade: Complexidade;
+  data_vencimento: string;
+  projeto_id: string | null;
+  responsaveis: Responsavel[];
+  checklist: ItemRascunho[];
+}
+
+function rascunhoDe(t: Tarefa): Rascunho {
+  return {
+    tarefaId: t.id,
+    titulo: t.titulo,
+    descricao: t.descricao ?? "",
+    status: t.status,
+    prioridade: t.prioridade,
+    complexidade: t.complexidade,
+    data_vencimento: t.data_vencimento,
+    projeto_id: t.projeto_id ?? null,
+    responsaveis: t.responsaveis.map((r) => ({ id: r.id, nome: r.nome, iniciais: r.iniciais })),
+    checklist: (t.checklist ?? []).map((i) => ({ ...i })),
+  };
+}
+
+function calcularAlteracoes(t: Tarefa, r: Rascunho) {
+  const patch: Partial<Tarefa> = {};
+  const titulo = r.titulo.trim();
+  if (titulo && titulo !== t.titulo) patch.titulo = titulo;
+  if (r.descricao !== (t.descricao ?? "")) patch.descricao = r.descricao;
+  if (r.status !== t.status) patch.status = r.status;
+  if (r.prioridade !== t.prioridade) patch.prioridade = r.prioridade;
+  if (r.complexidade !== t.complexidade) patch.complexidade = r.complexidade;
+  if (r.data_vencimento !== t.data_vencimento) patch.data_vencimento = r.data_vencimento;
+  if (r.projeto_id !== (t.projeto_id ?? null)) patch.projeto_id = r.projeto_id;
+  const ids = (arr: Responsavel[]) =>
+    arr
+      .map((x) => x.id)
+      .sort()
+      .join(",");
+  if (ids(r.responsaveis) !== ids(t.responsaveis)) patch.responsaveis = r.responsaveis;
+
+  const originais = new Map((t.checklist ?? []).map((i) => [i.id, i]));
+  const mantidos = new Set(r.checklist.filter((i) => !i.novo).map((i) => i.id));
+  const checklist: AlteracoesChecklist = {
+    adicionar: r.checklist
+      .filter((i) => i.novo)
+      .map((i) => ({ texto: i.texto, concluido: i.concluido })),
+    alternar: r.checklist
+      .filter((i) => !i.novo && originais.has(i.id))
+      .filter((i) => originais.get(i.id)!.concluido !== i.concluido)
+      .map((i) => ({ id: i.id, concluido: i.concluido })),
+    remover: [...originais.keys()].filter((id) => !mantidos.has(id)),
+  };
+
+  const temAlteracao =
+    Object.keys(patch).length > 0 ||
+    checklist.adicionar.length > 0 ||
+    checklist.alternar.length > 0 ||
+    checklist.remover.length > 0;
+  return { patch, checklist, temAlteracao };
+}
+
 export function TaskDetailDialog() {
   const {
     tarefas,
@@ -84,36 +156,40 @@ export function TaskDetailDialog() {
     projetos,
     selectedTaskId,
     closeTask,
-    updateTarefa,
+    salvarTarefa,
     addComentario,
     removerTarefa,
     myCargo,
-    addChecklistItem,
-    toggleChecklistItem,
-    removerChecklistItem,
   } = useTasks();
   const tarefa = tarefas.find((t) => t.id === selectedTaskId) ?? null;
   const cliente = tarefa ? clientes.find((c) => c.id === tarefa.cliente_id) : null;
   const isAdmin = myCargo === "Admin";
 
-  const [titulo, setTitulo] = useState("");
-  const [descricao, setDescricao] = useState("");
+  const [rascunho, setRascunho] = useState<Rascunho | null>(null);
+  const [salvando, setSalvando] = useState(false);
   const [comentario, setComentario] = useState("");
   const [novoItem, setNovoItem] = useState("");
   const [compartilhando, setCompartilhando] = useState(false);
 
+  // Abrir (ou reabrir) a tarefa sempre parte do que está salvo — fechar sem
+  // salvar descarta o rascunho.
   useEffect(() => {
+    setRascunho(tarefa ? rascunhoDe(tarefa) : null);
     if (tarefa) {
-      setTitulo(tarefa.titulo);
-      setDescricao(tarefa.descricao ?? "");
       setComentario("");
+      setNovoItem("");
       setCompartilhando(false);
     }
   }, [tarefa?.id]);
 
   if (!tarefa) return null;
 
-  const checklist = tarefa.checklist ?? [];
+  const r = rascunho?.tarefaId === tarefa.id ? rascunho : rascunhoDe(tarefa);
+  const editar = (patch: Partial<Rascunho>) => setRascunho({ ...r, ...patch });
+  const { patch, checklist: alteracoesChecklist, temAlteracao } = calcularAlteracoes(tarefa, r);
+  const podeSalvar = temAlteracao && !!r.titulo.trim() && !salvando;
+
+  const checklist = r.checklist;
   const totalItens = checklist.length;
   const concluidosItens = checklist.filter((i) => i.concluido).length;
   const progresso = totalItens > 0 ? Math.round((concluidosItens / totalItens) * 100) : 0;
@@ -121,17 +197,24 @@ export function TaskDetailDialog() {
   const adicionarItem = () => {
     const v = novoItem.trim();
     if (!v) return;
-    addChecklistItem(tarefa.id, v);
+    editar({
+      checklist: [
+        ...checklist,
+        { id: `novo-${crypto.randomUUID()}`, texto: v, concluido: false, novo: true },
+      ],
+    });
     setNovoItem("");
   };
 
-  const commitTitulo = () => {
-    const v = titulo.trim();
-    if (v && v !== tarefa.titulo) updateTarefa(tarefa.id, { titulo: v });
-    else if (!v) setTitulo(tarefa.titulo);
-  };
-  const commitDescricao = () => {
-    if (descricao !== (tarefa.descricao ?? "")) updateTarefa(tarefa.id, { descricao });
+  const salvar = async () => {
+    if (!podeSalvar) return;
+    setSalvando(true);
+    const ok = await salvarTarefa(tarefa.id, patch, alteracoesChecklist);
+    setSalvando(false);
+    if (ok) {
+      toast.success("Alterações salvas");
+      closeTask();
+    }
   };
 
   const enviarComentario = () => {
@@ -163,8 +246,8 @@ export function TaskDetailDialog() {
           </span>
           <div className="ml-auto">
             <StatusDropdown
-              status={tarefa.status}
-              onChange={(s) => updateTarefa(tarefa.id, { status: s })}
+              status={r.status}
+              onChange={(s) => editar({ status: s })}
               isAdmin={isAdmin}
             />
           </div>
@@ -220,18 +303,16 @@ export function TaskDetailDialog() {
           {/* Corpo principal */}
           <div className="flex flex-col overflow-y-auto px-6 py-5">
             <input
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              onBlur={commitTitulo}
+              value={r.titulo}
+              onChange={(e) => editar({ titulo: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
               placeholder="Título da tarefa"
               className="w-full border-0 bg-transparent text-2xl font-semibold leading-tight outline-none placeholder:text-muted-foreground"
             />
 
             <Textarea
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              onBlur={commitDescricao}
+              value={r.descricao}
+              onChange={(e) => editar({ descricao: e.target.value })}
               placeholder="Escreva uma descrição..."
               className="mt-4 min-h-[120px] resize-none border-border/60 bg-[var(--surface-1)] text-sm shadow-none focus-visible:ring-1"
             />
@@ -258,12 +339,12 @@ export function TaskDetailDialog() {
               </div>
             )}
 
-            {/* Anexos (trazidos de uma demanda externa aceita) */}
+            {/* Anexos (enviados na criação da tarefa ou trazidos de uma demanda aceita) */}
             {(tarefa.anexos ?? []).length > 0 && (
               <div className="mt-4 rounded-md border border-border bg-[var(--surface-1)] p-3">
                 <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <Paperclip className="h-3.5 w-3.5" />
-                  Anexos da demanda
+                  Anexos
                 </div>
                 <ul className="flex flex-col gap-1">
                   {(tarefa.anexos ?? []).map((a) =>
@@ -316,7 +397,13 @@ export function TaskDetailDialog() {
                     className="group flex items-center gap-2 rounded-md px-1 py-1.5 hover:bg-muted/40"
                   >
                     <button
-                      onClick={() => toggleChecklistItem(item.id, !item.concluido)}
+                      onClick={() =>
+                        editar({
+                          checklist: checklist.map((i) =>
+                            i.id === item.id ? { ...i, concluido: !i.concluido } : i,
+                          ),
+                        })
+                      }
                       className={cn(
                         "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                         item.concluido
@@ -335,7 +422,9 @@ export function TaskDetailDialog() {
                       {item.texto}
                     </span>
                     <button
-                      onClick={() => removerChecklistItem(item.id)}
+                      onClick={() =>
+                        editar({ checklist: checklist.filter((i) => i.id !== item.id) })
+                      }
                       className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-destructive group-hover:opacity-100"
                       title="Remover item"
                     >
@@ -428,29 +517,29 @@ export function TaskDetailDialog() {
           <aside className="flex flex-col gap-5 overflow-y-auto border-l border-border bg-[var(--surface-1)] px-4 py-5">
             <MetaRow label="Responsáveis">
               <ResponsavelPicker
-                atuais={tarefa.responsaveis}
-                onChange={(arr) => updateTarefa(tarefa.id, { responsaveis: arr })}
+                atuais={r.responsaveis}
+                onChange={(arr) => editar({ responsaveis: arr })}
               />
             </MetaRow>
 
             <MetaRow label="Data de vencimento">
               <DatePickerField
-                value={tarefa.data_vencimento}
-                onChange={(iso) => updateTarefa(tarefa.id, { data_vencimento: iso })}
+                value={r.data_vencimento}
+                onChange={(iso) => editar({ data_vencimento: iso })}
               />
             </MetaRow>
 
             <MetaRow label="Prioridade">
               <PrioridadeDropdown
-                value={tarefa.prioridade}
-                onChange={(p) => updateTarefa(tarefa.id, { prioridade: p })}
+                value={r.prioridade}
+                onChange={(p) => editar({ prioridade: p })}
               />
             </MetaRow>
 
             <MetaRow label="Complexidade">
               <ComplexidadeDropdown
-                value={tarefa.complexidade}
-                onChange={(c) => updateTarefa(tarefa.id, { complexidade: c })}
+                value={r.complexidade}
+                onChange={(c) => editar({ complexidade: c })}
               />
             </MetaRow>
 
@@ -465,12 +554,31 @@ export function TaskDetailDialog() {
 
             <MetaRow label="Projeto">
               <ProjetoDropdown
-                value={tarefa.projeto_id ?? null}
+                value={r.projeto_id}
                 projetos={projetos}
-                onChange={(id) => updateTarefa(tarefa.id, { projeto_id: id })}
+                onChange={(id) => editar({ projeto_id: id })}
               />
             </MetaRow>
           </aside>
+        </div>
+
+        {/* Rodapé: nada do que foi editado acima vai pro servidor sem Salvar */}
+        <div className="flex items-center gap-2 border-t border-border px-5 py-3">
+          {temAlteracao && (
+            <span className="text-xs text-muted-foreground">Alterações não salvas</span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            disabled={!temAlteracao || salvando}
+            onClick={() => setRascunho(rascunhoDe(tarefa))}
+          >
+            Descartar
+          </Button>
+          <Button size="sm" disabled={!podeSalvar} onClick={salvar}>
+            {salvando ? "Salvando..." : "Salvar"}
+          </Button>
         </div>
 
         {compartilhando && (

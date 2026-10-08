@@ -86,6 +86,13 @@ export interface Transacao {
   data_pagamento: string;
 }
 
+/** O que mudou no checklist desde que o diálogo da tarefa abriu. */
+export interface AlteracoesChecklist {
+  adicionar: { texto: string; concluido: boolean }[];
+  alternar: { id: string; concluido: boolean }[];
+  remover: string[];
+}
+
 interface TasksCtx {
   tarefas: Tarefa[];
   clientes: Cliente[];
@@ -153,9 +160,13 @@ interface TasksCtx {
   openTask: (id: string) => void;
   closeTask: () => void;
   addComentario: (taskId: string, c: Omit<Comentario, "id" | "criado_em">) => void;
-  addChecklistItem: (tarefaId: string, texto: string) => void;
-  toggleChecklistItem: (id: string, concluido: boolean) => void;
-  removerChecklistItem: (id: string) => void;
+  /** Grava de uma vez as alterações feitas no diálogo da tarefa. Resolve
+   * depois que os dados recarregaram; false se algo falhou (já vira toast). */
+  salvarTarefa: (
+    id: string,
+    patch: Partial<Tarefa>,
+    checklist: AlteracoesChecklist,
+  ) => Promise<boolean>;
   workspace: WorkspaceView;
   setWorkspace: (v: WorkspaceView) => void;
   contarTarefasCliente: (clienteId: string) => number;
@@ -254,6 +265,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           escopo: (vars.escopo ?? "geral") as "geral" | "pessoal",
           responsavel_ids: vars.responsaveis.map((r) => r.id),
           mural_quadro_id: muralQuadroId,
+          anexos: (vars.anexos ?? []).map((a) => ({ path: a.path, nome_arquivo: a.nome_arquivo })),
         },
       }),
     onSuccess: (_res, vars) => {
@@ -266,23 +278,25 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao criar"),
   });
 
-  const updateMut = useMutation({
-    mutationFn: (vars: { id: string; patch: Partial<Tarefa> }) =>
-      updateFn({
-        data: {
-          id: vars.id,
-          patch: {
-            titulo: vars.patch.titulo,
-            status: vars.patch.status,
-            prioridade: vars.patch.prioridade,
-            complexidade: vars.patch.complexidade,
-            descricao: vars.patch.descricao,
-            data_vencimento: vars.patch.data_vencimento,
-            projeto_id: vars.patch.projeto_id !== undefined ? vars.patch.projeto_id : undefined,
-            responsavel_ids: vars.patch.responsaveis?.map((r) => r.id),
-          },
+  const enviarPatch = (id: string, patch: Partial<Tarefa>) =>
+    updateFn({
+      data: {
+        id,
+        patch: {
+          titulo: patch.titulo,
+          status: patch.status,
+          prioridade: patch.prioridade,
+          complexidade: patch.complexidade,
+          descricao: patch.descricao,
+          data_vencimento: patch.data_vencimento,
+          projeto_id: patch.projeto_id !== undefined ? patch.projeto_id : undefined,
+          responsavel_ids: patch.responsaveis?.map((r) => r.id),
         },
-      }),
+      },
+    });
+
+  const updateMut = useMutation({
+    mutationFn: (vars: { id: string; patch: Partial<Tarefa> }) => enviarPatch(vars.id, vars.patch),
     onSuccess: invalidate,
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao atualizar"),
   });
@@ -291,24 +305,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     mutationFn: (vars: { tarefa_id: string; conteudo: string }) => commentFn({ data: vars }),
     onSuccess: invalidate,
     onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao comentar"),
-  });
-
-  const addChecklistMut = useMutation({
-    mutationFn: (vars: { tarefa_id: string; texto: string }) => addChecklistFn({ data: vars }),
-    onSuccess: invalidate,
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao adicionar item"),
-  });
-
-  const toggleChecklistMut = useMutation({
-    mutationFn: (vars: { id: string; concluido: boolean }) => toggleChecklistFn({ data: vars }),
-    onSuccess: invalidate,
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao atualizar item"),
-  });
-
-  const deleteChecklistMut = useMutation({
-    mutationFn: (id: string) => deleteChecklistFn({ data: { id } }),
-    onSuccess: invalidate,
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha ao excluir item"),
   });
 
   const deleteMut = useMutation({
@@ -500,17 +496,29 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     [commentMut],
   );
 
-  const addChecklistItem = useCallback(
-    (tarefaId: string, texto: string) => addChecklistMut.mutate({ tarefa_id: tarefaId, texto }),
-    [addChecklistMut],
-  );
-  const toggleChecklistItem = useCallback(
-    (id: string, concluido: boolean) => toggleChecklistMut.mutate({ id, concluido }),
-    [toggleChecklistMut],
-  );
-  const removerChecklistItem = useCallback(
-    (id: string) => deleteChecklistMut.mutate(id),
-    [deleteChecklistMut],
+  const salvarTarefa = useCallback(
+    async (id: string, patch: Partial<Tarefa>, checklist: AlteracoesChecklist) => {
+      try {
+        if (Object.keys(patch).length > 0) await enviarPatch(id, patch);
+        await Promise.all([
+          ...checklist.remover.map((itemId) => deleteChecklistFn({ data: { id: itemId } })),
+          ...checklist.alternar.map((i) => toggleChecklistFn({ data: i })),
+          ...checklist.adicionar.map(async (i) => {
+            const novo = await addChecklistFn({ data: { tarefa_id: id, texto: i.texto } });
+            if (i.concluido) await toggleChecklistFn({ data: { id: novo.id, concluido: true } });
+          }),
+        ]);
+        await invalidate();
+        return true;
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao salvar");
+        // Parte pode ter sido gravada antes do erro: recarrega pra mostrar o real.
+        await invalidate();
+        return false;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [updateFn, addChecklistFn, toggleChecklistFn, deleteChecklistFn],
   );
 
   const contarTarefasCliente = useCallback(
@@ -614,9 +622,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       openTask,
       closeTask,
       addComentario,
-      addChecklistItem,
-      toggleChecklistItem,
-      removerChecklistItem,
+      salvarTarefa,
       workspace,
       setWorkspace,
       contarTarefasCliente,
@@ -669,9 +675,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       openTask,
       closeTask,
       addComentario,
-      addChecklistItem,
-      toggleChecklistItem,
-      removerChecklistItem,
+      salvarTarefa,
       workspace,
       contarTarefasCliente,
       mainView,

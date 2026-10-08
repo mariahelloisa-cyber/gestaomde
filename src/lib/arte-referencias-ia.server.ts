@@ -109,7 +109,7 @@ function custoDaResposta(resp: Anthropic.Beta.BetaMessage): number {
 export type Gasto = { em: string; usd: number };
 
 /** Início do dia em São Paulo (UTC-3, sem horário de verão desde 2019). */
-function inicioDoDiaSP(agora = new Date()): number {
+export function inicioDoDiaSP(agora = new Date()): number {
   const sp = new Date(agora.getTime() - 3 * 3600 * 1000);
   return Date.parse(`${sp.toISOString().slice(0, 10)}T00:00:00-03:00`);
 }
@@ -141,7 +141,7 @@ export async function gastoAnaliseHoje(): Promise<{
 
 /* ---------------- Medidas da imagem (lendo o cabeçalho) ---------------- */
 
-function dimensoesDoCabecalho(b: Uint8Array): { largura: number; altura: number } | null {
+export function dimensoesDoCabecalho(b: Uint8Array): { largura: number; altura: number } | null {
   const u16be = (i: number) => (b[i] << 8) | b[i + 1];
   const u16le = (i: number) => b[i] | (b[i + 1] << 8);
   const u24le = (i: number) => b[i] | (b[i + 1] << 8) | (b[i + 2] << 16);

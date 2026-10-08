@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { garantirResponsaveisAtivos } from "./responsaveis.server";
+import { liberarGeracoesTravadas } from "./arte-geracao-ia.server";
 import {
   BUCKET_APROVADAS,
   BUCKET_ARQUIVOS,
@@ -271,7 +272,7 @@ export const listArtes = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("art_requests")
       .select(
-        "id, tipo, status, briefing, campos, largura_px, altura_px, medida_impressao, qtd_slides, data_comemorativa, responsavel_id, status_alterado_por, status_alterado_em, aprovado_por, aprovado_em, job_aprovado_id, criado_em, projetos(nome), demandas_externas(id, solicitante_nome, solicitante_email, justificativa_recusa, tarefa_id), art_request_files(id, path, categoria, nome_arquivo, mime_type, confirmado), ai_generation_jobs!ai_generation_jobs_art_request_id_fkey(id, origem, status, solicitado_por, criado_em, concluido_em, ai_generations(id, slide_index, variacao, path, path_aprovado, status)), ai_generation_reviews(id, job_id, decisao, comentario, revisor_id, criado_em)",
+        "id, tipo, status, briefing, campos, largura_px, altura_px, medida_impressao, qtd_slides, data_comemorativa, max_geracoes, responsavel_id, status_alterado_por, status_alterado_em, aprovado_por, aprovado_em, job_aprovado_id, criado_em, projetos(nome), demandas_externas(id, solicitante_nome, solicitante_email, justificativa_recusa, tarefa_id), art_request_files(id, path, categoria, nome_arquivo, mime_type, confirmado), ai_generation_jobs!ai_generation_jobs_art_request_id_fkey(id, origem, status, solicitado_por, criado_em, concluido_em, lease_ate, ai_generations(id, slide_index, variacao, path, path_aprovado, status, largura, altura)), ai_generation_reviews(id, job_id, decisao, comentario, revisor_id, criado_em)",
       )
       .neq("status", "rascunho")
       .order("criado_em", { ascending: false })
@@ -300,59 +301,78 @@ export const listArtes = createServerFn({ method: "GET" })
       ),
     ]);
 
-    return rows.map((r) => ({
-      id: r.id,
-      tipo: r.tipo as TipoArte,
-      status: r.status,
-      briefing: r.briefing,
-      qtd_slides: r.qtd_slides,
-      aprovado_por: r.aprovado_por,
-      aprovado_em: r.aprovado_em,
-      job_aprovado_id: r.job_aprovado_id,
-      // Envio que ficou aberto (ex.: aba fechada no meio do upload) — a tela
-      // oferece descartar, senão o índice de job ativo bloqueia novos envios.
-      job_ativo_id:
-        r.ai_generation_jobs.find((j) => j.status === "na_fila" || j.status === "processando")
-          ?.id ?? null,
-      versoes: versoesDe(r).map((j) => ({
-        id: j.id,
-        origem: j.origem,
-        solicitado_por: j.solicitado_por,
-        concluido_em: j.concluido_em,
-        imagens: [...j.ai_generations]
-          .sort((a, b) => a.slide_index - b.slide_index || a.variacao - b.variacao)
-          .map((g) => ({
-            id: g.id,
-            slide_index: g.slide_index,
-            status: g.status,
-            url: g.path_aprovado
-              ? (urlsAprovadas.get(g.path_aprovado) ?? null)
-              : (urlsGeradas.get(g.path) ?? null),
-          })),
-      })),
-      revisoes: [...r.ai_generation_reviews].sort((a, b) => b.criado_em.localeCompare(a.criado_em)),
-      detalhes: camposParaExibir(r),
-      projeto_nome: (r.projetos as { nome: string } | null)?.nome ?? null,
-      demanda: r.demandas_externas as {
-        id: string;
-        solicitante_nome: string;
-        solicitante_email: string | null;
-        justificativa_recusa: string | null;
-        tarefa_id: string | null;
-      } | null,
-      responsavel_id: r.responsavel_id,
-      status_alterado_por: r.status_alterado_por,
-      status_alterado_em: r.status_alterado_em,
-      criado_em: r.criado_em,
-      arquivos: r.art_request_files
-        .filter((f) => f.confirmado)
-        .map((f) => ({
-          id: f.id,
-          categoria: f.categoria as CategoriaArquivo,
-          nome_arquivo: f.nome_arquivo,
-          url: urls.get(f.path) ?? null,
+    const agora = new Date().toISOString();
+    return rows.map((r) => {
+      const ativo = r.ai_generation_jobs.find(
+        (j) => j.status === "na_fila" || j.status === "processando",
+      );
+      // Geração com IA que passou do lease foi abandonada: a próxima ação
+      // (gerar ou enviar) a encerra, então não bloqueia a tela.
+      const iaTravada = ativo?.origem === "ia" && !!ativo.lease_ate && ativo.lease_ate < agora;
+      return {
+        id: r.id,
+        tipo: r.tipo as TipoArte,
+        status: r.status,
+        briefing: r.briefing,
+        qtd_slides: r.qtd_slides,
+        aprovado_por: r.aprovado_por,
+        aprovado_em: r.aprovado_em,
+        job_aprovado_id: r.job_aprovado_id,
+        // Envio manual que ficou aberto (ex.: aba fechada no meio do upload) —
+        // a tela oferece descartar, senão o índice de job ativo bloqueia novos envios.
+        job_ativo_id: ativo && ativo.origem === "manual" ? ativo.id : null,
+        gerando_ia: ativo?.origem === "ia" && !iaTravada,
+        geracoes_ia: {
+          usadas: r.ai_generation_jobs.filter(
+            (j) => j.origem === "ia" && j.status !== "falhou" && j.status !== "cancelado",
+          ).length,
+          max: r.max_geracoes,
+        },
+        versoes: versoesDe(r).map((j) => ({
+          id: j.id,
+          origem: j.origem,
+          solicitado_por: j.solicitado_por,
+          concluido_em: j.concluido_em,
+          imagens: [...j.ai_generations]
+            .sort((a, b) => a.slide_index - b.slide_index || a.variacao - b.variacao)
+            .map((g) => ({
+              id: g.id,
+              slide_index: g.slide_index,
+              variacao: g.variacao,
+              largura: g.largura,
+              altura: g.altura,
+              status: g.status,
+              url: g.path_aprovado
+                ? (urlsAprovadas.get(g.path_aprovado) ?? null)
+                : (urlsGeradas.get(g.path) ?? null),
+            })),
         })),
-    }));
+        revisoes: [...r.ai_generation_reviews].sort((a, b) =>
+          b.criado_em.localeCompare(a.criado_em),
+        ),
+        detalhes: camposParaExibir(r),
+        projeto_nome: (r.projetos as { nome: string } | null)?.nome ?? null,
+        demanda: r.demandas_externas as {
+          id: string;
+          solicitante_nome: string;
+          solicitante_email: string | null;
+          justificativa_recusa: string | null;
+          tarefa_id: string | null;
+        } | null,
+        responsavel_id: r.responsavel_id,
+        status_alterado_por: r.status_alterado_por,
+        status_alterado_em: r.status_alterado_em,
+        criado_em: r.criado_em,
+        arquivos: r.art_request_files
+          .filter((f) => f.confirmado)
+          .map((f) => ({
+            id: f.id,
+            categoria: f.categoria as CategoriaArquivo,
+            nome_arquivo: f.nome_arquivo,
+            url: urls.get(f.path) ?? null,
+          })),
+      };
+    });
   });
 
 const aceitarArteSchema = z.object({
@@ -573,6 +593,9 @@ export const iniciarUploadManual = createServerFn({ method: "POST" })
       );
     }
 
+    // Geração com IA abandonada (passou do lease) não pode travar o envio manual.
+    await liberarGeracoesTravadas(art.id);
+
     const jobId = crypto.randomUUID();
     const arquivos: ArquivoManual[] = data.arquivos.map((a) => ({
       slide_index: a.slide_index,
@@ -715,6 +738,8 @@ const revisarSchema = z
     job_id: z.string().uuid(),
     decisao: z.enum(["aprovada", "ajuste_solicitado", "recusada"]),
     comentario: z.string().trim().max(2000).optional(),
+    /** Aprovação de versão com variações: a escolhida de cada slide. */
+    generation_ids: z.array(z.string().uuid()).min(1).max(10).optional(),
   })
   .refine((d) => d.decisao !== "ajuste_solicitado" || !!d.comentario, {
     message: "Descreva o ajuste pedido.",
@@ -782,14 +807,28 @@ export const revisarArte = createServerFn({ method: "POST" })
       return { ok: true };
     }
 
-    const esperado = slidesEsperados(art.tipo, art.qtd_slides);
-    const slides = new Set(imagens.map((g) => g.slide_index));
-    if (imagens.length !== esperado || slides.size !== esperado) {
-      throw new Error("Esta versão está incompleta: falta imagem de algum slide.");
+    // Versão com variações (IA): aprova só a escolhida de cada slide; as
+    // outras viram 'descartada'. Versão manual (uma por slide) aprova tudo.
+    const escolhidas = data.generation_ids
+      ? imagens.filter((g) => data.generation_ids!.includes(g.id))
+      : imagens;
+    if (data.generation_ids && escolhidas.length !== data.generation_ids.length) {
+      throw new Error("A variação escolhida não é desta versão. Recarregue a página.");
     }
+    const esperado = slidesEsperados(art.tipo, art.qtd_slides);
+    const slides = new Set(escolhidas.map((g) => g.slide_index));
+    const comVariacoes = new Set(imagens.map((g) => g.slide_index)).size < imagens.length;
+    if (escolhidas.length !== esperado || slides.size !== esperado) {
+      throw new Error(
+        comVariacoes
+          ? "Escolha uma variação para aprovar."
+          : "Esta versão está incompleta: falta imagem de algum slide.",
+      );
+    }
+    const naoEscolhidas = imagens.filter((g) => !escolhidas.includes(g)).map((g) => g.id);
 
     // 1) Cópia para approved-arts. Remove antes para o retry ser idempotente.
-    for (const g of imagens) {
+    for (const g of escolhidas) {
       const destino = `${art.id}/${g.id}.${EXTENSAO[g.mime_type] ?? "png"}`;
       await supabaseAdmin.storage.from(BUCKET_APROVADAS).remove([destino]);
       const { error: errCopia } = await supabaseAdmin.storage
@@ -809,7 +848,7 @@ export const revisarArte = createServerFn({ method: "POST" })
       art_request_id: art.id,
       job_id: job.id,
       decisao: "aprovada",
-      generation_ids: ids,
+      generation_ids: escolhidas.map((g) => g.id),
       comentario: data.comentario || null,
     });
     if (errRev) throw new Error(errRev.message);
@@ -817,8 +856,18 @@ export const revisarArte = createServerFn({ method: "POST" })
     const { error: errGen } = await supabase
       .from("ai_generations")
       .update({ status: "aprovada" })
-      .in("id", ids);
+      .in(
+        "id",
+        escolhidas.map((g) => g.id),
+      );
     if (errGen) throw new Error(errGen.message);
+    if (naoEscolhidas.length > 0) {
+      const { error: errDesc } = await supabase
+        .from("ai_generations")
+        .update({ status: "descartada" })
+        .in("id", naoEscolhidas);
+      if (errDesc) throw new Error(errDesc.message);
+    }
 
     const { error: errFim } = await supabase
       .from("art_requests")

@@ -29,8 +29,7 @@ function rotuloEnviada(iso: string): string {
   if (diffDias === -1) return "ontem";
   if (diffDias > -7 && diffDias < 0) return `há ${-diffDias} dias`;
   return `em ${d.toLocaleDateString("pt-BR")}`;
-}
-
+} 
 const ARTE_BADGE: Record<string, { backgroundColor: string; color: string }> = {
   "Em análise": { backgroundColor: "#F59E0B", color: "#fff" },
   "Em produção": { backgroundColor: "#3B82F6", color: "#fff" },

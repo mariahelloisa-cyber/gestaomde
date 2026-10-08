@@ -349,6 +349,16 @@ const createSchema = z.object({
   responsavel_ids: z.array(z.string().uuid()).default([]),
   // Lembrete criado dentro de um quadro do Mural: já entra no quadro.
   mural_quadro_id: z.string().uuid().optional(),
+  // Arquivos já enviados pelo front ao bucket demandas-anexos.
+  anexos: z
+    .array(
+      z.object({
+        path: z.string().min(1).max(500),
+        nome_arquivo: z.string().min(1).max(255),
+      }),
+    )
+    .max(10)
+    .default([]),
 });
 
 export const createTarefa = createServerFn({ method: "POST" })
@@ -368,6 +378,14 @@ export const createTarefa = createServerFn({ method: "POST" })
       }
     }
 
+    // A listagem assina os anexos com service role, então só aceita caminhos
+    // na pasta do próprio usuário — senão daria pra apontar a tarefa pra um
+    // arquivo de demanda alheio e ler ele por tabela.
+    const prefixoAnexos = `tarefas/${userId}/`;
+    if (data.anexos.some((a) => !a.path.startsWith(prefixoAnexos) || a.path.includes(".."))) {
+      throw new Error("Anexo inválido.");
+    }
+
     const isLembrete = data.tipo === "lembrete";
     const insertPayload = {
       cliente_id: isLembrete ? null : (data.cliente_id ?? null),
@@ -381,6 +399,7 @@ export const createTarefa = createServerFn({ method: "POST" })
       tipo: data.tipo,
       escopo: isLembrete ? data.escopo : ("geral" as const),
       criado_por: userId,
+      anexos: data.anexos,
     };
 
     const { data: nova, error } = await supabase

@@ -37,6 +37,7 @@ import {
   type EscopoItem,
 } from "@/lib/mock-data";
 import { useTasks, USUARIO_LOGADO_INICIAIS } from "@/lib/tasks-store";
+import { supabase } from "@/integrations/supabase/client";
 import { passaFiltros } from "@/lib/filtros";
 import { TaskCard, complexidadeIcon } from "./task-card";
 import { ShareDialog, type ShareAlvo } from "./ShareDialog";
@@ -302,7 +303,7 @@ export function AddTaskDialog({
    * entra no quadro. */
   muralQuadroId?: string;
 }) {
-  const { addTarefa, clientes, projetos } = useTasks();
+  const { addTarefa, clientes, projetos, myId } = useTasks();
   const doMural = !!muralQuadroId;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -340,14 +341,32 @@ export function AddTaskDialog({
     { id: string; nome: string; iniciais: string }[]
   >([]);
   const [anexos, setAnexos] = useState<File[]>([]);
+  const [enviando, setEnviando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const clienteAtual = clientes.find((c) => c.id === clienteId);
   const isLembrete = tipo === "lembrete";
 
-  const submit = () => {
-    if (!titulo.trim()) return;
-    addTarefa(
+  const submit = async () => {
+    if (!titulo.trim() || enviando) return;
+    setEnviando(true);
+    // Sobe os arquivos antes de criar a tarefa, no mesmo bucket privado das
+    // demandas; a tarefa guarda só o caminho e a listagem assina a URL.
+    const anexosEnviados: { path: string; nome_arquivo: string; url: null }[] = [];
+    for (const file of anexos) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `tarefas/${myId}/${crypto.randomUUID()}-${safeName}`;
+      const { error } = await supabase.storage
+        .from("demandas-anexos")
+        .upload(path, file, { contentType: file.type || undefined, upsert: false });
+      if (error) {
+        toast.error(`Falha no upload de "${file.name}": ${error.message}`);
+        setEnviando(false);
+        return;
+      }
+      anexosEnviados.push({ path, nome_arquivo: file.name, url: null });
+    }
+    const criada = await addTarefa(
       {
         cliente_id: isLembrete || semCliente ? "" : clienteId,
         projeto_id: projetoId || null,
@@ -361,9 +380,13 @@ export function AddTaskDialog({
         tipo,
         escopo: isLembrete ? escopo : undefined,
         criado_por: USUARIO_LOGADO_INICIAIS,
+        anexos: anexosEnviados,
       },
       { muralQuadroId },
     );
+    setEnviando(false);
+    // Falhou: o erro já virou toast; mantém o formulário pra tentar de novo.
+    if (!criada) return;
     setTitulo("");
     setDescricao("");
     setProjetoId("");
@@ -590,8 +613,16 @@ export function AddTaskDialog({
             {anexos.length > 0 && (
               <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
                 {anexos.map((a, i) => (
-                  <li key={i} className="truncate">
-                    • {a.name}
+                  <li key={i} className="flex items-center gap-1.5">
+                    <span className="flex-1 truncate">• {a.name}</span>
+                    <button
+                      onClick={() => setAnexos((prev) => prev.filter((_, j) => j !== i))}
+                      disabled={enviando}
+                      className="rounded p-0.5 hover:bg-muted hover:text-foreground disabled:opacity-50"
+                      aria-label={`Remover ${a.name}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -609,10 +640,10 @@ export function AddTaskDialog({
           </button>
           <button
             onClick={submit}
-            disabled={!titulo.trim()}
+            disabled={!titulo.trim() || enviando}
             className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
-            {isLembrete ? "Criar Lembrete" : "Criar Tarefa"}
+            {enviando ? "Criando..." : isLembrete ? "Criar Lembrete" : "Criar Tarefa"}
           </button>
         </div>
       </SheetContent>
