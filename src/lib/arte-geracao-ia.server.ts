@@ -7,12 +7,12 @@ import {
   BUCKET_REFERENCIAS,
   removerObjetos,
 } from "./arte.server";
-import { normalizarPng } from "./arte-imagem.server";
+import { normalizarNoStorage } from "./arte-imagem.server";
 import { dimensoesDoCabecalho, inicioDoDiaSP } from "./arte-referencias-ia.server";
 import { metadadosIA, statusAnalise, type MetadadosIA } from "./arte/analise-referencias";
 import {
   ERRO_TETO_GERACAO,
-  GERACAO_ENTREGA_MAX_PX,
+  GERACAO_ENTREGA_LADO_MAX,
   GERACAO_LEASE_MS,
   GERACAO_LIMITE_DIARIO_PADRAO_USD,
   GERACAO_MODELO_PADRAO,
@@ -47,14 +47,15 @@ export function configGeracao() {
 
 /* ---------------- Tamanho pedido à API ----------------
  * gpt-image-2 / 2.5 aceitam WIDTHxHEIGHT com lados múltiplos de 16, proporção
- * entre 1:3 e 3:1 e de 655.360 a 8.294.400 px. Gera perto da área pedida (o
- * custo cresce com a área), limitado a ~2,4 MP. Depois, normalizarPng
- * (arte-imagem.server.ts) leva cada variação ao tamanho EXATO de entrega. */
+ * entre 1:3 e 3:1 e de 655.360 a 8.294.400 px.
+ *
+ * Gera o MENOR retângulo nessa proporção que COBRE o tamanho de entrega nos
+ * dois lados: a normalização (transformação do Supabase Storage, ver
+ * arte-imagem.server.ts) só reduz e corta — ela não amplia. Com entrega até
+ * 2500 px por lado, a geração fica em no máximo ~2512 px por lado. */
 
 const PX_MIN = 655_360;
-const PX_MAX_API = 8_294_400;
-const PX_MAX_GERACAO = 2_359_296;
-const LADO_MAX = 3840;
+const teto16 = (n: number) => Math.ceil(n / 16) * 16;
 
 export function tamanhoDeGeracao(
   largura: number,
@@ -62,30 +63,19 @@ export function tamanhoDeGeracao(
 ): { largura: number; altura: number; proporcaoAjustada: boolean } {
   const original = largura / altura;
   const r = Math.min(3, Math.max(1 / 3, original));
-  const alvoPx = Math.min(PX_MAX_GERACAO, Math.max(PX_MIN, largura * altura));
-  const hIdeal = Math.sqrt(alvoPx / r);
-  let melhor: { w: number; h: number; erro: number } | null = null;
-  for (let k = Math.floor(hIdeal / 16) - 4; k <= Math.ceil(hIdeal / 16) + 4; k++) {
-    const h = k * 16;
-    if (h < 16 || h > LADO_MAX) continue;
-    for (const w of [Math.floor((r * h) / 16) * 16, Math.ceil((r * h) / 16) * 16]) {
-      const px = w * h;
-      const rr = w / h;
-      if (w < 16 || w > LADO_MAX || px < PX_MIN || px > PX_MAX_API || rr < 1 / 3 || rr > 3) {
-        continue;
-      }
-      // Proporção pesa mais que área: errar a proporção corta a arte. Ficar
-      // abaixo da área pesa 3x: ampliar depois perde nitidez, reduzir não.
-      const erro =
-        Math.abs(Math.log(rr / r)) * 10 + (Math.abs(px - alvoPx) / alvoPx) * (px < alvoPx ? 3 : 1);
-      if (!melhor || erro < melhor.erro) melhor = { w, h, erro };
-    }
+  let w = Math.max(largura, r * altura);
+  let h = w / r;
+  if (w * h < PX_MIN) {
+    const k = Math.sqrt(PX_MIN / (w * h));
+    w *= k;
+    h *= k;
   }
-  return {
-    largura: melhor?.w ?? 1024,
-    altura: melhor?.h ?? 1024,
-    proporcaoAjustada: Math.abs(original - r) > 1e-9,
-  };
+  let W = teto16(w);
+  let H = teto16(h);
+  // O arredondamento para 16 pode passar de 3:1 por um fio: a API recusaria.
+  if (W > 3 * H) H = teto16(W / 3);
+  if (H > 3 * W) W = teto16(H / 3);
+  return { largura: W, altura: H, proporcaoAjustada: Math.abs(original - r) > 1e-9 };
 }
 
 /* ---------------- Custo ----------------
@@ -901,7 +891,7 @@ export async function executarGeracaoIA(
   }
   if (!entregaCabeNaGeracao(art.largura_px, art.altura_px)) {
     throw new Error(
-      `Arte de ${art.largura_px}×${art.altura_px} px é grande demais para a geração com IA (até ${(GERACAO_ENTREGA_MAX_PX / 1e6).toFixed(1)} MP). Use o envio manual.`,
+      `Arte de ${art.largura_px}×${art.altura_px} px é grande demais para a geração com IA (até ${GERACAO_ENTREGA_LADO_MAX} px por lado). Use o envio manual.`,
     );
   }
 
@@ -1012,14 +1002,34 @@ export async function executarGeracaoIA(
     } catch (e) {
       if (e instanceof ErroOpenAI) custo = 0;
       throw e;
+    } finally {
+      // Logo, referências e arquivos do solicitante (até 35 MB) só servem
+      // para a chamada: soltos aqui, antes de mexer nas imagens geradas.
+      anexos.length = 0;
     }
     const uso = resposta.corpo.usage ?? null;
     custo = uso ? custoDoUso(cfg.modelo, uso) : estimativa;
 
-    const imagens = (resposta.corpo.data ?? []).filter(
-      (d): d is { b64_json: string; revised_prompt?: string } => typeof d.b64_json === "string",
-    );
-    if (imagens.length === 0) throw new Error("A OpenAI não devolveu nenhuma imagem.");
+    // Grava a cobrança JÁ: se algo cair daqui em diante, o custo real e o
+    // usage da OpenAI ficam registrados no job (e no teto diário).
+    await supabaseAdmin
+      .from("ai_generation_jobs")
+      .update({
+        custo_estimado_usd: custo4(custo),
+        uso: (uso ?? {}) as Json,
+        openai_response_id: resposta.requestId,
+      })
+      .eq("id", jobId);
+
+    // Tira o base64 da resposta: cada variação é decodificada, enviada e
+    // solta uma por vez, para nunca haver duas imagens em memória.
+    const pendentes: Array<{ b64?: string; revised?: string }> = (resposta.corpo.data ?? [])
+      .slice(0, GERACAO_VARIACOES)
+      .map((d) => ({ b64: d.b64_json, revised: d.revised_prompt }));
+    resposta.corpo.data = undefined;
+    if (!pendentes.some((p) => typeof p.b64 === "string")) {
+      throw new Error("A OpenAI não devolveu nenhuma imagem.");
+    }
 
     // Para cada variação: a bruta da OpenAI fica guardada para auditoria
     // (-bruta.png, listada no job) e a normalizada no tamanho EXATO de entrega
@@ -1037,22 +1047,36 @@ export async function executarGeracaoIA(
     };
     const linhas = [];
     const brutas = [];
-    for (const [i, img] of imagens.slice(0, GERACAO_VARIACOES).entries()) {
-      const bruta = deBase64(img.b64_json);
-      const dimsBruta = dimensoesDoCabecalho(bruta);
-      const final = normalizarPng(bruta, art.largura_px, art.altura_px);
+    for (const [i, item] of pendentes.entries()) {
+      if (typeof item.b64 !== "string") continue;
       const base = `${art.id}/${jobId}/s01-v${i + 1}`;
-      if (final.alterada) {
-        await salvar(`${base}-bruta.png`, bruta);
+      const path = `${base}.png`;
+      let bruta: Uint8Array<ArrayBuffer> | null = deBase64(item.b64);
+      item.b64 = undefined;
+      const dimsBruta = dimensoesDoCabecalho(bruta);
+      if (dimsBruta?.largura === art.largura_px && dimsBruta?.altura === art.altura_px) {
+        // Já veio no tamanho exato: a bruta é a final.
+        await salvar(path, bruta);
+        bruta = null;
+      } else {
+        const pathBruta = `${base}-bruta.png`;
+        await salvar(pathBruta, bruta);
+        bruta = null;
         brutas.push({
           variacao: i + 1,
-          path: `${base}-bruta.png`,
+          path: pathBruta,
           largura: dimsBruta?.largura ?? null,
           altura: dimsBruta?.altura ?? null,
         });
+        // Reduz e corta no Storage (sem decodificar imagem no Worker).
+        const final = await normalizarNoStorage(
+          BUCKET_GERADAS,
+          pathBruta,
+          art.largura_px,
+          art.altura_px,
+        );
+        await salvar(path, final);
       }
-      const path = `${base}.png`;
-      await salvar(path, final.bytes);
       linhas.push({
         job_id: jobId,
         art_request_id: art.id,
@@ -1060,9 +1084,9 @@ export async function executarGeracaoIA(
         variacao: i + 1,
         path,
         mime_type: "image/png",
-        largura: final.largura,
-        altura: final.altura,
-        revised_prompt: img.revised_prompt?.slice(0, 4000) ?? null,
+        largura: art.largura_px,
+        altura: art.altura_px,
+        revised_prompt: item.revised?.slice(0, 4000) ?? null,
       });
     }
     const { error: errGen } = await supabaseAdmin.from("ai_generations").insert(linhas);

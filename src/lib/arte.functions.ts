@@ -272,7 +272,7 @@ export const listArtes = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("art_requests")
       .select(
-        "id, tipo, status, briefing, campos, largura_px, altura_px, medida_impressao, qtd_slides, data_comemorativa, max_geracoes, responsavel_id, status_alterado_por, status_alterado_em, aprovado_por, aprovado_em, job_aprovado_id, criado_em, projetos(nome), demandas_externas(id, solicitante_nome, solicitante_email, justificativa_recusa, tarefa_id), art_request_files(id, path, categoria, nome_arquivo, mime_type, confirmado), ai_generation_jobs!ai_generation_jobs_art_request_id_fkey(id, origem, status, solicitado_por, criado_em, concluido_em, lease_ate, ai_generations(id, slide_index, variacao, path, path_aprovado, status, largura, altura)), ai_generation_reviews(id, job_id, decisao, comentario, revisor_id, criado_em)",
+        "id, tipo, status, briefing, campos, largura_px, altura_px, medida_impressao, qtd_slides, data_comemorativa, max_geracoes, responsavel_id, status_alterado_por, status_alterado_em, aprovado_por, aprovado_em, job_aprovado_id, criado_em, projetos(nome), demandas_externas(id, solicitante_nome, solicitante_email, justificativa_recusa, tarefa_id), art_request_files(id, path, categoria, nome_arquivo, mime_type, confirmado), ai_generation_jobs!ai_generation_jobs_art_request_id_fkey(id, origem, status, solicitado_por, criado_em, concluido_em, lease_ate, erro, openai_response_id, ai_generations(id, slide_index, variacao, path, path_aprovado, status, largura, altura)), ai_generation_reviews(id, job_id, decisao, comentario, revisor_id, criado_em)",
       )
       .neq("status", "rascunho")
       .order("criado_em", { ascending: false })
@@ -309,6 +309,15 @@ export const listArtes = createServerFn({ method: "GET" })
       // Geração com IA que passou do lease foi abandonada: a próxima ação
       // (gerar ou enviar) a encerra, então não bloqueia a tela.
       const iaTravada = ativo?.origem === "ia" && !!ativo.lease_ate && ativo.lease_ate < agora;
+      // O job mais recente da arte, se for uma geração com IA que falhou ou
+      // foi abandonada: a tela explica o que houve e oferece tentar de novo.
+      const ultimo = [...r.ai_generation_jobs].sort((x, y) =>
+        y.criado_em.localeCompare(x.criado_em),
+      )[0];
+      const ultimoIaFalhou =
+        ultimo?.origem === "ia" &&
+        (ultimo.status === "falhou" ||
+          (ultimo.status === "processando" && !!ultimo.lease_ate && ultimo.lease_ate < agora));
       return {
         id: r.id,
         tipo: r.tipo as TipoArte,
@@ -324,6 +333,15 @@ export const listArtes = createServerFn({ method: "GET" })
         // a tela oferece descartar, senão o índice de job ativo bloqueia novos envios.
         job_ativo_id: ativo && ativo.origem === "manual" ? ativo.id : null,
         gerando_ia: ativo?.origem === "ia" && !iaTravada,
+        falha_ia: ultimoIaFalhou
+          ? {
+              job_id: ultimo.id,
+              criado_em: ultimo.criado_em,
+              erro: ultimo.erro || "Geração interrompida (tempo esgotado).",
+              // A OpenAI respondeu (e cobrou), mas a gravação não terminou.
+              openai_respondeu: !!ultimo.openai_response_id,
+            }
+          : null,
         geracoes_ia: {
           usadas: r.ai_generation_jobs.filter(
             (j) => j.origem === "ia" && j.status !== "falhou" && j.status !== "cancelado",

@@ -18,6 +18,10 @@ export const GERACAO_LIMITE_DIARIO_PADRAO_USD = 5;
  * interrompido): libera a demanda para nova geração ou envio manual. */
 export const GERACAO_LEASE_MS = 8 * 60 * 1000;
 
+/** A tela para de esperar a resposta depois disto (pouco antes do lease) e
+ * passa a confiar na lista recarregada. */
+export const GERACAO_TELA_TIMEOUT_MS = 7.5 * 60 * 1000;
+
 /** Tipos que a IA gera livremente. Foto de perfil é composição em template
  * fixo (fase própria) e nunca entra aqui. */
 export const TIPOS_GERATIVOS: readonly TipoArte[] = [
@@ -43,13 +47,13 @@ export function podeGerarComIA(tipo: string): boolean {
   );
 }
 
-/** Área máxima de ENTREGA para a geração com IA (ex.: 2000x2250). A arte é
- * normalizada para o tamanho exato dentro do Worker (128 MB de memória);
- * acima disso, envio manual. */
-export const GERACAO_ENTREGA_MAX_PX = 4_500_000;
+/** Lado máximo de ENTREGA para a geração com IA. A arte vai ao tamanho exato
+ * pela transformação de imagem do Supabase Storage, que aceita até 2500 px
+ * por lado; acima disso, envio manual. */
+export const GERACAO_ENTREGA_LADO_MAX = 2500;
 
 export function entregaCabeNaGeracao(largura: number, altura: number): boolean {
-  return largura * altura <= GERACAO_ENTREGA_MAX_PX;
+  return largura <= GERACAO_ENTREGA_LADO_MAX && altura <= GERACAO_ENTREGA_LADO_MAX;
 }
 
 /** Começo da mensagem de erro do teto diário. */

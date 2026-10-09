@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -20,7 +20,12 @@ import {
   type listArtes,
 } from "@/lib/arte.functions";
 import { gerarArteComIA, resumoGeracaoIA } from "@/lib/arte-geracao-ia.functions";
-import { GERACAO_VARIACOES, entregaCabeNaGeracao, podeGerarComIA } from "@/lib/arte/geracao";
+import {
+  GERACAO_TELA_TIMEOUT_MS,
+  GERACAO_VARIACOES,
+  entregaCabeNaGeracao,
+  podeGerarComIA,
+} from "@/lib/arte/geracao";
 import { ARQUIVO_MIMES, ARTE_PRONTA_TAMANHO_MAX_MB, slidesEsperados } from "@/lib/arte/tipos";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +48,12 @@ const DECISAO_ROTULO: Record<string, string> = {
   ajuste_solicitado: "Ajuste pedido",
   recusada: "Versão recusada",
 };
+
+function mensagemFalhaIA(f: NonNullable<Arte["falha_ia"]>): string {
+  return f.openai_respondeu
+    ? `A geração foi interrompida depois de a OpenAI responder (houve cobrança): ${f.erro}`
+    : `A geração com IA falhou: ${f.erro}`;
+}
 
 function dataHora(iso: string | null): string {
   if (!iso) return "—";
@@ -85,31 +96,56 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
    * houver. A geração roda no servidor por 1 a 3 min: a resposta pode se
    * perder (ou vir sem corpo) mesmo com a geração concluída, então a lista
    * é a fonte de verdade sobre o que aconteceu. */
-  const versaoIANova = async (antes: string | null) => {
+  const estadoAtual = async () => {
     await qc.refetchQueries({ queryKey: ["artes"], exact: true });
-    const atual = qc.getQueryData<Arte[]>(["artes"])?.find((x) => x.id === a.id);
-    const v = atual?.versoes[0];
-    return v && v.origem === "ia" && v.id !== antes ? v : null;
+    return qc.getQueryData<Arte[]>(["artes"])?.find((x) => x.id === a.id) ?? null;
   };
 
   const gerarMut = useMutation({
-    mutationFn: async (): Promise<{ variacoes: number | null }> => {
+    mutationFn: async (): Promise<{ variacoes: number | null; aindaRodando?: boolean }> => {
       const antes = versaoAtual?.id ?? null;
-      let r: Awaited<ReturnType<typeof gerarFn>> | undefined;
+      // Folga de 1 min para diferença de relógio entre navegador e servidor.
+      const inicio = new Date(Date.now() - 60_000).toISOString();
+      // Não cancela a requisição no tempo limite (fechar a conexão pode
+      // interromper o servidor no meio): só para de esperar e consulta a lista.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const tempoEsgotado = new Promise<"tempo">((ok) => {
+        timer = setTimeout(() => ok("tempo"), GERACAO_TELA_TIMEOUT_MS);
+      });
+      const chamada = gerarFn({ data: { art_request_id: a.id } });
+      chamada.catch(() => {}); // pode terminar depois do tempo limite
+      let r: Awaited<typeof chamada> | "tempo" | undefined;
+      let erro: unknown = null;
       try {
-        r = await gerarFn({ data: { art_request_id: a.id } });
+        r = await Promise.race([chamada, tempoEsgotado]);
       } catch (e) {
-        // Erro na resposta não prova que a geração falhou: confere na lista.
-        const v = await versaoIANova(antes);
-        if (v) return { variacoes: v.imagens.length };
-        throw e;
+        erro = e;
+      } finally {
+        clearTimeout(timer);
       }
-      if (typeof r?.variacoesGeradas === "number") return { variacoes: r.variacoesGeradas };
-      const v = await versaoIANova(antes);
-      return { variacoes: v ? v.imagens.length : null };
+      if (r && r !== "tempo" && typeof r.variacoesGeradas === "number") {
+        return { variacoes: r.variacoesGeradas };
+      }
+
+      // Sem resposta completa (erro, tempo esgotado ou corpo vazio): a lista é
+      // a fonte de verdade sobre o que aconteceu no servidor.
+      const atual = await estadoAtual();
+      const v = atual?.versoes[0];
+      if (v && v.origem === "ia" && v.id !== antes) return { variacoes: v.imagens.length };
+      const falha = atual?.falha_ia;
+      if (falha && falha.criado_em >= inicio.slice(0, 19)) {
+        throw new Error(mensagemFalhaIA(falha));
+      }
+      if (r === "tempo" || atual?.gerando_ia) return { variacoes: null, aindaRodando: true };
+      if (erro) throw erro;
+      return { variacoes: null };
     },
-    onSuccess: ({ variacoes }) => {
-      if (variacoes === null) {
+    onSuccess: ({ variacoes, aindaRodando }) => {
+      if (aindaRodando) {
+        toast.warning(
+          "A geração está demorando mais que o normal. A lista se atualiza sozinha; se falhar, aparece o aviso aqui.",
+        );
+      } else if (variacoes === null) {
         toast.warning(
           "A geração terminou sem confirmação. A lista foi atualizada: confira abaixo.",
         );
@@ -135,6 +171,17 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
   });
 
   const gerando = gerarMut.isPending || a.gerando_ia;
+
+  // Enquanto há geração rodando no servidor (inclusive iniciada em outra aba
+  // ou por outra pessoa), a lista é recarregada a cada 15 s: a tela sai de
+  // "Gerando…" sozinha quando o job termina, falha ou passa do prazo.
+  useEffect(() => {
+    if (!a.gerando_ia) return;
+    const t = setInterval(() => {
+      qc.invalidateQueries({ queryKey: ["artes"], exact: true });
+    }, 15_000);
+    return () => clearInterval(t);
+  }, [a.gerando_ia, qc]);
   const podeEnviar = RECEBE_ARTE.includes(a.status) && !a.job_ativo_id && !gerando;
   const podeGerar =
     podeEnviar &&
@@ -256,6 +303,17 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
         <div className="flex items-center gap-2 text-xs text-violet-700">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Gerando {GERACAO_VARIACOES} variações com IA… pode levar de 1 a 3 minutos.
+        </div>
+      )}
+      {!gerando && a.falha_ia && RECEBE_ARTE.includes(a.status) && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <strong>A última geração com IA não terminou</strong> ({dataHora(a.falha_ia.criado_em)}
+          ). {mensagemFalhaIA(a.falha_ia)}
+          {podeGerar
+            ? " Você pode tentar de novo."
+            : a.geracoes_ia.usadas >= a.geracoes_ia.max
+              ? " O limite de gerações desta arte foi atingido; use o envio manual."
+              : ""}
         </div>
       )}
       {a.job_ativo_id && (
