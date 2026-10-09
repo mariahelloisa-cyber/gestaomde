@@ -19,6 +19,27 @@ export async function exigirEquipeInterna(userId: string): Promise<void> {
   if (data !== true) throw new Error("Apenas a equipe interna pode fazer isso.");
 }
 
+/** Admin ou Supervisor (is_admin no banco), para ações destrutivas. */
+export async function exigirAdmin(userId: string): Promise<void> {
+  const { data, error } = await supabaseAdmin.rpc("is_admin", { _user_id: userId });
+  if (error) throw new Error(error.message);
+  if (data !== true) throw new Error("Apenas Admin ou Supervisor pode fazer isso.");
+}
+
+/** Todos os arquivos sob um prefixo (desce nas subpastas). */
+export async function listarArquivos(bucket: string, prefixo: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin.storage.from(bucket).list(prefixo, { limit: 1000 });
+  if (error) throw new Error(error.message);
+  const out: string[] = [];
+  for (const item of data ?? []) {
+    const path = `${prefixo}/${item.name}`;
+    // Pasta não tem id na listagem do Storage.
+    if (item.id === null) out.push(...(await listarArquivos(bucket, path)));
+    else out.push(path);
+  }
+  return out;
+}
+
 export const EXTENSAO: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",

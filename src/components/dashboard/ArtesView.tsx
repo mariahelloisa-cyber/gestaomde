@@ -2,8 +2,13 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Building2, Check, Inbox, Mail, Palette, X } from "lucide-react";
-import { aceitarDemandaArte, listArtes, recusarDemandaArte } from "@/lib/arte.functions";
+import { Building2, Check, Inbox, Mail, Palette, Trash2, X } from "lucide-react";
+import {
+  aceitarDemandaArte,
+  excluirDemandaArte,
+  listArtes,
+  recusarDemandaArte,
+} from "@/lib/arte.functions";
 import {
   CATEGORIA_ROTULO,
   STATUS_INTERNO_ROTULO,
@@ -122,15 +127,19 @@ export function ArtesView() {
 }
 
 function SolicitacoesArte() {
-  const { membros, membrosAtivos } = useTasks();
+  const { membros, membrosAtivos, myCargo } = useTasks();
   const qc = useQueryClient();
   const listFn = useServerFn(listArtes);
   const aceitarFn = useServerFn(aceitarDemandaArte);
   const recusarFn = useServerFn(recusarDemandaArte);
+  const excluirFn = useServerFn(excluirDemandaArte);
+  // Mesma regra do servidor (is_admin: Admin ou Supervisor).
+  const podeExcluir = myCargo === "Admin" || myCargo === "Supervisor";
 
   const [aba, setAba] = useState<Aba>("fila");
   const [aceitar, setAceitar] = useState<{ id: string; responsavel_id: string } | null>(null);
   const [recusar, setRecusar] = useState<{ id: string; justificativa: string } | null>(null);
+  const [excluir, setExcluir] = useState<Arte | null>(null);
 
   const {
     data: artes = [],
@@ -163,6 +172,16 @@ function SolicitacoesArte() {
       invalidar();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao recusar."),
+  });
+
+  const excluirMut = useMutation({
+    mutationFn: (art_request_id: string) => excluirFn({ data: { art_request_id } }),
+    onSuccess: () => {
+      toast.success("Demanda de arte excluída.");
+      setExcluir(null);
+      invalidar();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao excluir."),
   });
 
   const contagem = useMemo(() => {
@@ -226,7 +245,12 @@ function SolicitacoesArte() {
               nomeDe={nomeDe}
               onAceitar={() => setAceitar({ id: a.id, responsavel_id: "" })}
               onRecusar={() => setRecusar({ id: a.id, justificativa: "" })}
-              ocupado={aceitarMut.isPending || recusarMut.isPending}
+              onExcluir={
+                podeExcluir && (ABAS.andamento.status as readonly string[]).includes(a.status)
+                  ? () => setExcluir(a)
+                  : undefined
+              }
+              ocupado={aceitarMut.isPending || recusarMut.isPending || excluirMut.isPending}
             />
           ))}
         </div>
@@ -310,6 +334,37 @@ function SolicitacoesArte() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={!!excluir}
+        onOpenChange={(o) => !o && !excluirMut.isPending && setExcluir(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta demanda de arte?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {excluir &&
+                `${rotuloTipo(excluir.tipo)} de ${excluir.demanda?.solicitante_nome ?? "—"}${excluir.projeto_nome ? ` (${excluir.projeto_nome})` : ""}. `}
+              Apaga de vez a demanda, a tarefa criada no aceite, as versões geradas ou enviadas, as
+              revisões e todos os arquivos. Ela some também do portal de quem pediu. Não dá para
+              desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluirMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (excluir) excluirMut.mutate(excluir.id);
+              }}
+              disabled={excluirMut.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {excluirMut.isPending ? "Excluindo…" : "Excluir de vez"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -321,6 +376,7 @@ function ArteCard({
   nomeDe,
   onAceitar,
   onRecusar,
+  onExcluir,
   ocupado,
 }: {
   a: Arte;
@@ -329,6 +385,8 @@ function ArteCard({
   nomeDe: (id: string | null) => string;
   onAceitar: () => void;
   onRecusar: () => void;
+  /** Só vem para Admin/Supervisor e arte em andamento. */
+  onExcluir?: () => void;
   ocupado: boolean;
 }) {
   const status = a.status as StatusArte;
@@ -436,6 +494,21 @@ function ArteCard({
           </Button>
           <Button size="sm" variant="destructive" onClick={onRecusar} disabled={ocupado}>
             <X className="mr-1 h-4 w-4" /> Recusar
+          </Button>
+        </div>
+      )}
+
+      {onExcluir && (
+        <div className="mt-3 flex justify-end">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+            onClick={onExcluir}
+            disabled={ocupado || a.gerando_ia}
+            title={a.gerando_ia ? "Espere a geração com IA terminar" : undefined}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" /> Excluir demanda
           </Button>
         </div>
       )}

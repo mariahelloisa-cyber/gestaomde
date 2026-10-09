@@ -10,7 +10,9 @@ import {
   BUCKET_GERADAS,
   EXTENSAO,
   assinarLeitura,
+  exigirAdmin,
   exigirEquipeInterna,
+  listarArquivos,
   pathArquivo,
   removerObjetos,
   urlDeUpload,
@@ -546,6 +548,80 @@ export const recusarDemandaArte = createServerFn({ method: "POST" })
     await supabaseAdmin.from("art_request_files").delete().eq("art_request_id", art.id);
 
     return { ok: true };
+  });
+
+const STATUS_EM_ANDAMENTO = ["aceita", "em_geracao", "aguardando_revisao", "ajustes"];
+
+/**
+ * Exclusão DEFINITIVA de uma arte em andamento (só Admin/Supervisor).
+ *
+ * Apaga a demanda externa — o CASCADE leva art_request, arquivos enviados,
+ * jobs, gerações e revisões —, a tarefa criada no aceite e todos os arquivos
+ * no Storage (enviados, gerados, brutos e aprovados). Some também do portal
+ * do solicitante. Recusa se houver geração ou envio rodando, para nenhum
+ * arquivo ser gravado depois da exclusão.
+ */
+export const excluirDemandaArte = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ art_request_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context.userId);
+
+    const { data: art, error } = await supabaseAdmin
+      .from("art_requests")
+      .select(
+        "id, status, demanda_id, demandas_externas(tarefa_id), art_request_files(path), ai_generation_jobs!ai_generation_jobs_art_request_id_fkey(id, origem, status, lease_ate)",
+      )
+      .eq("id", data.art_request_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!art || !art.demanda_id) throw new Error("Demanda de arte não encontrada.");
+    if (!STATUS_EM_ANDAMENTO.includes(art.status)) {
+      throw new Error("Só dá para excluir uma arte em andamento.");
+    }
+
+    const agora = new Date().toISOString();
+    const ativo = art.ai_generation_jobs.find(
+      (j) =>
+        (j.status === "na_fila" || j.status === "processando") &&
+        // Geração com IA que passou do lease já foi abandonada.
+        !(j.origem === "ia" && j.lease_ate && j.lease_ate < agora),
+    );
+    if (ativo) {
+      throw new Error(
+        ativo.origem === "ia"
+          ? "Há uma geração com IA em andamento. Espere terminar para excluir."
+          : "Há um envio de arte em andamento. Descarte o envio antes de excluir.",
+      );
+    }
+
+    // Lista os arquivos ANTES de apagar as linhas; o Storage é limpo depois,
+    // para uma falha no banco não deixar linhas apontando para nada.
+    const [geradas, aprovadas] = await Promise.all([
+      listarArquivos(BUCKET_GERADAS, art.id),
+      listarArquivos(BUCKET_APROVADAS, art.id),
+    ]);
+    const enviados = art.art_request_files.map((f) => f.path);
+    const tarefaId = (art.demandas_externas as { tarefa_id: string | null } | null)?.tarefa_id;
+
+    const { error: errDem } = await supabaseAdmin
+      .from("demandas_externas")
+      .delete()
+      .eq("id", art.demanda_id);
+    if (errDem) throw new Error(errDem.message);
+
+    if (tarefaId) {
+      const { error: errTar } = await supabaseAdmin.from("tarefas").delete().eq("id", tarefaId);
+      if (errTar) console.error("[arte] não excluiu a tarefa", tarefaId, errTar.message);
+    }
+
+    await Promise.all([
+      removerObjetos(enviados, BUCKET_ARQUIVOS),
+      removerObjetos(geradas, BUCKET_GERADAS),
+      removerObjetos(aprovadas, BUCKET_APROVADAS),
+    ]);
+
+    return { ok: true, arquivos_removidos: enviados.length + geradas.length + aprovadas.length };
   });
 
 /* ===========================================================================
