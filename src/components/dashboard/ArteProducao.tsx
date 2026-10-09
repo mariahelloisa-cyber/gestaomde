@@ -9,6 +9,7 @@ import {
   MessageSquareWarning,
   Sparkles,
   Trash2,
+  UserRound,
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,7 @@ import {
   type listArtes,
 } from "@/lib/arte.functions";
 import { gerarArteComIA, resumoGeracaoIA } from "@/lib/arte-geracao-ia.functions";
+import { gerarFotoPerfil } from "@/lib/arte-foto-perfil.functions";
 import {
   GERACAO_TELA_TIMEOUT_MS,
   GERACAO_VARIACOES,
@@ -72,6 +74,7 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
   const revisarFn = useServerFn(revisarArte);
   const gerarFn = useServerFn(gerarArteComIA);
   const resumoIAFn = useServerFn(resumoGeracaoIA);
+  const fotoPerfilFn = useServerFn(gerarFotoPerfil);
 
   const esperado = slidesEsperados(a.tipo, a.qtd_slides);
   const [envioAberto, setEnvioAberto] = useState(false);
@@ -172,6 +175,21 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
 
   const gerando = gerarMut.isPending || a.gerando_ia;
 
+  // Foto de perfil: montagem no modelo do nível, sem IA e sem custo. Roda em
+  // segundos na própria requisição; o erro (texto longo, modelo inválido…)
+  // volta direto para a tela.
+  const fotoPerfilMut = useMutation({
+    mutationFn: () => fotoPerfilFn({ data: { art_request_id: a.id } }),
+    onSuccess: () => {
+      toast.success("Foto de perfil montada e enviada para revisão.");
+      setEscolhidas({});
+    },
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar a foto de perfil."),
+    onSettled: invalidar,
+  });
+  const compondo = fotoPerfilMut.isPending || a.compondo_foto;
+
   // Enquanto há geração rodando no servidor (inclusive iniciada em outra aba
   // ou por outra pessoa), a lista é recarregada a cada 15 s: a tela sai de
   // "Gerando…" sozinha quando o job termina, falha ou passa do prazo.
@@ -182,7 +200,8 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
     }, 15_000);
     return () => clearInterval(t);
   }, [a.gerando_ia, qc]);
-  const podeEnviar = RECEBE_ARTE.includes(a.status) && !a.job_ativo_id && !gerando;
+  const podeEnviar = RECEBE_ARTE.includes(a.status) && !a.job_ativo_id && !gerando && !compondo;
+  const podeComporFoto = podeEnviar && a.tipo === "foto_perfil";
   const podeGerar =
     podeEnviar &&
     podeGerarComIA(a.tipo) &&
@@ -305,6 +324,12 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
           Gerando {GERACAO_VARIACOES} variações com IA… pode levar de 1 a 3 minutos.
         </div>
       )}
+      {compondo && (
+        <div className="flex items-center gap-2 text-xs text-violet-700">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Montando a foto de perfil no modelo…
+        </div>
+      )}
       {!gerando && a.falha_ia && RECEBE_ARTE.includes(a.status) && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           <strong>A última geração com IA não terminou</strong> ({dataHora(a.falha_ia.criado_em)}
@@ -336,7 +361,7 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
           <div className="mb-2 text-xs font-medium text-gray-600">
             {versaoAprovada
               ? `Arte aprovada${a.aprovado_por ? ` por ${nomeDe(a.aprovado_por)}` : ""} em ${dataHora(a.aprovado_em)}`
-              : `${versaoMostrada.origem === "ia" ? "Gerada com IA" : "Versão enviada"} por ${nomeDe(versaoMostrada.solicitado_por)} em ${dataHora(versaoMostrada.concluido_em)}`}
+              : `${versaoMostrada.composicao ? "Montada pelo modelo" : versaoMostrada.origem === "ia" ? "Gerada com IA" : "Versão enviada"} por ${nomeDe(versaoMostrada.solicitado_por)} em ${dataHora(versaoMostrada.concluido_em)}`}
           </div>
           {emRevisao && temVariacoes && (
             <p className="mb-2 text-xs text-gray-600">
@@ -437,6 +462,17 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
               <X className="mr-1 h-4 w-4" /> Recusar versão
             </Button>
           </>
+        )}
+        {podeComporFoto && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-violet-300 bg-white text-violet-800 hover:bg-violet-50"
+            onClick={() => fotoPerfilMut.mutate()}
+          >
+            <UserRound className="mr-1 h-4 w-4" />
+            {a.versoes.length > 0 ? "Gerar novamente" : "Gerar foto de perfil"}
+          </Button>
         )}
         {podeGerar && (
           <Button

@@ -1117,6 +1117,9 @@ function LogoCard({
  *
  * A foto de perfil usa sempre o mesmo modelo; só muda a moldura, uma por
  * nível do cargo. Aqui não existe empresa: as 4 molduras são da agência.
+ * Cada arquivo é o modelo inteiro (PNG 1080x1080) com o círculo da foto
+ * transparente; o servidor confere a transparência ao salvar e grava o
+ * círculo achado em valor.area_foto.
  * ========================================================================= */
 
 export function ModelosFotoPerfil() {
@@ -1152,7 +1155,7 @@ export function ModelosFotoPerfil() {
     if (!arquivo) return toast.error("Escolha o arquivo da moldura.");
     const mime = mimeDoArquivo(arquivo);
     if (!(MOLDURA_MIMES as readonly string[]).includes(mime))
-      return toast.error("Use PNG, WebP ou SVG (a moldura precisa de fundo transparente).");
+      return toast.error("Use PNG com o círculo da foto transparente.");
     if (arquivo.size > MARCA_TAMANHO_MAX_MB * MB)
       return toast.error(`O arquivo passa de ${MARCA_TAMANHO_MAX_MB} MB.`);
 
@@ -1190,7 +1193,8 @@ export function ModelosFotoPerfil() {
         <p className="text-xs text-muted-foreground">
           O modelo é sempre o mesmo; muda só a moldura, uma por nível do cargo. Valem para a agência
           inteira (não pertencem a nenhuma empresa). {cadastrados} de {NIVEIS_CARGO.length}{" "}
-          cadastrados.
+          cadastrados. A foto da pessoa entra por baixo do círculo transparente; nome e cargo são
+          escritos pelo sistema.
         </p>
       </div>
 
@@ -1235,8 +1239,18 @@ export function ModelosFotoPerfil() {
                   />
                   Moldura {cfg.moldura} ({cfg.corPadrao})
                 </div>
-                <div className={m ? "text-emerald-600" : "text-amber-600"}>
-                  {m ? "Cadastrado" : "Pendente"}
+                <div
+                  className={
+                    m && (m.valor as Record<string, unknown> | null)?.area_foto
+                      ? "text-emerald-600"
+                      : "text-amber-600"
+                  }
+                >
+                  {!m
+                    ? "Pendente"
+                    : (m.valor as Record<string, unknown> | null)?.area_foto
+                      ? "Cadastrado · transparência conferida"
+                      : "Cadastrado sem transparência conferida — substitua pelo PNG transparente"}
                 </div>
                 <Button
                   size="sm"
@@ -1270,7 +1284,7 @@ export function ModelosFotoPerfil() {
                 Moldura {cfgEditando.moldura} ({cfgEditando.corPadrao}), válida para a agência toda.
               </p>
               <div className="space-y-1">
-                <Label>Arquivo da moldura *</Label>
+                <Label>Arquivo do modelo *</Label>
                 <Input
                   type="file"
                   accept={MOLDURA_MIMES.join(",")}
@@ -1278,7 +1292,8 @@ export function ModelosFotoPerfil() {
                   onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  PNG, WebP ou SVG com fundo transparente, até {MARCA_TAMANHO_MAX_MB} MB.
+                  PNG 1080×1080 com o círculo da foto transparente (vazio), o fundo fora dele opaco
+                  e a caixa sem nome e sem cargo. Até {MARCA_TAMANHO_MAX_MB} MB.
                   {editando && porNivel.has(editando) ? " O arquivo atual será substituído." : ""}
                 </p>
               </div>

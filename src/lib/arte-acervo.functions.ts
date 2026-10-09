@@ -33,6 +33,7 @@ import {
   type TipoAsset,
 } from "./arte/tipos";
 import { metadadosIA } from "./arte/analise-referencias";
+import { lerModeloFotoPerfil } from "./arte-foto-perfil.server";
 
 /* Acervo do módulo de artes.
  *
@@ -533,6 +534,11 @@ const salvarModeloSchema = z.object({
  * "uma moldura ativa por tipo de cargo" da Fase 1 olham essa chave — então o
  * banco garante uma moldura por nível.
  *
+ * O arquivo é o MODELO da foto de perfil: PNG 1080x1080 que vai por cima da
+ * foto. Antes de gravar, confere a transparência de verdade (lendo os
+ * pixels): o círculo da foto tem de estar vazio e o fundo fora dele, opaco.
+ * O círculo achado fica em valor.area_foto (a montagem confere de novo).
+ *
  * Substituir atualiza a linha existente (não cria outra) e só depois apaga o
  * arquivo antigo; se algo falhar no meio, o arquivo novo é que é descartado.
  */
@@ -555,15 +561,22 @@ export const salvarModeloFotoPerfil = createServerFn({ method: "POST" })
 
     const nivel = data.nivel_cargo;
     const cfg = NIVEL_CARGO_CONFIG[nivel];
-    const linha = {
-      nome: `Moldura ${cfg.rotulo} (${cfg.moldura})`,
-      valor: { nivel_cargo: nivel, tipo_cargo: nivel, cor: cfg.corPadrao },
-      path,
-      mime_type,
-    };
 
     try {
       await verificarObjeto(path, mime_type, MARCA_TAMANHO_MAX_MB * MB, BUCKET_MARCA);
+      const { area } = await lerModeloFotoPerfil(path);
+      const linha = {
+        nome: `Moldura ${cfg.rotulo} (${cfg.moldura})`,
+        valor: {
+          nivel_cargo: nivel,
+          tipo_cargo: nivel,
+          cor: cfg.corPadrao,
+          area_foto: area,
+          validado_em: new Date().toISOString(),
+        },
+        path,
+        mime_type,
+      };
 
       const { data: atual, error: errAtual } = await supabase
         .from("brand_assets")

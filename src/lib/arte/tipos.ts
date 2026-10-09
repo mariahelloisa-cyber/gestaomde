@@ -69,6 +69,8 @@ type UploadConfig = {
   rotulo: string;
   obrigatorio: boolean;
   max: number;
+  /** Formatos aceitos, quando mais restritos que ARQUIVO_MIMES. */
+  mimes?: readonly (typeof ARQUIVO_MIMES)[number][];
 };
 
 type TipoConfig = {
@@ -103,7 +105,16 @@ export const TIPOS_CONFIG: Record<TipoArte, TipoConfig> = {
     rotulo: "Foto de perfil",
     formato: "1080 × 1080 px",
     usaProjeto: false,
-    uploads: [{ categoria: "foto_pessoa", rotulo: "Foto da pessoa *", obrigatorio: true, max: 1 }],
+    // Só JPG/PNG: a montagem (resvg) não lê WebP.
+    uploads: [
+      {
+        categoria: "foto_pessoa",
+        rotulo: "Foto da pessoa *",
+        obrigatorio: true,
+        max: 1,
+        mimes: ["image/jpeg", "image/png"],
+      },
+    ],
   },
   panfleto: {
     rotulo: "Arte panfleto",
@@ -187,8 +198,8 @@ export const NIVEL_CARGO_CONFIG: Record<
   { rotulo: string; moldura: string; corPadrao: string }
 > = {
   diretor: { rotulo: "Diretor", moldura: "preta", corPadrao: "#000000" },
-  supervisor: { rotulo: "Supervisor", moldura: "vermelha", corPadrao: "#C62828" },
-  gerente: { rotulo: "Gerente", moldura: "dourada", corPadrao: "#C9A227" },
+  supervisor: { rotulo: "Supervisor", moldura: "vermelha", corPadrao: "#CA003F" },
+  gerente: { rotulo: "Gerente", moldura: "dourada", corPadrao: "#BE8E00" },
   colaborador: { rotulo: "Colaborador", moldura: "branca", corPadrao: "#FFFFFF" },
 };
 
@@ -333,15 +344,25 @@ export const arquivoDeclaradoSchema = z.object({
 });
 export type ArquivoDeclarado = z.infer<typeof arquivoDeclaradoSchema>;
 
-/** Regras de quantidade por categoria. Retorna a mensagem de erro, ou null. */
+/** Formatos aceitos numa categoria de upload do tipo. */
+export function mimesDoUpload(tipo: TipoArte, categoria: CategoriaArquivo): readonly string[] {
+  return TIPOS_CONFIG[tipo].uploads.find((u) => u.categoria === categoria)?.mimes ?? ARQUIVO_MIMES;
+}
+
+/** Regras de quantidade (e de formato, quando o mime vem junto) por
+ * categoria. Retorna a mensagem de erro, ou null. */
 export function validarArquivos(
   tipo: TipoArte,
-  arquivos: Array<Pick<ArquivoDeclarado, "categoria">>,
+  arquivos: Array<Pick<ArquivoDeclarado, "categoria"> & { mime_type?: string }>,
 ): string | null {
   const uploads = TIPOS_CONFIG[tipo].uploads;
   for (const a of arquivos) {
-    if (!uploads.some((u) => u.categoria === a.categoria)) {
+    const u = uploads.find((x) => x.categoria === a.categoria);
+    if (!u) {
       return `${CATEGORIA_ROTULO[a.categoria]} não se aplica a ${TIPOS_CONFIG[tipo].rotulo}.`;
+    }
+    if (a.mime_type && u.mimes && !(u.mimes as readonly string[]).includes(a.mime_type)) {
+      return `${CATEGORIA_ROTULO[a.categoria]}: envie em JPG ou PNG.`;
     }
   }
   for (const u of uploads) {
@@ -618,8 +639,9 @@ export const SUGESTOES_VERSAO_LOGO = [
   "Ícone",
 ] as const;
 
-/** Moldura é sobreposição sobre a foto: precisa de transparência. */
-export const MOLDURA_MIMES = ["image/png", "image/webp", "image/svg+xml"] as const;
+/** Modelo da foto de perfil: PNG 1080x1080 com o círculo da foto
+ * transparente (vai por cima da foto). Só PNG: é o que a montagem valida. */
+export const MOLDURA_MIMES = ["image/png"] as const;
 
 /** Assets só de texto (guardado em valor.texto, sem arquivo). */
 export const ASSET_DE_TEXTO: ReadonlySet<TipoAsset> = new Set<TipoAsset>([

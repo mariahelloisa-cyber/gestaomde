@@ -41,6 +41,7 @@ import {
   TIPOS_CONFIG,
   TRAFEGO_PX_MAX,
   TRAFEGO_PX_MIN,
+  mimesDoUpload,
   solicitacaoArteSchema,
   validarArquivos,
   type CategoriaArquivo,
@@ -59,6 +60,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+function rotuloFormatos(mimes: readonly string[]): string {
+  const nomes = mimes.map((m) => (m === "image/jpeg" ? "JPG" : m === "image/png" ? "PNG" : "WebP"));
+  return nomes.length > 1 ? `${nomes.slice(0, -1).join(", ")} ou ${nomes.at(-1)}` : nomes[0];
+}
 
 const BUCKET = "art-request-files";
 
@@ -183,9 +189,10 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
   const adicionarArquivos = (categoria: CategoriaArquivo, max: number, files: FileList | null) => {
     if (!files) return;
     const aceitos: File[] = [];
+    const mimes = tipo ? mimesDoUpload(tipo, categoria) : ARQUIVO_MIMES;
     for (const f of Array.from(files)) {
-      if (!(ARQUIVO_MIMES as readonly string[]).includes(f.type)) {
-        toast.error(`"${f.name}": use JPG, PNG ou WebP.`);
+      if (!mimes.includes(f.type)) {
+        toast.error(`"${f.name}": use ${rotuloFormatos(mimes)}.`);
         continue;
       }
       if (f.size > ARQUIVO_TAMANHO_MAX) {
@@ -768,11 +775,11 @@ export function NovaArteForm({ onEnviado }: { onEnviado: () => void }) {
                   {u.max === 1 ? "Selecionar imagem" : `Selecionar imagens (até ${u.max})`}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  JPG, PNG ou WebP • até {ARQUIVO_TAMANHO_MAX_MB} MB cada
+                  {rotuloFormatos(u.mimes ?? ARQUIVO_MIMES)} • até {ARQUIVO_TAMANHO_MAX_MB} MB cada
                 </span>
                 <input
                   type="file"
-                  accept={ARQUIVO_MIMES.join(",")}
+                  accept={(u.mimes ?? ARQUIVO_MIMES).join(",")}
                   multiple={u.max > 1}
                   className="hidden"
                   onChange={(e) => {
