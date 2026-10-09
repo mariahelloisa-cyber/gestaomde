@@ -85,5 +85,10 @@ export const gerarArteComIA = createServerFn({ method: "POST" })
       .in("status", STATUS_GERA);
     if (error) throw new Error(error.message);
 
-    return { job_id: r.job_id, imagens: r.imagens, custo_usd: Number(r.custoUsd.toFixed(4)) };
+    return {
+      jobId: r.job_id,
+      status: "aguardando_revisao" as const,
+      variacoesGeradas: r.imagens,
+      custoRealUsd: Number(r.custoUsd.toFixed(4)),
+    };
   });

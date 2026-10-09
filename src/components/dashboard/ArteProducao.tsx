@@ -81,12 +81,45 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
   const versaoAprovada =
     a.status === "concluida" ? a.versoes.find((v) => v.id === a.job_aprovado_id) : null;
 
+  /** Recarrega a lista e devolve a versão de IA criada depois de `antes`, se
+   * houver. A geração roda no servidor por 1 a 3 min: a resposta pode se
+   * perder (ou vir sem corpo) mesmo com a geração concluída, então a lista
+   * é a fonte de verdade sobre o que aconteceu. */
+  const versaoIANova = async (antes: string | null) => {
+    await qc.refetchQueries({ queryKey: ["artes"], exact: true });
+    const atual = qc.getQueryData<Arte[]>(["artes"])?.find((x) => x.id === a.id);
+    const v = atual?.versoes[0];
+    return v && v.origem === "ia" && v.id !== antes ? v : null;
+  };
+
   const gerarMut = useMutation({
-    mutationFn: () => gerarFn({ data: { art_request_id: a.id } }),
-    onSuccess: (r) => {
-      toast.success(
-        `${r.imagens} variaç${r.imagens === 1 ? "ão gerada" : "ões geradas"} e enviada${r.imagens === 1 ? "" : "s"} para revisão.`,
-      );
+    mutationFn: async (): Promise<{ variacoes: number | null }> => {
+      const antes = versaoAtual?.id ?? null;
+      let r: Awaited<ReturnType<typeof gerarFn>> | undefined;
+      try {
+        r = await gerarFn({ data: { art_request_id: a.id } });
+      } catch (e) {
+        // Erro na resposta não prova que a geração falhou: confere na lista.
+        const v = await versaoIANova(antes);
+        if (v) return { variacoes: v.imagens.length };
+        throw e;
+      }
+      if (typeof r?.variacoesGeradas === "number") return { variacoes: r.variacoesGeradas };
+      const v = await versaoIANova(antes);
+      return { variacoes: v ? v.imagens.length : null };
+    },
+    onSuccess: ({ variacoes }) => {
+      if (variacoes === null) {
+        toast.warning(
+          "A geração terminou sem confirmação. A lista foi atualizada: confira abaixo.",
+        );
+      } else {
+        toast.success(
+          variacoes === 1
+            ? "1 variação gerada e enviada para revisão."
+            : `${variacoes} variações geradas e enviadas para revisão.`,
+        );
+      }
       setConfirmarIA(false);
       setEscolhidas({});
     },
