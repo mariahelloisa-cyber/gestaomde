@@ -7,16 +7,19 @@ import {
   BUCKET_REFERENCIAS,
   removerObjetos,
 } from "./arte.server";
+import { normalizarPng } from "./arte-imagem.server";
 import { dimensoesDoCabecalho, inicioDoDiaSP } from "./arte-referencias-ia.server";
 import { metadadosIA, statusAnalise, type MetadadosIA } from "./arte/analise-referencias";
 import {
   ERRO_TETO_GERACAO,
+  GERACAO_ENTREGA_MAX_PX,
   GERACAO_LEASE_MS,
   GERACAO_LIMITE_DIARIO_PADRAO_USD,
   GERACAO_MODELO_PADRAO,
   GERACAO_PROMPT_VERSAO,
   GERACAO_QUALIDADE,
   GERACAO_VARIACOES,
+  entregaCabeNaGeracao,
   podeGerarComIA,
 } from "./arte/geracao";
 import { DIRECAO_CRIATIVA_EDUCACIONAL, camposParaExibir, rotuloTipo } from "./arte/tipos";
@@ -45,8 +48,8 @@ export function configGeracao() {
 /* ---------------- Tamanho pedido à API ----------------
  * gpt-image-2 / 2.5 aceitam WIDTHxHEIGHT com lados múltiplos de 16, proporção
  * entre 1:3 e 3:1 e de 655.360 a 8.294.400 px. Gera perto da área pedida (o
- * custo cresce com a área), limitado a ~2,4 MP; o ajuste fino para o tamanho
- * exato de entrega fica para a etapa de acabamento. */
+ * custo cresce com a área), limitado a ~2,4 MP. Depois, normalizarPng
+ * (arte-imagem.server.ts) leva cada variação ao tamanho EXATO de entrega. */
 
 const PX_MIN = 655_360;
 const PX_MAX_API = 8_294_400;
@@ -71,8 +74,10 @@ export function tamanhoDeGeracao(
       if (w < 16 || w > LADO_MAX || px < PX_MIN || px > PX_MAX_API || rr < 1 / 3 || rr > 3) {
         continue;
       }
-      // Proporção pesa mais que área: errar a proporção corta a arte.
-      const erro = Math.abs(Math.log(rr / r)) * 10 + Math.abs(px - alvoPx) / alvoPx;
+      // Proporção pesa mais que área: errar a proporção corta a arte. Ficar
+      // abaixo da área pesa 3x: ampliar depois perde nitidez, reduzir não.
+      const erro =
+        Math.abs(Math.log(rr / r)) * 10 + (Math.abs(px - alvoPx) / alvoPx) * (px < alvoPx ? 3 : 1);
       if (!melhor || erro < melhor.erro) melhor = { w, h, erro };
     }
   }
@@ -894,6 +899,11 @@ export async function executarGeracaoIA(
   if (!STATUS_GERA.includes(art.status)) {
     throw new Error("Só dá para gerar arte de uma demanda aceita.");
   }
+  if (!entregaCabeNaGeracao(art.largura_px, art.altura_px)) {
+    throw new Error(
+      `Arte de ${art.largura_px}×${art.altura_px} px é grande demais para a geração com IA (até ${(GERACAO_ENTREGA_MAX_PX / 1e6).toFixed(1)} MP). Use o envio manual.`,
+    );
+  }
 
   await liberarGeracoesTravadas(art.id);
 
@@ -924,6 +934,15 @@ export async function executarGeracaoIA(
   const jobId = crypto.randomUUID();
   const agora = Date.now();
   const size = `${gerado.largura}x${gerado.altura}`;
+  const parametros = {
+    size,
+    area_px: areaPx,
+    quality: GERACAO_QUALIDADE,
+    n: GERACAO_VARIACOES,
+    output_format: "png",
+    entrega: { largura: art.largura_px, altura: art.altura_px },
+    proporcao_ajustada: gerado.proporcaoAjustada,
+  };
   const { error: errJob } = await supabaseAdmin.from("ai_generation_jobs").insert({
     id: jobId,
     art_request_id: art.id,
@@ -937,15 +956,7 @@ export async function executarGeracaoIA(
     tentativas: 1,
     max_tentativas: 1,
     custo_estimado_usd: custo4(estimativa),
-    parametros: {
-      size,
-      area_px: areaPx,
-      quality: GERACAO_QUALIDADE,
-      n: GERACAO_VARIACOES,
-      output_format: "png",
-      entrega: { largura: art.largura_px, altura: art.altura_px },
-      proporcao_ajustada: gerado.proporcaoAjustada,
-    },
+    parametros,
   });
   if (errJob) {
     // Índice ai_generation_jobs_um_ativo_idx: um job ativo por demanda.
@@ -1010,11 +1021,11 @@ export async function executarGeracaoIA(
     );
     if (imagens.length === 0) throw new Error("A OpenAI não devolveu nenhuma imagem.");
 
-    const linhas = [];
-    for (const [i, img] of imagens.slice(0, GERACAO_VARIACOES).entries()) {
-      const bytes = deBase64(img.b64_json);
-      const dims = dimensoesDoCabecalho(bytes);
-      const path = `${art.id}/${jobId}/s01-v${i + 1}.png`;
+    // Para cada variação: a bruta da OpenAI fica guardada para auditoria
+    // (-bruta.png, listada no job) e a normalizada no tamanho EXATO de entrega
+    // é a que vira ai_generations — é ela que a equipe revisa e que é copiada
+    // para approved-arts na aprovação.
+    const salvar = async (path: string, bytes: Uint8Array<ArrayBuffer>) => {
       const { error: errUp } = await supabaseAdmin.storage
         .from(BUCKET_GERADAS)
         .upload(path, new Blob([bytes], { type: "image/png" }), {
@@ -1023,6 +1034,25 @@ export async function executarGeracaoIA(
         });
       if (errUp) throw new Error(`Falha ao salvar a imagem gerada: ${errUp.message}`);
       enviados.push(path);
+    };
+    const linhas = [];
+    const brutas = [];
+    for (const [i, img] of imagens.slice(0, GERACAO_VARIACOES).entries()) {
+      const bruta = deBase64(img.b64_json);
+      const dimsBruta = dimensoesDoCabecalho(bruta);
+      const final = normalizarPng(bruta, art.largura_px, art.altura_px);
+      const base = `${art.id}/${jobId}/s01-v${i + 1}`;
+      if (final.alterada) {
+        await salvar(`${base}-bruta.png`, bruta);
+        brutas.push({
+          variacao: i + 1,
+          path: `${base}-bruta.png`,
+          largura: dimsBruta?.largura ?? null,
+          altura: dimsBruta?.altura ?? null,
+        });
+      }
+      const path = `${base}.png`;
+      await salvar(path, final.bytes);
       linhas.push({
         job_id: jobId,
         art_request_id: art.id,
@@ -1030,8 +1060,8 @@ export async function executarGeracaoIA(
         variacao: i + 1,
         path,
         mime_type: "image/png",
-        largura: dims?.largura ?? null,
-        altura: dims?.altura ?? null,
+        largura: final.largura,
+        altura: final.altura,
         revised_prompt: img.revised_prompt?.slice(0, 4000) ?? null,
       });
     }
@@ -1046,6 +1076,7 @@ export async function executarGeracaoIA(
         custo_estimado_usd: custo4(custo),
         uso: (uso ?? {}) as Json,
         openai_response_id: resposta.requestId,
+        parametros: { ...parametros, brutas } as Json,
       })
       .eq("id", jobId);
     if (errFim) throw new Error(errFim.message);

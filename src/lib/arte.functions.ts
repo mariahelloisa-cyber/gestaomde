@@ -315,6 +315,8 @@ export const listArtes = createServerFn({ method: "GET" })
         status: r.status,
         briefing: r.briefing,
         qtd_slides: r.qtd_slides,
+        largura_px: r.largura_px,
+        altura_px: r.altura_px,
         aprovado_por: r.aprovado_por,
         aprovado_em: r.aprovado_em,
         job_aprovado_id: r.job_aprovado_id,

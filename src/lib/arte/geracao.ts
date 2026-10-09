@@ -43,5 +43,14 @@ export function podeGerarComIA(tipo: string): boolean {
   );
 }
 
+/** Área máxima de ENTREGA para a geração com IA (ex.: 2000x2250). A arte é
+ * normalizada para o tamanho exato dentro do Worker (128 MB de memória);
+ * acima disso, envio manual. */
+export const GERACAO_ENTREGA_MAX_PX = 4_500_000;
+
+export function entregaCabeNaGeracao(largura: number, altura: number): boolean {
+  return largura * altura <= GERACAO_ENTREGA_MAX_PX;
+}
+
 /** Começo da mensagem de erro do teto diário. */
 export const ERRO_TETO_GERACAO = "Teto diário de geração de artes atingido";

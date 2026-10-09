@@ -20,7 +20,7 @@ import {
   type listArtes,
 } from "@/lib/arte.functions";
 import { gerarArteComIA, resumoGeracaoIA } from "@/lib/arte-geracao-ia.functions";
-import { GERACAO_VARIACOES, podeGerarComIA } from "@/lib/arte/geracao";
+import { GERACAO_VARIACOES, entregaCabeNaGeracao, podeGerarComIA } from "@/lib/arte/geracao";
 import { ARQUIVO_MIMES, ARTE_PRONTA_TAMANHO_MAX_MB, slidesEsperados } from "@/lib/arte/tipos";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,7 +104,10 @@ export function ArteProducao({ a, nomeDe }: { a: Arte; nomeDe: (id: string | nul
   const gerando = gerarMut.isPending || a.gerando_ia;
   const podeEnviar = RECEBE_ARTE.includes(a.status) && !a.job_ativo_id && !gerando;
   const podeGerar =
-    podeEnviar && podeGerarComIA(a.tipo) && a.geracoes_ia.usadas < a.geracoes_ia.max;
+    podeEnviar &&
+    podeGerarComIA(a.tipo) &&
+    entregaCabeNaGeracao(a.largura_px, a.altura_px) &&
+    a.geracoes_ia.usadas < a.geracoes_ia.max;
 
   const abrirEnvio = () => {
     setSlots(Array.from({ length: esperado }, () => null));
